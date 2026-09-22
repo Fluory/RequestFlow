@@ -27,8 +27,9 @@ def test_eml_body_lines_become_segments_with_line_locators(fixtures_dir: Path) -
 
 def test_eml_from_and_subject_headers_are_segments(fixtures_dir: Path) -> None:
     segments = parse_eml((fixtures_dir / "anfrage_musterbau.eml").read_bytes())
-    headers = [s for s in segments if isinstance(s.locator, EmailLocator)]
-    header_segments = [s for s in headers if s.locator.part == "header"]
+    header_segments = [
+        s for s in segments if isinstance(s.locator, EmailLocator) and s.locator.part == "header"
+    ]
     assert [s.id for s in header_segments] == ["eml-h-from", "eml-h-subject"]
     assert header_segments[0].text == "From: Erika Mustermann <erika.mustermann@example.com>"
     # RFC 2047 encoded-word is decoded (en dash).
