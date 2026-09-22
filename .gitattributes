@@ -1,4 +1,5 @@
-# Normalise line endings: shell hooks and CI scripts break on CRLF (Windows checkouts with core.autocrlf=true)
+# Normalise line endings to LF. Git Bash on Windows tolerates CRLF, Linux shells (WSL2, containers
+# mounting a Windows checkout with core.autocrlf=true) are not guaranteed to – keep scripts portable.
 * text=auto eol=lf
 *.sh text eol=lf
 *.png binary
