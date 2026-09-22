@@ -90,7 +90,7 @@ jobs:
       - name: Foundation phase (AI service)
         if: steps.diff.outputs.ai == 'true' && hashFiles('services/ai/pyproject.toml') == ''
         run: echo "No services/ai/pyproject.toml – AI service not created yet."
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0   # no floating v10 tag exists (verified 2026-09-22)
         if: steps.diff.outputs.ai == 'true' && hashFiles('services/ai/pyproject.toml') != ''
         with:
           enable-cache: true
