@@ -9,8 +9,11 @@
 name: CI
 
 # No branches filter: stacked PRs on slice branches must be checked too.
+# Explicit types: the defaults (opened, synchronize, reopened) never re-run the PR guard when a draft is
+# marked ready (verify-green rule) or when the description is edited.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, edited]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -87,6 +90,8 @@ jobs:
         if: steps.diff.outputs.code == 'true' && hashFiles('package.json') != '' && (steps.profile.outputs.stage == 'production' || contains(github.event.pull_request.labels.*.name, 'verify-full'))
 
       # --- Python AI service: path-targeted (services/ai, contracts) ---------------------------
+      # The AI eval gate (ADR-0001 D8) joins this block with Epic 2 (#17): it runs on every change
+      # under services/ai/ and needs Vertex credentials via Workload Identity Federation.
       - name: Foundation phase (AI service)
         if: steps.diff.outputs.ai == 'true' && hashFiles('services/ai/pyproject.toml') == ''
         run: echo "No services/ai/pyproject.toml – AI service not created yet."

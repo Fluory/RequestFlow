@@ -67,7 +67,7 @@ korrigieren → freigeben → Export über (simulierte) REST-Schnittstelle.
 - *Vorschlag:* SSO/Active-Directory-Login, Mehrgesellschafts-Betrieb aktiv (nur im Datenmodell vorbereitet), Angebotskalkulation/Preise, mobile Nutzung
 
 ### Offene Produktfragen
-> An den Kunden – Grundlage für den Vorschlag. Vollständige Liste: Abschnitt „Offene Fragen an den Kunden" unten.
+> An den Kunden – Grundlage für den Vorschlag. Vollständige Liste: `docs/product/pilot-vorschlag.md` §9.
 - [ ] Welches ERP, welche Zielfelder – gibt es eine Feldliste/ein Schema der Auftragsübersicht?
 - [ ] Wie sehen reale Anfragen aus (Beispiele, anonymisiert)? Anteil gescannter PDFs/Bilder, Sprachen?
 - [ ] Welche KI-Anbieter und Regionen sind zulässig (AVV, EU-Datenresidenz, kein Training)?
@@ -203,14 +203,10 @@ Begründung, Auswirkungsanalyse und bei langfristiger Wirkung einen ADR.
 - Neue Dependencies brauchen eine PR-Begründung.
 
 ### Architektur-Skizze
-```text
-[Client / Nutzer]
-  ↓
-[Frontend / API / Worker / Datenbank / externe Dienste]
-```
+Siehe Abschnitt „Overview" in `docs/decisions/ADR-0001-pilot-architecture.md` (Browser → web/worker (TS) → PostgreSQL + S3; worker → stateless AI-Service (Python) → Vertex AI `eu`; Export → ERP-Mock).
 
 ### Entscheidungsbedarf
-- [ ] [Architektur- oder Technologiefrage]
+Keine offene Architekturentscheidung – ADR-0001 ist angenommen. Offene Prüfpunkte der Umsetzung und Kundenfragen: ADR-0001 „Open points".
 
 ---
 

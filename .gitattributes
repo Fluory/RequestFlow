@@ -2,6 +2,8 @@
 # mounting a Windows checkout with core.autocrlf=true) are not guaranteed to – keep scripts portable.
 * text=auto eol=lf
 *.sh text eol=lf
+# Raw e-mails keep their CRLF bytes (RFC 5322) – duplicate fingerprints hash the raw file
+*.eml -text
 *.png binary
 *.jpg binary
 *.pdf binary

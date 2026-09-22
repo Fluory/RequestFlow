@@ -13,6 +13,8 @@ paths:
   - "src/features/storage/**"
   - "**/*rls*"
   - "**/*polic*"
+  - "src/features/intake/**"
+  - "services/ai/src/**/parsing/**"
 ---
 
 # Security rules (loaded when auth, permission or session code is read)

@@ -162,7 +162,7 @@ time budget is used up. Who calls it depends on the runtime:
 
 **Trade-offs.** On the showcase, retries with backoff are only picked up when something triggers
 `drain()`. Timely unattended retries exist only where the worker runs (Docker/production). This is
-recorded as a showcase exception, not hidden.
+recorded in the exceptions register (`docs/technical/architecture.md`), not hidden.
 
 **Rationale.** The same job code runs in both environments, and production behaviour (a real worker)
 is the default.
@@ -364,7 +364,7 @@ forgotten `WHERE company_id = …` → a cross-tenant data leak.
 3. **Exception.** Better Auth tables (`auth`) and the queue (`pgboss`) are not company-owned
    business data. They live in separate schemas that only server code reaches. This deviates from
    the global rule "RLS on every table"; the rule's intent (database-enforced tenant isolation) is
-   met for all business data. → Ausnahmen-Register.
+   met for all business data. → exceptions register in `docs/technical/architecture.md`.
 
 **Alternatives.**
 1. *Application-level filtering only* – simplest and works with any pooler, but a single missing
@@ -592,8 +592,8 @@ later in an unknown customer environment.
 2. *Vercel only, no Docker* – loses the on-prem path and the offline reproducibility.
 
 **Trade-offs.** There are three build artefacts (the Vercel build and two images); CI covers them
-path-targeted. The showcase deviates from production on retries (D2); that goes into the
-Ausnahmen-Register.
+path-targeted. The showcase deviates from production on retries (D2); that is recorded in the
+exceptions register (`docs/technical/architecture.md`).
 
 **Rationale.** Reviewers can run everything with one command; production uses the same images.
 
@@ -656,7 +656,7 @@ separate ops page, the IMAP/Graph mailbox import and the real ERP mapping. Secur
 grounding verifier (D8) and exactly-once export (D9) are **not** cut: they are the customer's
 explicit requirements.
 
-## Candidates for the Ausnahmen-Register (ARCHITEKTUR.md)
+## Exceptions register entries (recorded in `docs/technical/architecture.md`)
 
 | Exception | Why accepted | Expires |
 |---|---|---|
@@ -693,7 +693,8 @@ explicit requirements.
 - Storage: developers.cloudflare.com/r2/pricing · developers.cloudflare.com/r2/reference/data-location ·
   docs.hetzner.com/storage/object-storage/overview
 - Better Auth: better-auth.com/docs/plugins/organization · /docs/plugins/admin · /docs/plugins/sso ·
-  /docs/adapters/drizzle · /docs/concepts/rate-limit · github.com/better-auth/better-auth/security/advisories
+  /docs/adapters/drizzle · /docs/concepts/rate-limit · github.com/better-auth/better-auth/security/advisories ·
+  better-auth.com/blog/authjs-joins-better-auth · better-auth.com/blog/better-auth-joins-vercel
 - Managed auth: clerk.com/security · clerk.com/pricing · workos.com/legal/data-processing-addendum · workos.com/pricing
 - Gemini/Vertex: ai.google.dev/gemini-api/terms · docs.cloud.google.com/vertex-ai/generative-ai/docs/learn/data-residency ·
   …/docs/learn/model-versions · …/docs/data-governance · …/multimodal/document-understanding

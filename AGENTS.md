@@ -16,8 +16,9 @@ as a real customer engagement for a mid-sized machine-building company. **All da
 
 - Setup: `pnpm install && uv sync --project services/ai` · Start: `docker compose up`
 - `verify:changed` – inner loop: format, typecheck, focused tests of the touched files. `pnpm verify:changed -- <path>` · AI service: `uv run --project services/ai pytest <path>`
-- `verify` – canonical PR proof: lint, types, relevant tests, architecture check (dependency-cruiser), build, `pnpm audit`, plus ruff/pyright/pytest for `services/ai`. `pnpm verify` A PR is not `ready-for-review` while verify fails, cannot run, or the exception is not justified in the PR.
-- `verify:full` – integration against Postgres + object storage, Playwright smoke flow, AI eval gate. `pnpm verify:full` – before a release, after risky refactors or with PR label `verify-full`.
+- `verify` – canonical PR proof: lint, types, unit tests **and integration tests against real Postgres + S3 storage** (they prove tenant isolation and exactly-once export on every PR), architecture check (dependency-cruiser), build, `pnpm audit`, plus ruff/pyright/pytest for `services/ai`. `pnpm verify` (needs `docker compose up -d postgres storage`). A PR is not `ready-for-review` while verify fails, cannot run, or the exception is not justified in the PR.
+- `verify:full` – Playwright smoke flow + full AI eval run. `pnpm verify:full` – before a release, after risky refactors or with PR label `verify-full`.
+- **AI eval gate** (ADR-0001 D8): additionally runs path-targeted in CI on every change under `services/ai/` (prompts, parsing, extraction, model config) – a regression on a key field fails the PR.
 - Test and verify output is trimmed automatically (`scripts/quiet-run.sh` via the hook `filter-test-output.sh`): exit code unchanged, full log path printed; prefix `FLUORY_FULL_OUTPUT=1` once when the cause is unclear.
 - **Docs guard:** `scripts/doku-check.sh` – runs in CI and in `/finish-work`.
 

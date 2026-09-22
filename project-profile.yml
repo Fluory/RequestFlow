@@ -45,4 +45,4 @@ addons:
   ki_rag: true
   releases: false # activated with the first delivery to the customer
   saas_auftrag: true
-  recht: false # no public website; DPA/contract handled via saas_auftrag + datenschutz
+  recht: false # activated with the public showcase (Impressum/Datenschutz/Lizenz); DPA/contract via saas_auftrag + datenschutz
