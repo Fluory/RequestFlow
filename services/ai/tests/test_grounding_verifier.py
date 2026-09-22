@@ -66,9 +66,7 @@ def test_quote_not_in_cited_segment_is_unverified() -> None:
 
 
 def test_invented_quote_is_unverified() -> None:
-    result = verify_field(
-        field("Beispiel AG", "found", "p1-l1", "Beispiel AG"), "text", SEGMENTS
-    )
+    result = verify_field(field("Beispiel AG", "found", "p1-l1", "Beispiel AG"), "text", SEGMENTS)
     assert result.status == "unverified"
     assert result.reason == "quote_not_in_segment"
 
@@ -113,9 +111,7 @@ def test_value_not_supported_by_quote_is_unverified() -> None:
 
 
 def test_date_value_inconsistent_with_quote_is_unverified() -> None:
-    result = verify_field(
-        field("2026-11-16", "found", "p1-l6", "15.11.2026"), "date", SEGMENTS
-    )
+    result = verify_field(field("2026-11-16", "found", "p1-l6", "15.11.2026"), "date", SEGMENTS)
     assert result.status == "unverified"
     assert result.reason == "value_not_in_quote"
 

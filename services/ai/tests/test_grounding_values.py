@@ -24,7 +24,7 @@ from requestflow_ai.grounding.values import (
         ("0,75", Decimal("0.75")),
         ("1234.5", Decimal("1234.5")),
         ("1 234,5", Decimal("1234.5")),
-        ("1 234,5", Decimal("1234.5")),
+        ("1\u202f234,5", Decimal("1234.5")),
         ("42", Decimal("42")),
         ("-3,5", Decimal("-3.5")),
     ],
@@ -56,7 +56,9 @@ def test_parse_date_formats(raw: str, expected: date) -> None:
     assert parse_date(raw) == expected
 
 
-@pytest.mark.parametrize("raw", ["31.02.2026", "2026-13-01", "15.11.", "morgen", "15.11.2026 und mehr"])
+@pytest.mark.parametrize(
+    "raw", ["31.02.2026", "2026-13-01", "15.11.", "morgen", "15.11.2026 und mehr"]
+)
 def test_parse_date_rejects_invalid_or_partial(raw: str) -> None:
     assert parse_date(raw) is None
 

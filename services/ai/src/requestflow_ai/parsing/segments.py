@@ -38,7 +38,10 @@ class EmailLocator(_ApiModel):
     part: Literal["header", "body"]
     line: int = Field(
         ge=1,
-        description="1-based line in the decoded text body (part=body) or header order (part=header).",
+        description=(
+            "1-based line in the decoded text body (part=body), "
+            "or 1-based position in the header list (part=header)."
+        ),
     )
     header: str | None = Field(default=None, description="Header name when part=header.")
 
