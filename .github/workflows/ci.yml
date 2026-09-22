@@ -1,0 +1,110 @@
+# Base CI – minute-saving without breaking required gates (SYSTEM.md §11)
+# Adapted from Entwicklungsplan/templates/base/ci.yml: pnpm + Node 24 (TS app), uv (Python AI service),
+# action majors as of 2026-09-22 (template still pins v4).
+#
+# No workflow-wide paths-ignore: a skipped required workflow stays "Pending" and blocks doc PRs.
+# The required job `check` always runs, detects doc-only changes internally and is green at once –
+# expensive steps run only for code changes with a manifest.
+
+name: CI
+
+# No branches filter: stacked PRs on slice branches must be checked too.
+# Explicit types: the defaults (opened, synchronize, reopened) never re-run the PR guard when a draft is
+# marked ready (verify-green rule) or when the description is edited.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest   # Linux only: Windows counts 2x, macOS 10x minutes.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect doc-only changes
+        id: diff
+        run: |
+          if git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -qvE '^docs/|\.md$'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+          if git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -qE '^(services/ai|contracts)/'; then
+            echo "ai=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ai=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Docs guard: runs on EVERY PR. Seconds, no dependencies. (SYSTEM.md §2, §9)
+      - name: Docs guard
+        run: bash scripts/doku-check.sh
+
+      # PR guard: plain language, plan gate, exactly one docs decision, file-size gate,
+      # before-creating proof, next step for drafts, green verify for ready-for-review.
+      - name: PR guard
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_DRAFT: ${{ github.event.pull_request.draft }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BASE_REF: origin/${{ github.base_ref }}
+        run: bash scripts/pr-check.sh
+
+      - name: Doc-only result
+        if: steps.diff.outputs.code == 'false'
+        run: echo "Docs only – docs guard green, base gate green."
+
+      # Foundation phase: no manifest yet. Report honestly instead of faking green tests.
+      - name: Foundation phase (TS)
+        if: steps.diff.outputs.code == 'true' && hashFiles('package.json') == ''
+        run: echo "No package.json – foundation phase, TS verify not applicable yet. Disappears with the first code issue."
+
+      # --- TS app: verify (lint, types, tests, architecture check, build, audit) ---------------
+      - uses: pnpm/action-setup@v6
+        if: steps.diff.outputs.code == 'true' && hashFiles('package.json') != ''
+      - uses: actions/setup-node@v7
+        if: steps.diff.outputs.code == 'true' && hashFiles('package.json') != ''
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        if: steps.diff.outputs.code == 'true' && hashFiles('package.json') != ''
+      - run: pnpm verify
+        if: steps.diff.outputs.code == 'true' && hashFiles('package.json') != ''
+
+      # verify:full (integration + E2E smoke + eval gate): P2 always, otherwise only with label verify-full.
+      - name: Read stage from profile
+        id: profile
+        if: steps.diff.outputs.code == 'true' && hashFiles('package.json') != ''
+        run: echo "stage=$(sed -n 's/^[[:space:]]*stage:[[:space:]]*\([a-z]*\).*/\1/p' project-profile.yml | head -1)" >> "$GITHUB_OUTPUT"
+      - run: pnpm verify:full
+        if: steps.diff.outputs.code == 'true' && hashFiles('package.json') != '' && (steps.profile.outputs.stage == 'production' || contains(github.event.pull_request.labels.*.name, 'verify-full'))
+
+      # --- Python AI service: path-targeted (services/ai, contracts) ---------------------------
+      # The AI eval gate (ADR-0001 D8) joins this block with Epic 2 (#17): it runs on every change
+      # under services/ai/ and needs Vertex credentials via Workload Identity Federation.
+      - name: Foundation phase (AI service)
+        if: steps.diff.outputs.ai == 'true' && hashFiles('services/ai/pyproject.toml') == ''
+        run: echo "No services/ai/pyproject.toml – AI service not created yet."
+      - uses: astral-sh/setup-uv@v10.2.0   # no floating v10 tag exists (verified 2026-09-22)
+        if: steps.diff.outputs.ai == 'true' && hashFiles('services/ai/pyproject.toml') != ''
+        with:
+          enable-cache: true
+      - name: AI service verify (ruff, pyright, pytest)
+        if: steps.diff.outputs.ai == 'true' && hashFiles('services/ai/pyproject.toml') != ''
+        working-directory: services/ai
+        run: |
+          uv sync --frozen
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run pyright
+          uv run pytest -q

@@ -1,0 +1,48 @@
+# Project profile – determines which controls and add-ons apply (SYSTEM.md §10).
+# Update in its own PR on a maturity change (P1 → P2 before the production rollout).
+
+system:
+  fluory_system_version: "2.1" # = Entwicklungsplan/templates/VERSION at adoption
+  last_system_review: 2026-09-22
+
+project:
+  name: requestflow
+  type: saas # customer engagement: web app + AI service
+  stage: internal # P1 until pilot acceptance; P2 (production) before the productive rollout (M4)
+
+repository:
+  visibility: public
+  public_reason: "Reference project for the portfolio; fictional customer, synthetic data only"
+  sensitive_context: none # would be customer-data in a real engagement – then a private repo (PROJECT-START §3)
+
+governance:
+  p0_self_merge_exception: false
+  approved_by: Fluory
+  approved_at: 2026-09-22
+
+agent:
+  sandbox: false # synthetic data only, no production credentials, Windows host without WSL2 – re-evaluate with real credentials or customer data
+
+budget:
+  frame: "Local Docker 0 € + AI usage; showcase on free tiers (Vercel Hobby, Neon Free, R2 Free) + Vertex AI with a GCP budget alert at 10 €/month"
+
+risk:
+  public_users: false
+  personal_data: true # contact data of requesters (synthetic in this repo)
+  company_data: true # quote requests, specifications
+  authentication: true
+  persistent_data: true
+  external_api: true # Vertex AI, ERP (mock), later mailbox
+  ai_or_rag: true
+
+addons:
+  security: true
+  datenschutz: true
+  datenbank: true
+  infrastruktur: false # activated with the showcase deployment
+  betrieb: true
+  api: true # ERP export contract, AI service contract
+  ki_rag: true
+  releases: false # activated with the first delivery to the customer
+  saas_auftrag: true
+  recht: false # activated with the public showcase (Impressum/Datenschutz/Lizenz); DPA/contract via saas_auftrag + datenschutz
