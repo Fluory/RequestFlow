@@ -1,0 +1,31 @@
+From: Erika Mustermann <erika.mustermann@example.com>
+To: vertrieb@example.org
+Subject: =?utf-8?q?Anfrage_Flansche_=E2=80=93_Musterbau_Beispiel_GmbH?=
+Date: Tue, 22 Sep 2026 09:15:00 +0200
+Message-ID: <synthetic-0001@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="rf-boundary-1"
+
+--rf-boundary-1
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+
+Sehr geehrte Damen und Herren,
+
+bitte senden Sie uns ein Angebot f=C3=BCr 1.250 St=C3=BCck Flansch DN50.
+Gew=C3=BCnschter Liefertermin: 15.11.2026
+
+Mit freundlichen Gr=C3=BC=C3=9Fen
+Erika Mustermann
+Einkauf
+Musterbau Beispiel GmbH
+Beispielstra=C3=9Fe 12, 12345 Musterstadt
+
+--rf-boundary-1
+Content-Type: application/pdf; name="zeichnung.pdf"
+Content-Disposition: attachment; filename="zeichnung.pdf"
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjQKJSBzeW50aGV0aWMgcGxhY2Vob2xkZXIK
+
+--rf-boundary-1--
