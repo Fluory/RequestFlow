@@ -4,7 +4,7 @@ AI-assisted intake of quote requests for industrial sales teams: extract structu
 e-mails and PDF/Excel/Word attachments, review every value **beside its source**, and export each
 approved request **exactly once** to an ERP.
 
-> **Status:** foundation phase – architecture decided, no product code yet.
+> **Status:** app skeleton – the stack runs and is checked in CI; product features follow issue by issue.
 > **Reference project:** built like a real customer engagement for a mid-sized machine-building
 > company; the customer is fictional and **all data in this repository is synthetic**.
 
@@ -41,8 +41,23 @@ Rationale, alternatives and trade-offs: [ADR-0001](docs/decisions/ADR-0001-pilot
 
 ## Getting started
 
-Not runnable yet. The first code issue adds `docker compose up` (PostgreSQL, S3-compatible storage,
-web, worker, AI service) and the `verify` commands listed in [AGENTS.md](AGENTS.md).
+Requirements: Docker, Node 24 with corepack (`corepack enable` → pnpm 9.15.9).
+
+```bash
+cp .env.example .env            # optional – the defaults are local, synthetic-data-only values
+docker compose up --build       # postgres, storage, setup (migrations + bucket), web, worker
+curl localhost:3000/api/health  # {"status":"ok","checks":{"database":"ok","storage":"ok"}}
+```
+
+Developing against local services only:
+
+```bash
+pnpm install
+docker compose up -d postgres storage
+pnpm setup:deploy               # migrations as app_owner + bucket (needs the .env.example variables)
+pnpm dev
+pnpm verify                     # lint, types, unit + integration tests, architecture check, build, audit
+```
 
 ## How this repository is run
 
