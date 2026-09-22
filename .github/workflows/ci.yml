@@ -123,3 +123,34 @@ jobs:
           uv run ruff format --check .
           uv run pyright
           uv run pytest -q
+
+  # Image + compose smoke (ADR-0001 D11): only when the Dockerfile or the compose file changes.
+  compose-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Detect image changes
+        id: diff
+        run: |
+          if git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -qE '(^|/)Dockerfile$|^compose\.yaml$|^\.dockerignore$|^docker/'; then
+            echo "image=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "image=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: docker compose up → /api/health
+        if: steps.diff.outputs.image == 'true'
+        run: |
+          docker compose up -d --build
+          for _ in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/api/health; then echo; docker compose ps; exit 0; fi
+            sleep 3
+          done
+          docker compose ps
+          docker compose logs --tail 80
+          exit 1
+      - name: Worker is running
+        if: steps.diff.outputs.image == 'true'
+        run: docker compose ps --status running --services | grep -qx worker
