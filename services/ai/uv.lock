@@ -1207,6 +1207,15 @@ wheels = [
 ]
 
 [[package]]
+name = "python-multipart"
+version = "0.0.32"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/5b/42/55c32bb9b12693c092ad250a0e82edb5b31ddeda6eb772de5f308b3804ad/python_multipart-0.0.32.tar.gz", hash = "sha256:be54b7f3fa167bb83e4fcd936b887b708f4e57fe75911c02aebf53efaf8d938e", size = 46881, upload-time = "2026-06-04T16:18:58.647Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e1/04/e8135ebd1ad02c56ec633277529b2602ff99ff634be76cdba5744cf554fd/python_multipart-0.0.32-py3-none-any.whl", hash = "sha256:ff6d3f776f16878c894e52e107296ffc890e913c611b1a4ec6c44e2821fe2e23", size = 30042, upload-time = "2026-06-04T16:18:57.319Z" },
+]
+
+[[package]]
 name = "python-oxmsg"
 version = "0.0.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1341,9 +1350,11 @@ source = { editable = "." }
 dependencies = [
     { name = "docling" },
     { name = "fastapi" },
+    { name = "google-auth" },
     { name = "google-genai" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "python-multipart" },
     { name = "torch", version = "2.14.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
     { name = "torch", version = "2.14.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform != 'darwin'" },
     { name = "torchvision", version = "0.29.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
@@ -1356,6 +1367,7 @@ dev = [
     { name = "httpx" },
     { name = "pyright" },
     { name = "pytest" },
+    { name = "pyyaml" },
     { name = "reportlab" },
     { name = "ruff" },
 ]
@@ -1364,9 +1376,11 @@ dev = [
 requires-dist = [
     { name = "docling", specifier = "==2.130.0" },
     { name = "fastapi", specifier = "==0.141.1" },
+    { name = "google-auth", specifier = "==2.58.0" },
     { name = "google-genai", specifier = "==2.25.0" },
     { name = "pydantic", specifier = "==2.13.5" },
     { name = "pydantic-settings", specifier = "==2.15.0" },
+    { name = "python-multipart", specifier = "==0.0.32" },
     { name = "torch", specifier = "==2.14.0", index = "https://download.pytorch.org/whl/cpu" },
     { name = "torchvision", specifier = "==0.29.0", index = "https://download.pytorch.org/whl/cpu" },
     { name = "uvicorn", specifier = "==0.53.0" },
@@ -1377,6 +1391,7 @@ dev = [
     { name = "httpx", specifier = "==0.28.1" },
     { name = "pyright", specifier = "==1.1.414" },
     { name = "pytest", specifier = "==9.1.1" },
+    { name = "pyyaml", specifier = "==6.0.3" },
     { name = "reportlab", specifier = "==5.0.1" },
     { name = "ruff", specifier = "==0.16.8" },
 ]
