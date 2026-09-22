@@ -277,11 +277,12 @@ def test_service_refuses_to_start_without_token(monkeypatch: pytest.MonkeyPatch)
         Settings()  # type: ignore[call-arg]
 
 
-def test_short_token_is_rejected() -> None:
+def test_short_token_is_rejected_without_echoing_it() -> None:
     from pydantic import ValidationError
 
-    with pytest.raises(ValidationError):
-        make_settings(ai_service_token="short")
+    with pytest.raises(ValidationError) as excinfo:
+        make_settings(ai_service_token="short-secret-value")
+    assert "short-secret-value" not in str(excinfo.value)
 
 
 def test_settings_have_no_database_or_storage_credentials() -> None:

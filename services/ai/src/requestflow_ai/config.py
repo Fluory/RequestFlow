@@ -12,7 +12,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(case_sensitive=False, extra="ignore", frozen=True)
+    # hide_input_in_errors: a rejected value (e.g. a too-short token) must not reach startup logs.
+    model_config = SettingsConfigDict(
+        case_sensitive=False, extra="ignore", frozen=True, hide_input_in_errors=True
+    )
 
     # Bearer token the TS worker sends. Required: the service refuses to start without it.
     ai_service_token: SecretStr = Field(min_length=24)

@@ -10,7 +10,6 @@ from pathlib import Path
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 
 import json
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -71,9 +70,6 @@ def fake_credentials() -> Credentials:
 
 def no_adc(**_: Any) -> Any:
     raise AssertionError("tests must not load application default credentials")
-
-
-CredentialsLoader = Callable[..., Any]
 
 
 def pdf_segment(segment_id: str, text: str, page: int = 1) -> Segment:
