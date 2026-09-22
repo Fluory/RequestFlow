@@ -3,7 +3,7 @@ import nextTypescript from "eslint-config-next/typescript";
 
 // Flat config (ESLint 9 – pinned: eslint-plugin-react/jsx-a11y reject ESLint 10).
 const config = [
-  { ignores: [".next/**", "node_modules/**", "services/**", "tests/fixtures/**", "next-env.d.ts"] },
+  { ignores: [".next/**", "node_modules/**", ".claude/**", "services/**", "tests/fixtures/**", "next-env.d.ts"] },
   ...nextCoreWebVitals,
   ...nextTypescript,
   {

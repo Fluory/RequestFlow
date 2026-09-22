@@ -1,4 +1,4 @@
-import { runMigrations } from "@/db";
+import { runMigrations } from "@/db/migrate";
 import { S3BlobStore } from "@/features/storage";
 import { loadConfig } from "@/config/env";
 
