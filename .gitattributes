@@ -1,0 +1,9 @@
+# Normalise line endings: shell hooks and CI scripts break on CRLF (Windows checkouts with core.autocrlf=true)
+* text=auto eol=lf
+*.sh text eol=lf
+*.png binary
+*.jpg binary
+*.pdf binary
+*.xlsx binary
+*.docx binary
+*.msg binary

@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output and caches
+.next/
+out/
+dist/
+build/
+coverage/
+.turbo/
+.cache/
+*.tsbuildinfo
+next-env.d.ts
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Environment and secrets – never commit (.env.example stays tracked)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*service-account*.json
+
+# Local tooling and data
+.remember/
+.data/
+*.log
+.DS_Store
+Thumbs.db
