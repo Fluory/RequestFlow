@@ -34,6 +34,7 @@ Every new file belongs to one of these modules – otherwise add the module here
 | `storage` | `src/features/storage/` | `BlobStore` port + S3 adapter | internal | confidential | private bucket, access via app routes | planned |
 | `observability` | `src/features/observability/` | logger, health, request-list ops data | `/api/health` | IDs only | no PII in logs | planned |
 | `db` | `src/db/` | Drizzle schema, migrations, DB roles | internal | – | migrations as owner role | planned |
+| `config` | `src/config/` | typed runtime configuration, validated at start (zod) | internal | secrets (in memory only) | errors name variables, never values | planned |
 | AI service | `services/ai/` | docling parsing, extraction, grounding, evals | internal HTTP | confidential + personal (transient) | bearer token, stateless, no DB/storage access | planned |
 | Contracts | `contracts/` | OpenAPI: AI service, ERP export | – | – | contract tests | planned |
 
