@@ -1,4 +1,4 @@
-"""The committed OpenAPI contract is exactly what the service serves (TS types are generated from it)."""
+"""The committed OpenAPI contract equals the app's schema (the TS types are generated from it)."""
 
 from __future__ import annotations
 

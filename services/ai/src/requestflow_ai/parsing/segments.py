@@ -14,7 +14,13 @@ from pydantic.alias_generators import to_camel
 
 
 class _ApiModel(BaseModel):
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, frozen=True)
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        frozen=True,
+        # Fields with defaults are still always present in responses: mark them required.
+        json_schema_serialization_defaults_required=True,
+    )
 
 
 class BoundingBox(_ApiModel):

@@ -1,0 +1,488 @@
+# GENERATED from services/ai (FastAPI + pydantic) - do not edit by hand.
+# Regenerate: cd services/ai && uv run python scripts/export_openapi.py
+# The TS client and types are generated from this file (ADR-0001 D8).
+openapi: 3.1.0
+info:
+  title: RequestFlow AI service
+  description: 'Stateless AI service of RequestFlow (ADR-0001 D8). The TS worker sends one document (PDF
+    or RFC 5322 e-mail) plus opaque IDs; the service parses it into segments with stable locators, extracts
+    header fields with Gemini on Vertex AI (`eu`) and verifies every quote deterministically. The model
+    never has the final say on `found`.
+
+
+    The service has no database, no storage and no tenant logic. Authentication: bearer token (`AI_SERVICE_TOKEN`)
+    on `/v1/extract`; `/healthz` is open.'
+  version: 1.0.0
+paths:
+  /healthz:
+    get:
+      tags:
+      - ops
+      summary: Healthz
+      operationId: healthz
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /v1/extract:
+    post:
+      tags:
+      - extraction
+      summary: Parse one document, extract header fields, verify every quote.
+      operationId: extract
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: X-Request-Id
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Correlation ID, echoed in the response header and body and in logs. Must match
+            ^[A-Za-z0-9._:-]{1,128}$; otherwise the service generates one.
+          title: X-Request-Id
+        description: Correlation ID, echoed in the response header and body and in logs. Must match ^[A-Za-z0-9._:-]{1,128}$;
+          otherwise the service generates one.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ExtractRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtractResponse'
+        '400':
+          description: Invalid form fields.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Document larger than AI_MAX_DOCUMENT_BYTES.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Not a PDF or RFC 5322 e-mail (.msg is not supported yet).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: The document could not be parsed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: All extraction slots busy; retry later.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: The model call failed or returned invalid output; retry later.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    BoundingBox:
+      properties:
+        l:
+          type: number
+          title: L
+        t:
+          type: number
+          title: T
+        r:
+          type: number
+          title: R
+        b:
+          type: number
+          title: B
+      type: object
+      required:
+      - l
+      - t
+      - r
+      - b
+      title: BoundingBox
+      description: Box in PDF points; origin top-left of the page (``t`` < ``b``).
+    EmailLocator:
+      properties:
+        kind:
+          type: string
+          const: email
+          title: Kind
+          default: email
+        part:
+          type: string
+          enum:
+          - header
+          - body
+          title: Part
+        line:
+          type: integer
+          minimum: 1.0
+          title: Line
+          description: 1-based line in the decoded text body (part=body), or 1-based position in the header
+            list (part=header).
+        header:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Header
+          description: Header name when part=header.
+      type: object
+      required:
+      - kind
+      - part
+      - line
+      - header
+      title: EmailLocator
+    ErrorDetail:
+      properties:
+        code:
+          type: string
+          enum:
+          - invalid_request
+          - unauthorized
+          - document_too_large
+          - unsupported_media_type
+          - document_unparseable
+          - busy
+          - model_error
+          - model_output_invalid
+          - internal_error
+          title: Code
+        message:
+          type: string
+          title: Message
+          description: Short, fixed text. Never contains document content.
+      type: object
+      required:
+      - code
+      - message
+      title: ErrorDetail
+    ErrorResponse:
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+        requestId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Requestid
+      type: object
+      required:
+      - error
+      - requestId
+      title: ErrorResponse
+    Evidence:
+      properties:
+        segmentId:
+          type: string
+          title: Segmentid
+          description: Id of a segment in `segments`.
+        quote:
+          type: string
+          title: Quote
+          description: Text the model copied from that segment.
+      type: object
+      required:
+      - segmentId
+      - quote
+      title: Evidence
+    ExtractRequest:
+      properties:
+        file:
+          type: string
+          contentMediaType: application/octet-stream
+          title: File
+          description: The document bytes (PDF or .eml).
+        documentId:
+          type: string
+          pattern: ^[A-Za-z0-9._:-]{1,128}$
+          title: Documentid
+          description: Opaque ID from the caller; echoed and logged, never interpreted.
+        mediaType:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+          title: Mediatype
+          description: Declared media type, e.g. message/rfc822. PDF is detected from bytes.
+      type: object
+      required:
+      - file
+      - documentId
+      title: ExtractRequest
+    ExtractResponse:
+      properties:
+        requestId:
+          type: string
+          title: Requestid
+        documentId:
+          type: string
+          title: Documentid
+        documentKind:
+          type: string
+          enum:
+          - pdf
+          - eml
+          title: Documentkind
+        segments:
+          items:
+            $ref: '#/components/schemas/Segment'
+          type: array
+          title: Segments
+        fields:
+          $ref: '#/components/schemas/ExtractedFields'
+        run:
+          $ref: '#/components/schemas/RunMetadata'
+        warnings:
+          items:
+            type: string
+            const: no_text
+          type: array
+          title: Warnings
+          description: '`no_text`: the document has no text layer (e.g. a scan); no model call made.'
+      type: object
+      required:
+      - requestId
+      - documentId
+      - documentKind
+      - segments
+      - fields
+      - run
+      - warnings
+      title: ExtractResponse
+    ExtractedFields:
+      properties:
+        company:
+          $ref: '#/components/schemas/FieldResult'
+        contact_person:
+          $ref: '#/components/schemas/FieldResult'
+        requested_delivery_date:
+          $ref: '#/components/schemas/FieldResult'
+      type: object
+      required:
+      - company
+      - contact_person
+      - requested_delivery_date
+      title: ExtractedFields
+      description: Field keys are fixed snake_case identifiers shared with the TS side.
+    FieldResult:
+      properties:
+        value:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Value
+          description: Extracted value (dates as YYYY-MM-DD). Kept for `unverified` so a human can review
+            the proposal; null for `missing`.
+        status:
+          type: string
+          enum:
+          - found
+          - uncertain
+          - missing
+          - unverified
+          title: Status
+          description: Final status after verification. `found` only if the verifier confirmed the quote
+            in the cited segment and the value against the quote.
+        evidence:
+          anyOf:
+          - $ref: '#/components/schemas/Evidence'
+          - type: 'null'
+        modelStatus:
+          type: string
+          enum:
+          - found
+          - uncertain
+          - missing
+          title: Modelstatus
+          description: What the model claimed before verification.
+        reason:
+          anyOf:
+          - type: string
+            enum:
+            - missing_with_value
+            - no_value
+            - no_evidence
+            - unknown_segment
+            - empty_quote
+            - quote_not_in_segment
+            - value_not_in_quote
+          - type: 'null'
+          title: Reason
+          description: Why the verifier set `unverified`; null otherwise.
+      type: object
+      required:
+      - value
+      - status
+      - evidence
+      - modelStatus
+      - reason
+      title: FieldResult
+    HealthResponse:
+      properties:
+        status:
+          type: string
+          const: ok
+          title: Status
+      type: object
+      required:
+      - status
+      title: HealthResponse
+    PdfLocator:
+      properties:
+        kind:
+          type: string
+          const: pdf
+          title: Kind
+          default: pdf
+        page:
+          type: integer
+          minimum: 1.0
+          title: Page
+          description: 1-based page number.
+        bbox:
+          $ref: '#/components/schemas/BoundingBox'
+        coordOrigin:
+          type: string
+          const: TOPLEFT
+          title: Coordorigin
+          default: TOPLEFT
+      type: object
+      required:
+      - kind
+      - page
+      - bbox
+      - coordOrigin
+      title: PdfLocator
+    RunMetadata:
+      properties:
+        modelId:
+          type: string
+          title: Modelid
+        modelVersion:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Modelversion
+          description: Model version reported by the provider.
+        promptVersion:
+          type: string
+          title: Promptversion
+        schemaVersion:
+          type: string
+          title: Schemaversion
+        pdfPipeline:
+          anyOf:
+          - type: string
+            enum:
+            - textlines
+            - layout
+          - type: 'null'
+          title: Pdfpipeline
+          description: PDF pipeline used; null for e-mails.
+        tokens:
+          $ref: '#/components/schemas/TokenUsage'
+        latencyMs:
+          type: integer
+          title: Latencyms
+          description: Server-side time for parse + extract + verify.
+        modelLatencyMs:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Modellatencyms
+          description: Time of the model call; null if skipped.
+      type: object
+      required:
+      - modelId
+      - modelVersion
+      - promptVersion
+      - schemaVersion
+      - pdfPipeline
+      - tokens
+      - latencyMs
+      - modelLatencyMs
+      title: RunMetadata
+    Segment:
+      properties:
+        id:
+          type: string
+          title: Id
+        text:
+          type: string
+          title: Text
+        locator:
+          oneOf:
+          - $ref: '#/components/schemas/PdfLocator'
+          - $ref: '#/components/schemas/EmailLocator'
+          title: Locator
+          discriminator:
+            propertyName: kind
+            mapping:
+              email: '#/components/schemas/EmailLocator'
+              pdf: '#/components/schemas/PdfLocator'
+      type: object
+      required:
+      - id
+      - text
+      - locator
+      title: Segment
+    TokenUsage:
+      properties:
+        inputTokens:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Inputtokens
+        outputTokens:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Outputtokens
+        totalTokens:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Totaltokens
+      type: object
+      required:
+      - inputTokens
+      - outputTokens
+      - totalTokens
+      title: TokenUsage
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
