@@ -66,7 +66,7 @@ def make_settings(**overrides: Any) -> Settings:
 
 def fake_credentials() -> Credentials:
     # A static bearer token: never refreshed, never sent anywhere but the mock transport.
-    return Credentials(token="fake-access-token")  # noqa: S106
+    return Credentials(token="fake-access-token")
 
 
 def no_adc(**_: Any) -> Any:
