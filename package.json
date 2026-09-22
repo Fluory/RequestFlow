@@ -1,0 +1,47 @@
+{
+  "name": "requestflow",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "worker": "node src/worker.ts",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "depcruise": "depcruise src --config .dependency-cruiser.cjs",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "verify:changed": "bash scripts/verify-changed.sh",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm test:integration && pnpm depcruise && pnpm build && pnpm audit --audit-level high",
+    "verify:full": "pnpm verify"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1138.0",
+    "drizzle-orm": "0.45.3",
+    "next": "16.3.6",
+    "pg": "8.23.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.6",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "dependency-cruiser": "18.4.0",
+    "drizzle-kit": "0.31.11",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.6",
+    "typescript": "6.0.3",
+    "vitest": "5.0.1"
+  }
+}
