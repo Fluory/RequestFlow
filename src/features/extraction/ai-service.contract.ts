@@ -42,6 +42,55 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AttachmentRef */
+        AttachmentRef: {
+            /**
+             * Index
+             * @description 0-based position among the message's attachments.
+             */
+            index: number;
+            /**
+             * Name
+             * @description File name as stored in the message (untrusted text).
+             */
+            name: string | null;
+        };
+        /**
+         * AttachmentResult
+         * @description One attachment of an Outlook ``.msg`` (also nested ones), parsed or not.
+         */
+        AttachmentResult: {
+            /**
+             * Path
+             * @description 0-based attachment index per nesting level, outermost first; the last one is `attachment.index` in the locators of this attachment's segments.
+             */
+            path: number[];
+            /**
+             * Name
+             * @description File name as stored in the message (untrusted text).
+             */
+            name: string | null;
+            /**
+             * Documentkind
+             * @description Detected kind; null when failed.
+             */
+            documentKind: ("pdf" | "eml" | "xlsx" | "docx" | "msg") | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "parsed" | "failed";
+            /**
+             * Error
+             * @description Why the attachment was not parsed; null when parsed. The message and its other attachments are still processed.
+             */
+            error: ("unsupported_media_type" | "document_unparseable" | "document_too_long" | "nesting_too_deep" | "too_many_attachments" | "not_attached_by_value") | null;
+            /**
+             * Segmentcount
+             * @description Segments this attachment contributed.
+             */
+            segmentCount: number;
+        };
         /**
          * BoundingBox
          * @description Box in PDF points; origin top-left of the page (``t`` < ``b``).
@@ -55,6 +104,42 @@ export interface components {
             r: number;
             /** B */
             b: number;
+        };
+        /**
+         * DocxLocator
+         * @description A body paragraph (``part=paragraph``) or one table cell (``part=table_cell``).
+         */
+        DocxLocator: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "docx";
+            /**
+             * Part
+             * @enum {string}
+             */
+            part: "paragraph" | "table_cell";
+            /**
+             * Paragraph
+             * @description 1-based index of the paragraph among the body paragraphs (empty ones count); null for a table cell.
+             */
+            paragraph: number | null;
+            /**
+             * Table
+             * @description 1-based table index in the body.
+             */
+            table: number | null;
+            /**
+             * Row
+             * @description 1-based row in the table.
+             */
+            row: number | null;
+            /**
+             * Cell
+             * @description 1-based grid column where the cell starts (a merged cell counts once).
+             */
+            cell: number | null;
         };
         /** EmailLocator */
         EmailLocator: {
@@ -115,7 +200,7 @@ export interface components {
         ExtractRequest: {
             /**
              * File
-             * @description The document bytes (PDF or .eml).
+             * @description The document bytes: PDF, .eml, Outlook .msg, .docx/.docm or .xlsx/.xlsm. The kind is detected from the bytes, not from the file name.
              */
             file: string;
             /**
@@ -125,7 +210,7 @@ export interface components {
             documentId: string;
             /**
              * Mediatype
-             * @description Declared media type, e.g. message/rfc822. PDF is detected from bytes.
+             * @description Declared media type, e.g. message/rfc822. Only helps to recognise an .eml; every kind is detected from the bytes.
              */
             mediaType?: string | null;
         };
@@ -137,9 +222,10 @@ export interface components {
             documentId: string;
             /**
              * Documentkind
+             * @description Detected from the bytes: pdf, eml, xlsx, docx or msg (Outlook).
              * @enum {string}
              */
-            documentKind: "pdf" | "eml";
+            documentKind: "pdf" | "eml" | "xlsx" | "docx" | "msg";
             /** Segments */
             segments: components["schemas"]["Segment"][];
             fields: components["schemas"]["ExtractedFields"];
@@ -151,9 +237,14 @@ export interface components {
             run: components["schemas"]["RunMetadata"];
             /**
              * Warnings
-             * @description `no_text`: the document has no text layer (e.g. a scan); no model call made.
+             * @description `no_text`: the document has no text (e.g. a scan without OCR); no model call made. `attachment_failed`: at least one attachment of a `.msg` could not be parsed (see `attachments`); the rest was processed.
              */
-            warnings: "no_text"[];
+            warnings: ("no_text" | "attachment_failed")[];
+            /**
+             * Attachments
+             * @description Attachments of an Outlook `.msg`, flattened in document order (nested ones after their parent); empty for other kinds.
+             */
+            attachments?: components["schemas"]["AttachmentResult"][];
         };
         /**
          * ExtractedFields
@@ -195,9 +286,9 @@ export interface components {
             modelStatus: "found" | "uncertain" | "missing";
             /**
              * Reason
-             * @description Why the verifier set `unverified`; for `uncertain`: `ambiguous_quote` when it downgraded `found` (the quote holds several dates) or `calendar_week_only` when a date field only has a calendar week (value then `KW <week>` or `KW <week>/<year>`, never a computed date); null otherwise.
+             * @description Why the verifier set `unverified`; for `uncertain`: `ambiguous_quote` when it downgraded `found` (the quote holds several dates), `calendar_week_only` when a date field only has a calendar week (value then `KW <week>` or `KW <week>/<year>`, never a computed date) or `ocr_only` when the only evidence is OCR text (a segment with `locator.ocr`, also inside an attachment); null otherwise.
              */
-            reason: ("missing_with_value" | "no_value" | "no_evidence" | "unknown_segment" | "empty_quote" | "quote_not_in_segment" | "value_not_in_quote" | "ambiguous_quote" | "calendar_week_only") | null;
+            reason: ("missing_with_value" | "no_value" | "no_evidence" | "unknown_segment" | "empty_quote" | "quote_not_in_segment" | "value_not_in_quote" | "ambiguous_quote" | "calendar_week_only" | "ocr_only") | null;
         };
         /** HealthResponse */
         HealthResponse: {
@@ -228,6 +319,39 @@ export interface components {
             /** @description Dimensions or nominal size; trimmed text. */
             dimensions: components["schemas"]["FieldResult"];
         };
+        /**
+         * MsgLocator
+         * @description Outlook ``.msg``: headers and body lines like ``email``; attachments wrap their locator.
+         */
+        MsgLocator: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "msg";
+            /**
+             * Part
+             * @enum {string}
+             */
+            part: "header" | "body" | "attachment";
+            /**
+             * Line
+             * @description 1-based line in the decoded text body (part=body), or 1-based position in the header list (part=header); null for part=attachment.
+             */
+            line: number | null;
+            /**
+             * Header
+             * @description Header name when part=header.
+             */
+            header: string | null;
+            /** @description The attachment holding the segment when part=attachment. */
+            attachment: components["schemas"]["AttachmentRef"] | null;
+            /**
+             * Inner
+             * @description Locator inside the attachment (pdf, xlsx, docx, email or a nested msg) when part=attachment.
+             */
+            inner: (components["schemas"]["PdfLocator"] | components["schemas"]["EmailLocator"] | components["schemas"]["XlsxLocator"] | components["schemas"]["DocxLocator"] | components["schemas"]["MsgLocator"]) | null;
+        };
         /** PdfLocator */
         PdfLocator: {
             /**
@@ -247,6 +371,12 @@ export interface components {
              * @constant
              */
             coordOrigin: "TOPLEFT";
+            /**
+             * Ocr
+             * @description True when the text comes from OCR of a page without a text layer. A field whose evidence is OCR text is at most `uncertain` (reason `ocr_only`). Optional: absent means false.
+             * @default false
+             */
+            ocr: boolean;
         };
         /** RunMetadata */
         RunMetadata: {
@@ -263,7 +393,7 @@ export interface components {
             schemaVersion: string;
             /**
              * Pdfpipeline
-             * @description PDF pipeline used; null for e-mails.
+             * @description PDF pipeline used; null when no PDF was parsed (neither the document nor one of its attachments).
              */
             pdfPipeline: ("textlines" | "layout") | null;
             tokens: components["schemas"]["TokenUsage"];
@@ -285,7 +415,7 @@ export interface components {
             /** Text */
             text: string;
             /** Locator */
-            locator: components["schemas"]["PdfLocator"] | components["schemas"]["EmailLocator"];
+            locator: components["schemas"]["PdfLocator"] | components["schemas"]["EmailLocator"] | components["schemas"]["XlsxLocator"] | components["schemas"]["DocxLocator"] | components["schemas"]["MsgLocator"];
         };
         /** TokenUsage */
         TokenUsage: {
@@ -295,6 +425,32 @@ export interface components {
             outputTokens: number | null;
             /** Totaltokens */
             totalTokens: number | null;
+        };
+        /**
+         * XlsxLocator
+         * @description One spreadsheet row: its non-empty cells are joined with `` | `` in the segment text.
+         */
+        XlsxLocator: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "xlsx";
+            /**
+             * Sheet
+             * @description Sheet name as in the workbook.
+             */
+            sheet: string;
+            /**
+             * Row
+             * @description 1-based row number.
+             */
+            row: number;
+            /**
+             * Cellrange
+             * @description Range of the non-empty cells of the row, e.g. "A7:D7" (or "B7" for one cell).
+             */
+            cellRange: string;
         };
     };
     responses: never;
@@ -386,7 +542,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Not a PDF or RFC 5322 e-mail (.msg is not supported yet). */
+            /** @description Not a PDF, RFC 5322 e-mail, Outlook .msg, DOCX or XLSX (e.g. legacy .doc/.xls, password-protected Office files, images). */
             415: {
                 headers: {
                     [name: string]: unknown;
@@ -395,7 +551,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description The document could not be parsed (`document_unparseable`) or has more pages than AI_MAX_PDF_PAGES (`document_too_long`). */
+            /** @description The document could not be parsed (`document_unparseable`) or is too long (`document_too_long`: more pages than AI_MAX_PDF_PAGES, too many rows, text blocks or pages without text to OCR). A failing attachment of a .msg does not cause this; it is reported in `attachments`. */
             422: {
                 headers: {
                     [name: string]: unknown;

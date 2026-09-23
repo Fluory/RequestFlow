@@ -9,6 +9,9 @@ This file records what changes **in the product** – process and session state 
 - AI eval set and gate: 15 synthetic cases (tables, scans, missing values, prompt injection) measure
   extraction quality per field; every change to the AI service is checked against a committed
   baseline and fails when a field gets worse by more than 5 points or an injected value is accepted.
+- More document formats: Outlook `.msg` (with attachments, parsed recursively), Excel `.xlsx` and Word
+  `.docx` are extracted with exact source positions; scanned PDFs can be read with OCR – such values are
+  at most "uncertain". A broken attachment no longer fails the whole request.
 - Extraction schema v2: e-mail, phone and additional requirements as header fields, plus line items
   (description, quantity, unit, material, dimensions), each with its own status and source quote; German
   number formats, units and dates are normalised, a bare calendar week ("KW 42") stays at most uncertain.

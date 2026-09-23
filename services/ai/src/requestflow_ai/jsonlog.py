@@ -32,11 +32,24 @@ _ALLOWED_EXTRAS = (
     "outputTokens",
     "fieldStatus",
     "lineItemCount",
+    "attachmentCount",
+    "attachmentFailedCount",
+    "ocrSegmentCount",
+    "depth",
+    "errorType",
     "header",
     "note",
 )
 # Third-party loggers that may log file names, URLs or payload snippets at INFO/DEBUG.
-_QUIET_LOGGERS = ("docling", "docling_core", "docling_parse", "google_genai", "httpx", "httpcore")
+_QUIET_LOGGERS = (
+    "docling",
+    "docling_core",
+    "docling_parse",
+    "google_genai",
+    "httpx",
+    "httpcore",
+    "RapidOCR",  # rapidocr's own logger (model paths, download URLs)
+)
 
 
 class JsonFormatter(logging.Formatter):
