@@ -1,4 +1,3 @@
-import { headers } from "next/headers";
 import { currentActor, getJobClient, getRuntime } from "@/app/_server/runtime";
 import { AuthorizationError } from "@/features/identity";
 import { submitUpload, UploadRejected } from "@/features/intake";
@@ -10,7 +9,7 @@ const problem = (status: number, title: string) => Response.json({ error: { titl
 // POST /api/requests – multipart upload of one request (field `files`, 1..n files).
 // Company and user come from the session, never from the form (ADR-0001 D7).
 export async function POST(request: Request): Promise<Response> {
-  const actor = await currentActor(await headers());
+  const actor = await currentActor(request.headers);
   if (!actor) return problem(401, "Nicht angemeldet.");
   const { config, tenancy, storage } = getRuntime();
 

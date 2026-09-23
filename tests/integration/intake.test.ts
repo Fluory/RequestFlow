@@ -3,13 +3,13 @@ import type { PgBoss } from "pg-boss";
 import { loadConfig } from "@/config/env";
 import { listAuditEvents } from "@/features/audit";
 import { listDocuments } from "@/features/documents";
-import { inviteUser, getActor, type Actor } from "@/features/identity";
+import { getActor, type Actor } from "@/features/identity";
 import { submitUpload, UploadRejected, type IntakeDeps } from "@/features/intake";
 import { createJobClient, QUEUES } from "@/features/jobs";
 import { getRequest } from "@/features/requests";
 import { S3BlobStore } from "@/features/storage";
 import { createTenancy } from "@/features/tenancy";
-import { companyWithAdmin, createStack, signIn, signUp, syntheticEmail, unique, type Stack } from "./helpers/stack";
+import { companyWithAdmin, createStack, invitedUser, unique, type Stack } from "./helpers/stack";
 
 const enc = (text: string) => new TextEncoder().encode(text);
 const mail = (messageId: string) =>
@@ -44,10 +44,8 @@ describe("intake: upload a request and enqueue processing atomically", () => {
 
     const a = await companyWithAdmin(stack);
     const adminA = (await getActor(stack.auth, stack.database.db, new Headers({ cookie: a.cookie })))!;
-    const clerkEmail = syntheticEmail("clerk");
-    await inviteUser(stack.database.db, adminA, { email: clerkEmail, role: "clerk" });
-    await signUp(stack.auth, clerkEmail);
-    clerkA = (await getActor(stack.auth, stack.database.db, new Headers({ cookie: (await signIn(stack.auth, clerkEmail)).cookie })))!;
+    const clerk = await invitedUser(stack, adminA, "clerk");
+    clerkA = (await getActor(stack.auth, stack.database.db, new Headers({ cookie: clerk.cookie })))!;
     const b = await companyWithAdmin(stack);
     adminB = (await getActor(stack.auth, stack.database.db, new Headers({ cookie: b.cookie })))!;
   });
@@ -90,7 +88,7 @@ describe("intake: upload a request and enqueue processing atomically", () => {
         requestId = data.requestId;
         await (boss.send as (...a: unknown[]) => Promise<unknown>)(...args); // the job row is really inserted …
         throw new Error("injected failure after the job insert"); // … and then the transaction fails
-      }) as PgBoss["send"],
+      }) as unknown as PgBoss["send"],
     };
     const put = storage.put.bind(storage);
     const spyStorage = Object.assign(Object.create(storage) as S3BlobStore, {
