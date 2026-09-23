@@ -30,7 +30,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Parse one document, extract header fields, verify every quote. */
+        /** Parse one document, extract header fields and line items, verify every quote. */
         post: operations["extract"];
         delete?: never;
         options?: never;
@@ -143,6 +143,11 @@ export interface components {
             /** Segments */
             segments: components["schemas"]["Segment"][];
             fields: components["schemas"]["ExtractedFields"];
+            /**
+             * Lineitems
+             * @description Requested positions in document order (schemaVersion 2); empty when none.
+             */
+            lineItems: components["schemas"]["LineItem"][];
             run: components["schemas"]["RunMetadata"];
             /**
              * Warnings
@@ -155,15 +160,24 @@ export interface components {
          * @description Field keys are fixed snake_case identifiers shared with the TS side.
          */
         ExtractedFields: {
+            /** @description Requesting company; trimmed text. */
             company: components["schemas"]["FieldResult"];
+            /** @description Contact person; trimmed text. */
             contact_person: components["schemas"]["FieldResult"];
+            /** @description Requester's e-mail address; lowercased. */
+            email: components["schemas"]["FieldResult"];
+            /** @description Requester's phone number; trimmed as written, no country code added. */
+            phone: components["schemas"]["FieldResult"];
+            /** @description Requested delivery date as YYYY-MM-DD; a calendar week without a date is at most `uncertain` (reason `calendar_week_only`, value `KW 42` or `KW 42/2026`). */
             requested_delivery_date: components["schemas"]["FieldResult"];
+            /** @description Additional requirements (certificates, tolerances, ...); trimmed text. */
+            additional_requirements: components["schemas"]["FieldResult"];
         };
         /** FieldResult */
         FieldResult: {
             /**
              * Value
-             * @description Extracted value. For `found` and verified `uncertain` it is normalised: trimmed text, dates as YYYY-MM-DD. Kept as the model sent it for `unverified` (and for `uncertain` without evidence) so a human can review the proposal; null for `missing`.
+             * @description Extracted value. For `found` and verified `uncertain` it is normalised: trimmed text; dates as YYYY-MM-DD (a calendar week without a date stays a week, see `reason` `calendar_week_only`); quantities as a plain decimal with a dot and no grouping ("1250", "2.5"); units canonical (mm, cm, m, kg, t, pcs) or trimmed text for other units; e-mail lowercased; phone trimmed as written (no country code added). Kept as the model sent it for `unverified` (and for `uncertain` without evidence) so a human can review the proposal; null for `missing`.
              */
             value: string | null;
             /**
@@ -181,9 +195,9 @@ export interface components {
             modelStatus: "found" | "uncertain" | "missing";
             /**
              * Reason
-             * @description Why the verifier set `unverified`, or `ambiguous_quote` when it downgraded `found` to `uncertain` (the quote holds several dates); null otherwise.
+             * @description Why the verifier set `unverified`; for `uncertain`: `ambiguous_quote` when it downgraded `found` (the quote holds several dates) or `calendar_week_only` when a date field only has a calendar week (value then `KW <week>` or `KW <week>/<year>`, never a computed date); null otherwise.
              */
-            reason: ("missing_with_value" | "no_value" | "no_evidence" | "unknown_segment" | "empty_quote" | "quote_not_in_segment" | "value_not_in_quote" | "ambiguous_quote") | null;
+            reason: ("missing_with_value" | "no_value" | "no_evidence" | "unknown_segment" | "empty_quote" | "quote_not_in_segment" | "value_not_in_quote" | "ambiguous_quote" | "calendar_week_only") | null;
         };
         /** HealthResponse */
         HealthResponse: {
@@ -192,6 +206,27 @@ export interface components {
              * @constant
              */
             status: "ok";
+        };
+        /**
+         * LineItem
+         * @description One requested position; every field is verified on its own (same rules as header fields).
+         */
+        LineItem: {
+            /**
+             * Index
+             * @description 0-based position in the document order.
+             */
+            index: number;
+            /** @description Product or article; trimmed text. */
+            description: components["schemas"]["FieldResult"];
+            /** @description Quantity as a plain decimal with a dot and no grouping ("1250", "2.5"). */
+            quantity: components["schemas"]["FieldResult"];
+            /** @description Unit: one of mm, cm, m, kg, t, pcs (Stk., St., Stueck -> pcs) when known; otherwise the unit as written, trimmed. */
+            unit: components["schemas"]["FieldResult"];
+            /** @description Material or material number; trimmed text. */
+            material: components["schemas"]["FieldResult"];
+            /** @description Dimensions or nominal size; trimmed text. */
+            dimensions: components["schemas"]["FieldResult"];
         };
         /** PdfLocator */
         PdfLocator: {

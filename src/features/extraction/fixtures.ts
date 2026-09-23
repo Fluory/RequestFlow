@@ -1,7 +1,13 @@
 import type { ExtractResponse } from "./types";
 
 // Synthetic AI-service response in the contract shape (tests and local demos only; no real data).
-export function syntheticExtractResponse(documentId: string, overrides: Partial<ExtractResponse["fields"]> = {}): ExtractResponse {
+const missing = { value: null, status: "missing", evidence: null, modelStatus: "missing", reason: null } as const;
+
+export function syntheticExtractResponse(
+  documentId: string,
+  overrides: Partial<ExtractResponse["fields"]> = {},
+  lineItems: ExtractResponse["lineItems"] = [],
+): ExtractResponse {
   return {
     requestId: "synthetic-request",
     documentId,
@@ -16,13 +22,17 @@ export function syntheticExtractResponse(documentId: string, overrides: Partial<
       company: { value: "Musterbau Beispiel GmbH", status: "found", evidence: { segmentId: "s2", quote: "Musterbau Beispiel GmbH" }, modelStatus: "found", reason: null },
       contact_person: { value: "Erika Beispiel", status: "found", evidence: { segmentId: "s3", quote: "Erika Beispiel" }, modelStatus: "found", reason: null },
       requested_delivery_date: { value: "2026-10-15", status: "found", evidence: { segmentId: "s4", quote: "15.10.2026" }, modelStatus: "found", reason: null },
+      email: { value: "einkauf@example.com", status: "found", evidence: { segmentId: "s1", quote: "einkauf@example.com" }, modelStatus: "found", reason: null },
+      phone: { ...missing },
+      additional_requirements: { ...missing },
       ...overrides,
     },
+    lineItems,
     run: {
       modelId: "gemini-3.5-flash",
       modelVersion: null,
-      promptVersion: "extract_header_v1",
-      schemaVersion: "1",
+      promptVersion: "extract_v2",
+      schemaVersion: "2",
       pdfPipeline: null,
       tokens: { inputTokens: 900, outputTokens: 120, totalTokens: 1020 },
       latencyMs: 850,
