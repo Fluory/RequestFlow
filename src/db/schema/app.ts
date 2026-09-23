@@ -7,7 +7,10 @@ import { organization } from "./auth";
 
 export const appSchema = pgSchema("app");
 
-/** `app.company_id` is set transaction-locally by `withTenant()`; unset → NULL → no row matches. */
+/**
+ * `app.company_id` is set transaction-locally by `withTenant()`; unset → NULL → no row matches.
+ * The guard test (#29, src/features/tenancy/rls-guard.ts) expects exactly this expression – change both.
+ */
 export const currentCompany = sql`nullif(current_setting('app.company_id', true), '')::uuid`;
 
 export const tenantPolicy = (table: string) =>
