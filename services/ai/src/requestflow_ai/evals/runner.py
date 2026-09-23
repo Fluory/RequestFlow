@@ -123,7 +123,8 @@ def _cell(value: float | None) -> str:
 
 
 def table(run: EvalRun) -> str:
-    header = f"{'field':<26}{'n':>4}  acc    missP  missR  ground falseF"
+    names = ("acc", "missP", "missR", "ground", "falseF")
+    header = f"{'field':<26}{'n':>4} " + " ".join(f"{name:>6}" for name in names)
     lines = [header, "-" * len(header)]
     for key, m in run.metrics().items():
         cells = " ".join(_cell(m.metric(name)) for name in METRIC_NAMES)
