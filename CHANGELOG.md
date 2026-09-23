@@ -6,6 +6,9 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
+- AI service (`services/ai`): `POST /v1/extract` turns an e-mail or PDF into segments with stable
+  locators and extracts company, contact person and requested delivery date with evidence; a
+  deterministic verifier marks every value whose quote is not in the cited segment as `unverified`.
 - Upload of a quote request (`/requests`): .eml, .msg, .pdf, .xlsx, .docx up to a configured size;
   originals stored privately, download only for the own company. Request, documents, audit entry and
   the processing job are created in one step; exact duplicates are flagged and linked.

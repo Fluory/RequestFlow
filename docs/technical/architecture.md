@@ -25,7 +25,7 @@ Every new file belongs to one of these modules – otherwise add the module here
 |---|---|---|---|---|---|---|
 | `intake` | `src/features/intake/` | upload, duplicate fingerprint, creates request + documents | authenticated UI/route | confidential + personal | session, tenant context, size/type limits | built: upload validation (extension + signature, size), fingerprint, atomic submit |
 | `documents` | `src/features/documents/` | document records, storage references, hashes | internal | confidential | tenant context | built: records, SHA-256, storage keys |
-| `extraction` | `src/features/extraction/` | AI-service client, persists runs/fields/evidence | internal | confidential + personal | tenant context, contract validation | skeleton |
+| `extraction` | `src/features/extraction/` | AI-service client, persists runs/fields/evidence | internal | confidential + personal | tenant context, contract validation | partial: contract types (client + persistence: #7) |
 | `requests` | `src/features/requests/` | request aggregate, status machine | internal | confidential | tenant context | partial: `app.requests` + repository (status machine: #7) |
 | `review` | `src/features/review/` | review UI, corrections, approve/reject | authenticated UI | confidential + personal | session, role check, audit | skeleton |
 | `export` | `src/features/export/` | ERP port + REST adapter, idempotency | outbound HTTP | confidential | idempotency key, unique export, timeout | skeleton |
@@ -39,8 +39,8 @@ Every new file belongs to one of these modules – otherwise add the module here
 | `db` | `src/db/`, deploy step `src/setup.ts` | Drizzle schema, migrations, DB roles | internal | – | migrations as owner role | built: roles check, schema `app`, default grants for `app_rw` |
 | `config` | `src/config/` | typed runtime configuration, validated at start (zod) | internal | secrets (in memory only) | errors name variables, never values | built |
 | `app` | `src/app/` | Next.js routes and pages; composition root `src/app/_server/` (pool, storage client) | `/`, `/login`, `/signup`, `/invite`, `/requests`, `/api/requests`, `/api/documents/:id`, `/api/auth/*`, `/api/health` | – | calls module APIs only (dependency-cruiser) | partial: login, sign-up, invite, home |
-| AI service | `services/ai/` | docling parsing, extraction, grounding, evals | internal HTTP | confidential + personal (transient) | bearer token, stateless, no DB/storage access | planned |
-| Contracts | `contracts/` | OpenAPI: AI service, ERP export | – | – | contract tests | planned |
+| AI service | `services/ai/` | docling parsing, extraction, grounding, evals | internal HTTP | confidential + personal (transient) | bearer token, stateless, no DB/storage access | partial: `POST /v1/extract` – EML + PDF (text layer) → segments, 3 header fields, grounding verifier, bearer auth; Vertex adapter with recorded responses (live call unverified) |
+| Contracts | `contracts/` | OpenAPI: AI service, ERP export | – | – | contract tests | partial: `contracts/ai-service.openapi.yaml` (generated from the service; TS types + drift test) |
 
 ## Exceptions register
 
