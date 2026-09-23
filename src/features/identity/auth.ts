@@ -5,7 +5,7 @@ import { admin, organization } from "better-auth/plugins";
 import { and, eq, gt, sql } from "drizzle-orm";
 import type { Database } from "@/db";
 import * as schema from "@/db/schema";
-import { organizationAc, organizationRoles } from "./access";
+import { organizationAc, organizationRoles, PLATFORM_ADMIN_ROLE, platformRoles } from "./access";
 import { isCompanyRole } from "./authorize";
 
 export interface AuthSettings {
@@ -14,10 +14,6 @@ export interface AuthSettings {
   /** Rate limit on /api/auth/* (built-in, database storage). Tests may tighten it. */
   rateLimit?: { window: number; max: number };
 }
-
-// Global admin-plugin role nobody holds in the pilot: company admins are `member.role = admin`
-// and therefore cannot use the plugin's cross-company endpoints (list/ban/impersonate users).
-const PLATFORM_ADMIN_ROLE = "platform-admin";
 
 const lower = (value: string) => value.trim().toLowerCase();
 
@@ -74,7 +70,14 @@ export function createAuth(db: Database, settings: AuthSettings) {
         invitationExpiresIn: 60 * 60 * 24 * 7,
         cancelPendingInvitationsOnReInvite: true,
       }),
-      admin({ defaultRole: "user", adminRoles: [PLATFORM_ADMIN_ROLE], allowImpersonatingAdmins: false }),
+      // Company admins are `member.role = admin`, never a global admin-plugin role, so they cannot use
+      // the plugin's cross-company endpoints (list/ban/impersonate users).
+      admin({
+        defaultRole: "user",
+        adminRoles: [PLATFORM_ADMIN_ROLE],
+        roles: platformRoles,
+        allowImpersonatingAdmins: false,
+      }),
     ],
     databaseHooks: {
       user: {

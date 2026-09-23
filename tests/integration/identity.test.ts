@@ -15,14 +15,19 @@ describe("identity: invite-only login and companies", () => {
     await stack.close();
   });
 
-  it("rejects a sign-up without an invitation and creates no user", async () => {
+  // Better Auth answers a refused sign-up with the same generic response as a successful one
+  // (anti-enumeration: nobody learns which addresses are invited). "Rejected" is therefore proven by
+  // its effect: no user, no session token, no login.
+  it("rejects a sign-up without an invitation: no user, no token, no login", async () => {
     const email = syntheticEmail("uninvited");
 
     const result = await signUp(stack.auth, email);
 
-    expect(result.status).toBe(403);
+    expect((result.body as { token: unknown }).token).toBeNull();
+    expect(result.cookie).not.toMatch(/session_token/);
     const users = await stack.database.db.select().from(schema.user).where(eq(schema.user.email, email));
     expect(users).toHaveLength(0);
+    expect((await signIn(stack.auth, email)).status).toBe(401);
   });
 
   it("gives an invited user a session that carries their active company and role", async () => {
