@@ -63,7 +63,8 @@ Errors use one shape, `{error: {code, message}, requestId}`, always with the `X-
 never echo the input.
 
 **Before the body is read.** A pure ASGI middleware (`ExtractGuard` in `api/app.py`) runs for
-`/v1/extract` before anything reads, spools or parses the multipart body: no valid bearer token →
+`/v1/extract` (matched on the route path, so also behind `--root-path`) before anything reads,
+spools or parses the multipart body: no valid bearer token →
 401 (constant-time compare); missing or non-numeric `Content-Length` (e.g. chunked uploads) → 411;
 declared length above `AI_MAX_DOCUMENT_BYTES` + 16 KiB → 413. The ASGI server (uvicorn) frames the
 body by `Content-Length`, so a client cannot send more than it declared. The FastAPI dependency
@@ -148,7 +149,8 @@ docling, httpx and google-genai loggers are raised to WARNING.
 **Native stderr (outside JSON logging).** docling-parse is a C++ extension that links qpdf and
 uses loguru; both write straight to file descriptor 2, bypassing Python logging and the JSON
 formatter. docling creates the parser with `loglevel="fatal"`, which silences loguru below fatal;
-qpdf warnings are not governed by that level. With the fixtures and deliberately damaged variants
+whether qpdf's own warning output is governed by that level was not established (inferred from
+strings in the compiled extension, not from source). With the fixtures and deliberately damaged variants
 (truncated file, broken `xref`/`startxref`, mangled font dictionary) no stderr output was observed
 (2026-09-23). qpdf warnings usually name object numbers and byte offsets, but whether any native
 message can contain document text is **unknown** (not established from the code). Treat the
