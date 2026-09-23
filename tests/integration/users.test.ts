@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { listAuditEvents } from "@/features/audit";
-import { AuthorizationError, changeUserRole, getActor, inviteUser, LastAdminError, listCompanyUsers, setUserActive, UserNotInCompany, type Actor } from "@/features/identity";
+import { AuthorizationError, changeUserRole, getActor, inviteUser, LastAdminError, listCompanyUsers, SelfDeactivation, setUserActive, UserNotInCompany, type Actor } from "@/features/identity";
 import { createTenancy } from "@/features/tenancy";
 import { call, companyWithAdmin, createStack, invitedUser, signIn, syntheticEmail, type Stack } from "./helpers/stack";
 
@@ -70,7 +70,8 @@ describe("user management for company admins (#30)", () => {
     expect((await actorOf(clerkCookie)).role).toBe("admin");
     expect((await auditOf(admin, clerk.userId)).map((event) => [event.action, event.actorUserId, event.data])).toEqual([["user.role_changed", admin.userId, { from: "clerk", to: "admin" }]]);
     const { invitationId } = await inviteUser(stack.database.db, admin, { email: syntheticEmail("neu"), role: "clerk" });
-    expect((await auditOf(admin, invitationId)).map((event) => event.action)).toEqual(["user.invited"]);
+    const invited = await createTenancy(stack.database.db).withTenant(admin.companyId, (tx) => listAuditEvents(tx, "invitation", invitationId));
+    expect(invited.map((event) => [event.action, event.data])).toEqual([["user.invited", { role: "clerk" }]]);
   });
 
   it("deactivating ends the sessions, blocks sign-in and is audited; reactivating allows sign-in again", async () => {
@@ -97,8 +98,19 @@ describe("user management for company admins (#30)", () => {
     await invitedUser(stack, admin, "clerk");
 
     await expect(changeUserRole(stack.database.db, admin, admin.userId, "clerk")).rejects.toBeInstanceOf(LastAdminError);
-    await expect(setUserActive(stack.database.db, admin, admin.userId, false)).rejects.toBeInstanceOf(LastAdminError);
+    await expect(setUserActive(stack.database.db, admin, admin.userId, false)).rejects.toBeInstanceOf(SelfDeactivation);
     expect(await auditOf(admin, admin.userId)).toEqual([]);
+  });
+
+  it("refuses self-deactivation even when another admin remains; another admin may deactivate them", async () => {
+    const a = await companyWithAdmin(stack);
+    const first = await actorOf(a.cookie);
+    const second = await actorOf((await invitedUser(stack, first, "admin")).cookie);
+
+    await expect(setUserActive(stack.database.db, first, first.userId, false)).rejects.toBeInstanceOf(SelfDeactivation);
+    await setUserActive(stack.database.db, second, first.userId, false);
+
+    expect(await getActor(stack.auth, stack.database.db, new Headers({ cookie: a.cookie }))).toBeNull();
   });
 
   it("serialises concurrent changes: two admins demoting each other leave exactly one admin", async () => {

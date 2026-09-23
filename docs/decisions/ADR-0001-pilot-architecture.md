@@ -337,6 +337,15 @@ maps tenants natively (organisations) and has a documented path to Entra ID.
 **Revisit when** real rollout happens (make Entra SSO mandatory), or if advisories keep hitting the
 plugins we use. The fallback is OIDC-only against the customer's identity provider, or Keycloak.
 
+**Amendment 2026-09-23 (#30).** The customer request asks for "eine einfache Benutzer- und
+Rechteverwaltung", so a minimal role-admin UI (`/users`: list, role admin/clerk, deactivate,
+reactivate; audited; last-admin rule) is part of the pilot after all. Hardening found on the way:
+Better Auth grants the organization plugin's `creatorRole` every plugin permission, and some plugin
+endpoints (e.g. `/organization/leave`, `/organization/list-members`) have no role check. Therefore
+`creatorRole` is a role nobody holds and all `/organization/*` endpoints except `set-active` are
+disabled – members, invitations and the company change only through the audited `identity` module.
+The admin plugin stays: its `banned` field implements deactivation.
+
 ---
 
 ## D7 · Authorization and tenant isolation — *challenged: application-level vs. RLS*

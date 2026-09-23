@@ -7,7 +7,7 @@ import { tenantOf, type TenantTx } from "@/features/tenancy";
 export interface AuditEventInput {
   actorUserId: string | null;
   action: string;
-  entityType: "request" | "document" | "user";
+  entityType: "request" | "document" | "user" | "invitation";
   entityId: string;
   data?: Record<string, unknown>;
 }

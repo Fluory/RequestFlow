@@ -76,7 +76,8 @@ export async function inviteUser(
       .values({ organizationId: actor.companyId, email, role: input.role, status: "pending", expiresAt: expiry(), inviterId: actor.userId })
       .returning({ id: schema.invitation.id });
     if (!row) throw new Error("invitation insert returned no row");
-    await recordAudit(tx, { actorUserId: actor.userId, action: "user.invited", entityType: "user", entityId: row.id, data: { email, role: input.role } });
+    // No e-mail in the append-only audit (it could never be erased); the invitation id points to it.
+    await recordAudit(tx, { actorUserId: actor.userId, action: "user.invited", entityType: "invitation", entityId: row.id, data: { role: input.role } });
     return { invitationId: row.id };
   });
 }

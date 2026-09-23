@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import { currentActor, getRuntime } from "@/app/_server/runtime";
-import { AuthorizationError, changeUserRole, COMPANY_ROLES, LastAdminError, setUserActive, UserNotInCompany } from "@/features/identity";
+import { AuthorizationError, changeUserRole, COMPANY_ROLES, LastAdminError, SelfDeactivation, setUserActive, UserNotInCompany } from "@/features/identity";
 
 // Server actions of the user management page (#30). Each resolves the actor from the session; the
 // identity module authorizes again next to the data (security rule: never only hidden UI). A clerk
@@ -23,6 +23,7 @@ async function guarded(action: () => Promise<void>, done: string): Promise<never
   } catch (error) {
     if (error instanceof AuthorizationError) notFound();
     if (error instanceof LastAdminError) redirect("/users?error=last_admin");
+    if (error instanceof SelfDeactivation) redirect("/users?error=self");
     if (error instanceof UserNotInCompany) redirect("/users?error=unknown_user");
     throw error;
   }

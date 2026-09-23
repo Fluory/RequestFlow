@@ -77,11 +77,12 @@ self-service password reset yet – recovery is an operator task (delete the use
 
 User management (#30): admins see their company's users on `/users`, change roles (`admin`/`clerk`),
 deactivate (sign-in blocked, all sessions ended at once) and reactivate. Every change – including an
-invitation – is an audit event (`user.invited`, `user.role_changed`, `user.deactivated`,
+invitation – is an audit event (`user.invited` on the invitation, `user.role_changed`, `user.deactivated`,
 `user.reactivated`). The last active admin of a company can be neither demoted nor deactivated; if a
 company still ends up without one, an operator re-invites an admin with `bootstrapCompany`-style SQL
-(no cross-company UI). Better Auth's own member/invitation endpoints grant nobody rights – every change
-goes through the audited module.
+(no cross-company UI). Admins cannot deactivate themselves. Better Auth's `/api/auth/organization/*`
+endpoints are disabled except `set-active` (404) – every change goes through the audited module. The
+`user.invited` audit event stores the role only; the invitation id points to the e-mail.
 
 ## Frequent failures
 

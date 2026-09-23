@@ -17,6 +17,7 @@ const ERRORS: Record<string, string> = {
   last_admin: "Der letzte aktive Admin der Firma kann weder herabgestuft noch deaktiviert werden.",
   unknown_user: "Diese Person gehört nicht zu Ihrer Firma.",
   input: "Bitte eine gültige Rolle wählen.",
+  self: "Den eigenen Zugang können Sie nicht deaktivieren – das muss ein anderer Admin tun.",
 };
 const dateFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "short", timeZone: "Europe/Berlin" });
 const pick = (table: Record<string, string>, code: string | undefined) => (code !== undefined && Object.hasOwn(table, code) ? table[code] : undefined);
