@@ -25,16 +25,21 @@ layout model plus the RapidOCR models (~31 MB) and is built at startup (fail-clo
 a field whose evidence is OCR text at ``uncertain`` (reason ``ocr_only``). The flag is per page:
 text docling reads from a PDF's own (invisible) text layer, e.g. a scanner's OCR, is not flagged,
 because nothing in the PDF says where it came from. At most ``MAX_OCR_PAGES`` pages are OCR'd per
-document (CPU time); more -> ``DocumentTooLongError``.
+extracted document (CPU time; a ``.msg`` shares the allowance across its attachments): the first
+pages without text are OCR'd, the rest stay empty and are counted in
+``PdfParse.ocr_pages_skipped`` (-> warning ``ocr_pages_skipped``). Consecutive pages are OCR'd in
+one conversion; docling still opens the whole PDF per conversion (no cheaper per-page entry).
 """
 
 from __future__ import annotations
 
 import functools
+from dataclasses import dataclass
 from io import BytesIO
 from typing import TYPE_CHECKING, Any, Literal
 
 from requestflow_ai.parsing.errors import (
+    BudgetExceededError,
     DocumentParseError,
     DocumentTooLongError,
     PdfPipelineInitError,
@@ -53,16 +58,28 @@ OCR_LANGUAGE = "iso:de"  # PP-OCRv6 recogniser; covers Latin script incl. umlaut
 Pages = dict[int, list[Segment]]
 
 
-def _page_count(data: bytes, max_pages: int) -> int:
-    backend = _load_pdf(data, max_pages)
+@dataclass(frozen=True)
+class PdfParse:
+    segments: list[Segment]
+    page_count: int
+    ocr_pages: int = 0  # pages OCR'd
+    ocr_pages_skipped: int = 0  # pages without text left empty because of the OCR cap
+
+
+def _page_count(data: bytes, max_pages: int, page_budget: int | None = None) -> int:
+    backend = _load_pdf(data, max_pages, page_budget)
     try:
         return int(backend.page_count())
     finally:
         backend.unload()
 
 
-def _load_pdf(data: bytes, max_pages: int) -> Any:
-    """Load the PDF with docling-parse (no model), enforce the page cap, return the backend."""
+def _load_pdf(data: bytes, max_pages: int, page_budget: int | None = None) -> Any:
+    """Load the PDF with docling-parse (no model), enforce the page caps, return the backend.
+
+    ``max_pages`` is the cap for one PDF (-> ``DocumentTooLongError``); ``page_budget`` what is
+    left of the extracted document's page budget (-> ``BudgetExceededError``).
+    """
     from docling.backend.docling_parse_backend import ThreadedDoclingParseDocumentBackend
     from docling.datamodel.backend_options import ThreadedDoclingParseBackendOptions
     from docling.datamodel.base_models import InputFormat
@@ -86,11 +103,14 @@ def _load_pdf(data: bytes, max_pages: int) -> Any:
     if in_doc.page_count > max_pages:
         backend.unload()
         raise DocumentTooLongError(f"document has more than {max_pages} pages")
+    if page_budget is not None and in_doc.page_count > page_budget:
+        backend.unload()
+        raise BudgetExceededError("PDF pages exceed the remaining page budget")
     return backend
 
 
 def parse_pdf_textlines(data: bytes, max_pages: int = DEFAULT_MAX_PAGES) -> list[Segment]:
-    return _flatten(_textline_pages(data, max_pages))
+    return _flatten(_textline_pages(data, max_pages)[0])
 
 
 def _flatten(pages: Pages) -> list[Segment]:
@@ -98,10 +118,13 @@ def _flatten(pages: Pages) -> list[Segment]:
     return [segment for page_no in sorted(pages) for segment in pages[page_no]]
 
 
-def _textline_pages(data: bytes, max_pages: int) -> Pages:
-    backend = _load_pdf(data, max_pages)
+def _textline_pages(
+    data: bytes, max_pages: int, page_budget: int | None = None
+) -> tuple[Pages, int]:
+    backend = _load_pdf(data, max_pages, page_budget)
     pages: Pages = {}
     try:
+        page_count = int(backend.page_count())
         for page in backend.iter_pages():
             if not page.is_valid():
                 raise DocumentParseError("could not parse a PDF page")
@@ -134,7 +157,7 @@ def _textline_pages(data: bytes, max_pages: int) -> Pages:
         raise DocumentParseError("could not parse PDF") from exc
     finally:
         backend.unload()
-    return pages
+    return pages, page_count
 
 
 @functools.cache
@@ -239,38 +262,61 @@ def _convert(converter: DocumentConverter, data: bytes, page_range: tuple[int, i
 
 
 def parse_pdf_layout(data: bytes, max_pages: int = DEFAULT_MAX_PAGES) -> list[Segment]:
-    return _flatten(_layout_pages(data, max_pages))
+    return _flatten(_layout_pages(data, max_pages)[0])
 
 
-def _layout_pages(data: bytes, max_pages: int) -> Pages:
+def _layout_pages(data: bytes, max_pages: int, page_budget: int | None = None) -> tuple[Pages, int]:
     # Model-free page count first: a too long PDF never reaches the layout model.
-    _page_count(data, max_pages)
-    return _document_pages(_convert(_layout_converter(), data, None), "b", ocr=False)
+    page_count = _page_count(data, max_pages, page_budget)
+    return _document_pages(_convert(_layout_converter(), data, None), "b", ocr=False), page_count
+
+
+def _runs(page_numbers: list[int]) -> list[tuple[int, int]]:
+    """Sorted page numbers as ranges of consecutive pages: [2, 3, 5] -> [(2, 3), (5, 5)]."""
+    runs: list[tuple[int, int]] = []
+    for page_no in page_numbers:
+        if runs and runs[-1][1] == page_no - 1:
+            runs[-1] = (runs[-1][0], page_no)
+        else:
+            runs.append((page_no, page_no))
+    return runs
 
 
 def _ocr_pages(data: bytes, page_numbers: list[int]) -> Pages:
-    if len(page_numbers) > MAX_OCR_PAGES:
-        raise DocumentTooLongError(f"document has more than {MAX_OCR_PAGES} pages without text")
     pages: Pages = {}
-    for page_no in page_numbers:
-        document = _convert(_ocr_converter(), data, (page_no, page_no))
-        pages[page_no] = _document_pages(document, "o", ocr=True).get(page_no, [])
+    for first, last in _runs(page_numbers):
+        read = _document_pages(_convert(_ocr_converter(), data, (first, last)), "o", ocr=True)
+        for page_no in range(first, last + 1):
+            pages[page_no] = read.get(page_no, [])
     return pages
+
+
+def parse_pdf_document(
+    data: bytes,
+    pipeline: PdfPipeline,
+    max_pages: int = DEFAULT_MAX_PAGES,
+    ocr: PdfOcr = "off",
+    max_ocr_pages: int | None = None,
+    page_budget: int | None = None,
+) -> PdfParse:
+    """Parse a PDF. ``max_ocr_pages`` (default ``MAX_OCR_PAGES``) bounds the pages OCR'd;
+    ``page_budget`` is what is left of the extracted document's page budget."""
+    if pipeline == "layout":
+        pages, page_count = _layout_pages(data, max_pages, page_budget)
+    else:
+        pages, page_count = _textline_pages(data, max_pages, page_budget)
+    ocr_done = ocr_skipped = 0
+    if ocr == "auto":
+        allowance = MAX_OCR_PAGES if max_ocr_pages is None else max(max_ocr_pages, 0)
+        without_text = [n for n in range(1, page_count + 1) if not pages.get(n)]
+        to_ocr = without_text[:allowance]
+        ocr_done, ocr_skipped = len(to_ocr), len(without_text) - len(to_ocr)
+        if to_ocr:
+            pages.update(_ocr_pages(data, to_ocr))
+    return PdfParse(_flatten(pages), page_count, ocr_done, ocr_skipped)
 
 
 def parse_pdf(
     data: bytes, pipeline: PdfPipeline, max_pages: int = DEFAULT_MAX_PAGES, ocr: PdfOcr = "off"
 ) -> list[Segment]:
-    if pipeline == "layout":
-        pages = _layout_pages(data, max_pages)
-    else:
-        pages = _textline_pages(data, max_pages)
-    if ocr == "auto":
-        without_text = [
-            page_no
-            for page_no in range(1, _page_count(data, max_pages) + 1)
-            if not pages.get(page_no)
-        ]
-        if without_text:
-            pages.update(_ocr_pages(data, without_text))
-    return _flatten(pages)
+    return parse_pdf_document(data, pipeline, max_pages, ocr).segments

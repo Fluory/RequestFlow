@@ -11,12 +11,10 @@
 from __future__ import annotations
 
 import re
-from io import BytesIO
 from typing import Literal
 
-import olefile
-
 from requestflow_ai.parsing.errors import DocumentParseError, UnsupportedMediaTypeError
+from requestflow_ai.parsing.msg import check_ole_container
 from requestflow_ai.parsing.ooxml import open_package, package_kind
 
 DocumentKind = Literal["pdf", "eml", "xlsx", "docx", "msg"]
@@ -31,12 +29,12 @@ _HEADER_LINE = re.compile(rb"^[!-9;-~]+:[ \t]")
 
 
 def _is_msg(data: bytes) -> bool:
-    try:
-        # Always a stream: olefile treats ``bytes`` shorter than 1536 as a *file name*.
-        with olefile.OleFileIO(BytesIO(data)) as ole:
+    # Stream sizes are bounded before anything is read (OLE stream bombs, see ``parsing.msg``).
+    with check_ole_container(data) as ole:
+        try:
             return bool(ole.exists(_MSG_ROOT_STREAM))
-    except Exception as exc:  # olefile raises OSError and others for damaged containers
-        raise DocumentParseError("could not read OLE container") from exc
+        except Exception as exc:
+            raise DocumentParseError("could not read OLE container") from exc
 
 
 def detect_kind(data: bytes, declared: str | None) -> DocumentKind:

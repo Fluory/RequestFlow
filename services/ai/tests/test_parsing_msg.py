@@ -2,14 +2,26 @@
 
 from __future__ import annotations
 
+import struct
+import time
+import zipfile
+from collections.abc import Callable
+from io import BytesIO
 from pathlib import Path
+from typing import Any
 
 import pytest
 from builders import DocxTable, MsgAttachment, MsgSpec, build_docx, build_msg, build_xlsx
+from oxmsg.attachment import Attachment
+from test_parsing_pdf import _OcrConverter
 
+from requestflow_ai.parsing import budget as budget_module
 from requestflow_ai.parsing import document as document_module
+from requestflow_ai.parsing import pdf as pdf_module
+from requestflow_ai.parsing.detect import detect_kind
 from requestflow_ai.parsing.document import ParseOptions, parse_document
 from requestflow_ai.parsing.errors import DocumentParseError
+from requestflow_ai.parsing.msg import load_message
 from requestflow_ai.parsing.segments import (
     AttachmentRef,
     DocxLocator,
@@ -204,3 +216,176 @@ def test_ole_file_that_is_not_a_message_is_a_parse_error() -> None:
 
     with pytest.raises(DocumentParseError):
         parse_document(build_cfb({"__properties_version1.0": b"\x00" * 4}), None, OPTIONS)
+
+
+# --- OLE stream bombs (security review of #40) ------------------------------------------------
+
+_FREE, _END, _FATSECT = 0xFFFFFFFF, 0xFFFFFFFE, 0xFFFFFFFD
+
+
+def _dirent(name: str, kind: int, child: int, start: int, size: int) -> bytes:
+    encoded = (name + "\0").encode("utf-16-le")
+    entry = encoded.ljust(64, b"\0") + struct.pack("<HBB", len(encoded), kind, 1)
+    entry += struct.pack("<III", _FREE, _FREE, child) + b"\0" * 36
+    entry += struct.pack("<III", start, size, 0)
+    assert len(entry) == 128
+    return entry
+
+
+def _looped_ole(stream_size: int, root_size: int = 0) -> bytes:
+    """A 2 KiB compound file whose one stream declares ``stream_size`` bytes on a FAT loop.
+
+    Sector 0 is the FAT, 1 the directory, 2 the stream's data; ``fat[2] = 2`` points the stream at
+    itself, so a reader that trusts the declared size reads sector 2 over and over.
+    """
+    header = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\0" * 16
+    header += struct.pack("<HHHHH", 0x3E, 3, 0xFFFE, 9, 6) + b"\0" * 6
+    # directory sectors, FAT sectors, first directory sector, transaction, mini cutoff,
+    # first mini FAT sector, mini FAT sectors, first DIFAT sector, DIFAT sectors
+    header += struct.pack("<IIIIIIIII", 0, 1, 1, 0, 4096, _END, 0, _END, 0)
+    header += struct.pack("<I", 0) + struct.pack("<I", _FREE) * 108
+    fat = struct.pack("<III", _FATSECT, _END, 2) + struct.pack("<I", _FREE) * 125
+    directory = _dirent("Root Entry", 5, 1, 2 if root_size else _END, root_size)
+    directory += _dirent("__properties_version1.0", 2, _FREE, 2, stream_size)
+    return header + fat + directory.ljust(512, b"\0") + b"A" * 512
+
+
+def _looped_difat_ole() -> bytes:
+    """Header claims 12.7 million FAT sectors, listed by a DIFAT sector that links to itself."""
+    data = bytearray(_looped_ole(100))
+    difat_sectors = 100_000
+    struct.pack_into("<I", data, 44, 109 + difat_sectors * 127)  # FAT sectors
+    struct.pack_into("<I", data, 68, 3)  # first DIFAT sector: the one appended below
+    struct.pack_into("<I", data, 72, difat_sectors)
+    data += struct.pack("<I", 0) * 127 + struct.pack("<I", 3)
+    return bytes(data)
+
+
+def _too_many_fat_sectors_ole() -> bytes:
+    data = bytearray(_looped_ole(100))
+    struct.pack_into("<I", data, 44, 100)  # 100 FAT sectors for a 3-sector file
+    return bytes(data)
+
+
+@pytest.mark.parametrize("build", [_looped_difat_ole, _too_many_fat_sectors_ole])
+def test_ole_header_sector_counts_beyond_the_file_are_rejected_fast(
+    build: Callable[[], bytes],
+) -> None:
+    data = build()
+    started = time.perf_counter()
+    with pytest.raises(DocumentParseError):
+        detect_kind(data, None)
+    with pytest.raises(DocumentParseError):
+        parse_document(data, None, OPTIONS)
+    assert time.perf_counter() - started < 2
+
+
+@pytest.mark.parametrize(
+    ("stream_size", "root_size"),
+    [
+        (64 * 1024 * 1024, 0),  # declared stream far beyond the container, looped FAT
+        (5_000, 0),  # small, but still larger than the whole 2 KiB file
+        (100, 64 * 1024 * 1024),  # mini stream (root entry) declared far beyond the container
+    ],
+)
+def test_ole_stream_larger_than_the_container_is_rejected_fast(
+    stream_size: int, root_size: int
+) -> None:
+    data = _looped_ole(stream_size, root_size)
+    assert len(data) == 2048
+    started = time.perf_counter()
+    with pytest.raises(DocumentParseError):
+        detect_kind(data, None)
+    with pytest.raises(DocumentParseError):
+        load_message(data)
+    with pytest.raises(DocumentParseError):
+        parse_document(data, None, OPTIONS)
+    assert time.perf_counter() - started < 2
+
+
+def test_attachments_beyond_the_cap_are_never_read(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(document_module, "MAX_ATTACHMENTS", 1)
+    xlsx = build_xlsx({"S": [["x"]]})
+    spec = _spec([MsgAttachment("a.xlsx", xlsx), MsgAttachment("b.xlsx", xlsx)])
+    read: list[int] = []
+    original: Any = Attachment.__dict__["file_bytes"]  # oxmsg's lazyproperty
+
+    def spy(self: Attachment) -> bytes | None:
+        read.append(1)
+        return original.__get__(self, Attachment)
+
+    monkeypatch.setattr(Attachment, "file_bytes", property(spy))
+    parsed = parse_document(build_msg(spec), None, OPTIONS)
+    assert [(a.status, a.error) for a in parsed.attachments] == [
+        ("parsed", None),
+        ("failed", "too_many_attachments"),
+    ]
+    assert len(read) == 1
+
+
+# --- One budget per extracted document, shared by all attachments (security review of #40) -----
+
+
+def test_attachment_budget_is_shared_across_nesting_levels(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(budget_module, "MAX_TOTAL_ATTACHMENTS", 2)
+    xlsx = build_xlsx({"S": [["x"]]})
+    inner = MsgSpec(subject="Weitergeleitet", attachments=[MsgAttachment("c.xlsx", xlsx)])
+    spec = _spec(
+        [
+            MsgAttachment("a.xlsx", xlsx),
+            MsgAttachment("fwd.msg", embedded=inner),
+            MsgAttachment("b.xlsx", xlsx),
+        ]
+    )
+    parsed = parse_document(build_msg(spec), None, OPTIONS)
+    assert [(a.path, a.status, a.error) for a in parsed.attachments] == [
+        ((0,), "parsed", None),
+        ((1,), "parsed", None),
+        ((1, 0), "failed", "budget_exceeded"),
+        ((2,), "failed", "budget_exceeded"),
+    ]
+    assert "msg-l3" in {s.id for s in parsed.segments}  # the body is still returned
+
+
+def test_unzipped_bytes_budget_is_shared(monkeypatch: pytest.MonkeyPatch) -> None:
+    xlsx = build_xlsx({"S": [["x"]]})
+    with zipfile.ZipFile(BytesIO(xlsx)) as archive:
+        unzipped = sum(entry.file_size for entry in archive.infolist())
+    monkeypatch.setattr(budget_module, "MAX_TOTAL_UNZIPPED_BYTES", unzipped + unzipped // 2)
+    spec = _spec([MsgAttachment("a.xlsx", xlsx), MsgAttachment("b.xlsx", xlsx)])
+    parsed = parse_document(build_msg(spec), None, OPTIONS)
+    assert [(a.status, a.error) for a in parsed.attachments] == [
+        ("parsed", None),
+        ("failed", "budget_exceeded"),
+    ]
+
+
+def test_pdf_page_budget_is_shared(fixtures_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(budget_module, "MAX_TOTAL_PDF_PAGES", 3)
+    pdf = (fixtures_dir / "anfrage_musterbau.pdf").read_bytes()  # 2 pages
+    spec = _spec([MsgAttachment("a.pdf", pdf), MsgAttachment("b.pdf", pdf)])
+    options = ParseOptions(pdf_pipeline="textlines", max_pdf_pages=2)
+    parsed = parse_document(build_msg(spec), None, options)
+    assert [(a.status, a.error) for a in parsed.attachments] == [
+        ("parsed", None),
+        ("failed", "budget_exceeded"),
+    ]
+
+
+def test_ocr_pages_are_shared_by_all_attachments(
+    fixtures_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(pdf_module, "MAX_OCR_PAGES", 1)
+    converter = _OcrConverter(["Liefertermin: 15.11.2026"])
+    monkeypatch.setattr(pdf_module, "_ocr_converter", lambda: converter)
+    scan = (fixtures_dir / "anfrage_scan.pdf").read_bytes()  # 1 page without text
+    spec = _spec([MsgAttachment("a.pdf", scan), MsgAttachment("b.pdf", scan)])
+    options = ParseOptions(pdf_pipeline="textlines", pdf_ocr="auto")
+    parsed = parse_document(build_msg(spec), None, options)
+
+    assert len(converter.page_ranges) == 1
+    assert [(a.status, a.segment_count) for a in parsed.attachments] == [
+        ("parsed", 1),
+        ("parsed", 0),
+    ]
+    assert parsed.ocr_pages_skipped == 1
