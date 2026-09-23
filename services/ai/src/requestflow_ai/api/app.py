@@ -24,6 +24,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.security.utils import get_authorization_scheme_param
+from starlette._utils import get_route_path
 from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -132,7 +133,8 @@ class ExtractGuard:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or scope["path"] != EXTRACT_PATH:
+        # get_route_path strips a proxy root_path (uvicorn --root-path), as the router does.
+        if scope["type"] != "http" or get_route_path(scope) != EXTRACT_PATH:
             await self.app(scope, receive, send)
             return
         settings: Settings = scope["app"].state.settings
