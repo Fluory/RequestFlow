@@ -30,9 +30,6 @@ export async function AppHeader() {
     <header className="app-header">
       <div className="app-header-inner">
         <Link href="/" className="brand">
-          <span className="brand-mark" aria-hidden="true">
-            R
-          </span>
           RequestFlow
           <span className="env-tag">Pilot</span>
         </Link>

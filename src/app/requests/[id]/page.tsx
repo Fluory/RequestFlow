@@ -69,7 +69,7 @@ export default async function RequestPage({
       )}
       {request.possibleDuplicate && request.duplicateOfId && (
         <section aria-labelledby="duplicate-heading" className="callout callout-warn" data-testid="duplicate-banner">
-          <h2 id="duplicate-heading">⚠ Mögliches Duplikat</h2>
+          <h2 id="duplicate-heading">Mögliches Duplikat</h2>
           <p>
             Gleiche E-Mail oder gleiche Dateien wie <Link href={`/requests/${request.duplicateOfId}`}>diese Anfrage</Link>.
             {request.duplicateDecision === "distinct" && " Entscheidung: eigenständige Anfrage."}

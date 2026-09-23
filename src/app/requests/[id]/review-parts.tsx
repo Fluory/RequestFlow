@@ -23,10 +23,10 @@ export const STATUS_LABEL: Record<ReviewStatus, string> = {
 export const needsAttention = (field: ReviewField): boolean => field.reviewStatus === "unverified" || field.reviewStatus === "uncertain";
 
 export function StatusBadge({ status }: { status: ReviewStatus }) {
-  // Uncertain and unverified are the ones a clerk must look at: prominent colour + text, never colour only.
+  // Uncertain and unverified are the ones a clerk must look at: a highlighted tag, the others stay
+  // quiet text (#52) – always with the label, never colour only.
   return (
     <span className={`badge badge-${status}`} data-testid={`status-${status}`}>
-      {status === "unverified" || status === "uncertain" ? "⚠ " : ""}
       {STATUS_LABEL[status]}
     </span>
   );
@@ -42,7 +42,7 @@ export function Source({ field }: { field: ReviewField }) {
       </h3>
       {source.ocr && (
         <p role="note">
-          <strong>⚠ Texterkennung (OCR):</strong> Der Text stammt aus einem gescannten Dokument – bitte mit dem Original vergleichen.
+          <strong>Texterkennung (OCR):</strong> Der Text stammt aus einem gescannten Dokument – bitte mit dem Original vergleichen.
         </p>
       )}
       {field.corrected && <p>Fundstelle des erkannten Werts „{field.extractedValue ?? "–"}“ – der aktuelle Wert wurde manuell korrigiert.</p>}
@@ -78,7 +78,7 @@ export function DocumentList({ documents, skippedDocuments, documentNotes }: Doc
               <ul>
                 {notes.failedAttachments.map((attachment, index) => (
                   <li key={index} role="note">
-                    ⚠ Anhang „{attachment.name ?? `Nr. ${index + 1}`}“ konnte nicht gelesen werden ({ATTACHMENT_ERROR[attachment.error ?? ""] ?? "unbekannter Grund"}) – bitte im Original prüfen.
+                    Anhang „{attachment.name ?? `Nr. ${index + 1}`}“ konnte nicht gelesen werden ({ATTACHMENT_ERROR[attachment.error ?? ""] ?? "unbekannter Grund"}) – bitte im Original prüfen.
                   </li>
                 ))}
               </ul>

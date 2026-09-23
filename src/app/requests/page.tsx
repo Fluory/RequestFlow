@@ -44,7 +44,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
       <div className="page-head">
         <div>
           <h1>Anfragen</h1>
-          <p className="lead">Neue Anfrage als E-Mail oder Dateien hochladen – sie wird automatisch ausgelesen und erscheint danach zur Prüfung.</p>
+          <p className="lead">Hochgeladene Anfragen werden automatisch ausgelesen und erscheinen danach zur Prüfung.</p>
         </div>
       </div>
       <section className="card" aria-label="Anfrage hochladen">
@@ -120,7 +120,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                           ) : request.duplicateDecision === "duplicate" ? (
                             "Als Duplikat abgelehnt"
                           ) : (
-                            <span className="badge badge-uncertain">⚠ Mögliches Duplikat – Entscheidung offen</span>
+                            <span className="badge badge-uncertain">Mögliches Duplikat – Entscheidung offen</span>
                           )
                         ) : (
                           ""
