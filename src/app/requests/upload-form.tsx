@@ -8,6 +8,7 @@ import { useState, type FormEvent } from "react";
 export function UploadForm() {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -15,6 +16,7 @@ export function UploadForm() {
     const formElement = event.currentTarget;
     setBusy(true);
     setMessage(null);
+    setFailed(false);
     const response = await fetch("/api/requests", { method: "POST", body: new FormData(formElement) });
     setBusy(false);
     if (response.ok) {
@@ -25,20 +27,20 @@ export function UploadForm() {
       return;
     }
     const body = (await response.json().catch(() => null)) as { error?: { title?: string } } | null;
+    setFailed(true);
     setMessage(body?.error?.title ?? "Upload fehlgeschlagen.");
   }
 
   return (
-    <form onSubmit={submit} aria-busy={busy}>
-      <p>
+    <form onSubmit={submit} aria-busy={busy} className="upload">
+      <p className="dropzone">
         <label htmlFor="files">E-Mail (.eml, .msg) oder Dateien (.pdf, .xlsx, .docx)</label>
-        <br />
         <input id="files" name="files" type="file" multiple required accept=".eml,.msg,.pdf,.xlsx,.docx" />
       </p>
-      <button type="submit" disabled={busy}>
+      <button type="submit" className="btn-primary" disabled={busy}>
         {busy ? "Wird hochgeladen …" : "Anfrage hochladen"}
       </button>
-      {message && <p role="status">{message}</p>}
+      {message && <p role={failed ? "alert" : "status"}>{message}</p>}
     </form>
   );
 }

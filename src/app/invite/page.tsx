@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
@@ -37,29 +38,35 @@ export default async function InvitePage({ searchParams }: { searchParams: Promi
   const link = params.invitation ? `${getRuntime().config.auth.baseURL}/signup?invitation=${encodeURIComponent(params.invitation)}` : null;
   return (
     <main>
-      <h1>Mitarbeitende einladen</h1>
-      {link && (
-        <p role="status">
-          Einladung angelegt (7 Tage gültig). Diesen Link an die eingeladene Person weitergeben: <code>{link}</code>
-        </p>
-      )}
-      {params.error && <p role="alert">Bitte eine gültige E-Mail-Adresse und Rolle angeben.</p>}
-      <form action={invite}>
-        <p>
-          <label htmlFor="email">E-Mail</label>
-          <br />
-          <input id="email" name="email" type="email" required maxLength={254} />
-        </p>
-        <p>
-          <label htmlFor="role">Rolle</label>
-          <br />
-          <select id="role" name="role" defaultValue="clerk">
-            <option value="clerk">Sachbearbeitung</option>
-            <option value="admin">Administration</option>
-          </select>
-        </p>
-        <button type="submit">Einladen</button>
-      </form>
+      <Link href="/users" className="back">
+        ← Benutzer
+      </Link>
+      <div className="auth card">
+        <h1>Mitarbeitende einladen</h1>
+        <p className="lead">Die Einladung erzeugt einen Link, den Sie selbst an die Person weitergeben.</p>
+        {link && (
+          <p role="status">
+            Einladung angelegt (7 Tage gültig). Diesen Link an die eingeladene Person weitergeben: <code>{link}</code>
+          </p>
+        )}
+        {params.error && <p role="alert">Bitte eine gültige E-Mail-Adresse und Rolle angeben.</p>}
+        <form action={invite}>
+          <p className="field">
+            <label htmlFor="email">E-Mail</label>
+            <input id="email" name="email" type="email" required maxLength={254} />
+          </p>
+          <p className="field">
+            <label htmlFor="role">Rolle</label>
+            <select id="role" name="role" defaultValue="clerk">
+              <option value="clerk">Sachbearbeitung</option>
+              <option value="admin">Administration</option>
+            </select>
+          </p>
+          <button type="submit" className="btn-primary">
+            Einladen
+          </button>
+        </form>
+      </div>
     </main>
   );
 }

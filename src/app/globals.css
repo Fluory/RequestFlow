@@ -444,6 +444,23 @@ button.btn-small {
   font-size: 0.875rem;
 }
 
+a.btn-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.25rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: var(--radius-sm);
+  background: var(--brand);
+  color: #fff;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+a.btn-link:hover {
+  background: var(--brand-hover);
+  color: #fff;
+}
+
 .inline-form {
   display: flex;
   align-items: center;

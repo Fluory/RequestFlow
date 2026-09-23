@@ -6,7 +6,8 @@ import { listExportRecords } from "@/features/export";
 import { listRequests, type RequestFilter } from "@/features/requests";
 import { reprocessAction } from "./actions";
 import { requestRowView } from "./row-view";
-import { REQUEST_STATUS_LABEL, requestStatusLabel } from "./status-labels";
+import { REQUEST_STATUS_LABEL } from "./status-labels";
+import { StatusPill } from "./status-pill";
 import { UploadForm } from "./upload-form";
 
 export const dynamic = "force-dynamic";
@@ -41,85 +42,107 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
 
   return (
     <main>
-      <h1>Anfragen</h1>
-      <UploadForm />
+      <div className="page-head">
+        <div>
+          <h1>Anfragen</h1>
+          <p className="lead">Neue Anfrage als E-Mail oder Dateien hochladen – sie wird automatisch ausgelesen und erscheint danach zur Prüfung.</p>
+        </div>
+      </div>
+      <section className="card" aria-label="Anfrage hochladen">
+        <UploadForm />
+      </section>
       {done && <p role="status">{done}</p>}
       {error && <p role="alert">{error}</p>}
-      <form method="get" aria-label="Filter">
-        <label>
-          Status{" "}
-          <select name="status" defaultValue={filter.status ?? ""}>
-            <option value="">alle</option>
-            {Object.entries(REQUEST_STATUS_LABEL).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>{" "}
-        <label>
-          <input type="checkbox" name="duplicate" value="1" defaultChecked={filter.possibleDuplicate === true} /> nur mögliche Duplikate
-        </label>{" "}
-        <button type="submit">Filtern</button>
-      </form>
-      {requests.length === 0 ? (
-        <p>{filter.status || filter.possibleDuplicate ? "Keine Anfragen für diesen Filter." : "Noch keine Anfragen."}</p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Eingang</th>
-              <th scope="col">Betreff</th>
-              <th scope="col">Status</th>
-              <th scope="col">Versuche</th>
-              <th scope="col">Letzter Fehler</th>
-              <th scope="col">Nächster Versuch</th>
-              <th scope="col">Hinweis</th>
-              <th scope="col">Aktion</th>
-            </tr>
-          </thead>
-          <tbody>
-            {requests.map((request) => {
-              const row = requestRowView(request, exports.get(request.id));
-              return (
-                <tr key={request.id} data-testid={`request-${request.id}`}>
-                  <td>{dateFormat.format(request.createdAt)}</td>
-                  <td>
-                    <Link href={`/requests/${request.id}`}>{request.subject ?? "(ohne Betreff)"}</Link>
-                  </td>
-                  <td>
-                    {requestStatusLabel(request.status)}
-                    {request.status === "ERROR" && row.stage ? ` (${STAGE_LABEL[row.stage]})` : ""}
-                  </td>
-                  <td>{row.attempts > 0 ? row.attempts : "–"}</td>
-                  {/* The stage appears once: in the status for ERROR, as a prefix while retrying. */}
-                  <td>{row.error ? `${request.status !== "ERROR" && row.stage ? `${STAGE_LABEL[row.stage]}: ` : ""}${row.error}` : "–"}</td>
-                  <td>{row.nextRetryAt ? dateFormat.format(row.nextRetryAt) : "–"}</td>
-                  <td>
-                    {request.possibleDuplicate
-                      ? request.duplicateDecision === "distinct"
-                        ? "Duplikat geprüft: eigenständig"
-                        : request.duplicateDecision === "duplicate"
-                          ? "Als Duplikat abgelehnt"
-                          : "Mögliches Duplikat – Entscheidung offen"
-                      : ""}
-                  </td>
-                  <td>
-                    {request.status === "ERROR" && (
-                      <form action={reprocessAction}>
-                        <input type="hidden" name="requestId" value={request.id} />
-                        <button type="submit" aria-label={`Erneut verarbeiten: ${request.subject ?? "(ohne Betreff)"}`}>
-                          Erneut verarbeiten
-                        </button>
-                      </form>
-                    )}
-                  </td>
+      <section className="card card-flush" aria-label="Anfragenliste">
+        <form method="get" aria-label="Filter" className="toolbar">
+          <label>
+            Status
+            <select name="status" defaultValue={filter.status ?? ""}>
+              <option value="">alle</option>
+              {Object.entries(REQUEST_STATUS_LABEL).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <input type="checkbox" name="duplicate" value="1" defaultChecked={filter.possibleDuplicate === true} /> nur mögliche Duplikate
+          </label>
+          <button type="submit" className="btn-small">
+            Filtern
+          </button>
+          <span className="muted hint">{requests.length === 1 ? "1 Anfrage" : `${requests.length} Anfragen`}</span>
+        </form>
+        {requests.length === 0 ? (
+          <p className="empty">{filter.status || filter.possibleDuplicate ? "Keine Anfragen für diesen Filter." : "Noch keine Anfragen."}</p>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Eingang</th>
+                  <th scope="col">Betreff</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" className="num">
+                    Versuche
+                  </th>
+                  <th scope="col">Letzter Fehler</th>
+                  <th scope="col">Nächster Versuch</th>
+                  <th scope="col">Hinweis</th>
+                  <th scope="col">
+                    <span className="visually-hidden">Aktion</span>
+                  </th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
+              </thead>
+              <tbody>
+                {requests.map((request) => {
+                  const row = requestRowView(request, exports.get(request.id));
+                  return (
+                    <tr key={request.id} data-testid={`request-${request.id}`}>
+                      <td className="nowrap muted">{dateFormat.format(request.createdAt)}</td>
+                      <td>
+                        <Link href={`/requests/${request.id}`}>{request.subject ?? "(ohne Betreff)"}</Link>
+                      </td>
+                      <td>
+                        <StatusPill status={request.status} />
+                        {request.status === "ERROR" && row.stage && <span className="stage">{STAGE_LABEL[row.stage]}</span>}
+                      </td>
+                      <td className="num">{row.attempts > 0 ? row.attempts : "–"}</td>
+                      {/* The stage appears once: in the status for ERROR, as a prefix while retrying. */}
+                      <td>{row.error ? `${request.status !== "ERROR" && row.stage ? `${STAGE_LABEL[row.stage]}: ` : ""}${row.error}` : "–"}</td>
+                      <td className="nowrap">{row.nextRetryAt ? dateFormat.format(row.nextRetryAt) : "–"}</td>
+                      <td className="hint">
+                        {request.possibleDuplicate ? (
+                          request.duplicateDecision === "distinct" ? (
+                            "Duplikat geprüft: eigenständig"
+                          ) : request.duplicateDecision === "duplicate" ? (
+                            "Als Duplikat abgelehnt"
+                          ) : (
+                            <span className="badge badge-uncertain">⚠ Mögliches Duplikat – Entscheidung offen</span>
+                          )
+                        ) : (
+                          ""
+                        )}
+                      </td>
+                      <td>
+                        {request.status === "ERROR" && (
+                          <form action={reprocessAction}>
+                            <input type="hidden" name="requestId" value={request.id} />
+                            <button type="submit" className="btn-small" aria-label={`Erneut verarbeiten: ${request.subject ?? "(ohne Betreff)"}`}>
+                              Erneut verarbeiten
+                            </button>
+                          </form>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </main>
   );
 }

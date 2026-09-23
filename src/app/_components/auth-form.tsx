@@ -8,12 +8,14 @@ import { useState, type FormEvent } from "react";
 export function AuthForm({ mode, invitationId }: { mode: "sign-in" | "sign-up"; invitationId?: string }) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     setMessage(null);
+    setFailed(false);
     const form = new FormData(event.currentTarget);
     const body = {
       email: String(form.get("email") ?? ""),
@@ -30,12 +32,14 @@ export function AuthForm({ mode, invitationId }: { mode: "sign-in" | "sign-up"; 
       if (response.ok) {
         router.push("/");
         router.refresh();
+        return;
       }
-      else if (response.status === 429) setMessage("Zu viele Versuche – bitte später erneut versuchen.");
-      else setMessage("Anmeldung fehlgeschlagen. Bitte E-Mail und Passwort prüfen.");
+      setFailed(true);
+      setMessage(response.status === 429 ? "Zu viele Versuche – bitte später erneut versuchen." : "Anmeldung fehlgeschlagen. Bitte E-Mail und Passwort prüfen.");
       return;
     }
     // Same answer for invited and uninvited addresses (no enumeration).
+    setFailed(!response.ok);
     setMessage(
       response.ok
         ? "Falls für diese Adresse eine Einladung vorliegt, ist das Konto jetzt angelegt. Bitte anmelden."
@@ -46,20 +50,17 @@ export function AuthForm({ mode, invitationId }: { mode: "sign-in" | "sign-up"; 
   return (
     <form onSubmit={submit} aria-busy={busy}>
       {mode === "sign-up" && (
-        <p>
+        <p className="field">
           <label htmlFor="name">Name</label>
-          <br />
           <input id="name" name="name" required autoComplete="name" />
         </p>
       )}
-      <p>
+      <p className="field">
         <label htmlFor="email">E-Mail</label>
-        <br />
         <input id="email" name="email" type="email" required autoComplete="email" />
       </p>
-      <p>
+      <p className="field">
         <label htmlFor="password">Passwort</label>
-        <br />
         <input
           id="password"
           name="password"
@@ -69,10 +70,12 @@ export function AuthForm({ mode, invitationId }: { mode: "sign-in" | "sign-up"; 
           autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
         />
       </p>
-      <button type="submit" disabled={busy}>
-        {mode === "sign-in" ? "Anmelden" : "Konto anlegen"}
-      </button>
-      {message && <p role="status">{message}</p>}
+      <p>
+        <button type="submit" className="btn-primary" disabled={busy}>
+          {mode === "sign-in" ? "Anmelden" : "Konto anlegen"}
+        </button>
+      </p>
+      {message && <p role={failed ? "alert" : "status"}>{message}</p>}
     </form>
   );
 }
@@ -85,7 +88,7 @@ export function SignOutButton() {
     router.refresh();
   }
   return (
-    <button type="button" onClick={signOut}>
+    <button type="button" className="btn-ghost btn-small" onClick={signOut}>
       Abmelden
     </button>
   );

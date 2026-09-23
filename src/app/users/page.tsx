@@ -39,66 +39,82 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
 
   return (
     <main>
-      <p>
-        <Link href="/">← Start</Link>
-      </p>
-      <h1>Benutzer</h1>
+      <div className="page-head">
+        <div>
+          <h1>Benutzer</h1>
+          <p className="lead">Rollen ändern und Zugänge deaktivieren. Der letzte aktive Admin bleibt immer erhalten.</p>
+        </div>
+        <Link href="/invite" className="btn-link">
+          Person einladen
+        </Link>
+      </div>
       {done && <p role="status">{done}</p>}
       {error && <p role="alert">{error}</p>}
-      <p>
-        <Link href="/invite">Person einladen</Link>
-      </p>
-      <table>
-        <thead>
-          <tr>
-            <th scope="col">Name</th>
-            <th scope="col">E-Mail</th>
-            <th scope="col">Rolle</th>
-            <th scope="col">Status</th>
-            <th scope="col">Aktionen</th>
-          </tr>
-        </thead>
-        <tbody>
-          {view.users.map((user) => (
-            <tr key={user.userId} data-testid={`user-${user.email}`}>
-              <th scope="row">{user.name}</th>
-              <td>{user.email}</td>
-              <td>
-                <form action={changeRoleAction}>
-                  <input type="hidden" name="userId" value={user.userId} />
-                  <label>
-                    <span className="visually-hidden">Rolle von {user.email}</span>
-                    <select name="role" defaultValue={user.role}>
-                      <option value="clerk">{ROLE_LABEL.clerk}</option>
-                      <option value="admin">{ROLE_LABEL.admin}</option>
-                    </select>
-                  </label>{" "}
-                  <button type="submit">Rolle speichern</button>
-                </form>
-              </td>
-              <td>{user.active ? "aktiv" : "deaktiviert"}</td>
-              <td>
-                <form action={user.active ? deactivateAction : reactivateAction}>
-                  <input type="hidden" name="userId" value={user.userId} />
-                  <button type="submit">{user.active ? "Deaktivieren" : "Reaktivieren"}</button>
-                </form>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <h2>Offene Einladungen</h2>
-      {view.invitations.length === 0 ? (
-        <p>Keine offenen Einladungen.</p>
-      ) : (
-        <ul>
-          {view.invitations.map((invitation) => (
-            <li key={invitation.id}>
-              {invitation.email} – {ROLE_LABEL[invitation.role] ?? invitation.role}, gültig bis {dateFormat.format(invitation.expiresAt)}
-            </li>
-          ))}
-        </ul>
-      )}
+      <section className="card card-flush" aria-label="Benutzerliste">
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col">E-Mail</th>
+                <th scope="col">Rolle</th>
+                <th scope="col">Status</th>
+                <th scope="col">
+                  <span className="visually-hidden">Aktionen</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {view.users.map((user) => (
+                <tr key={user.userId} data-testid={`user-${user.email}`}>
+                  <th scope="row">{user.name}</th>
+                  <td className="muted">{user.email}</td>
+                  <td>
+                    <form action={changeRoleAction} className="inline-form">
+                      <input type="hidden" name="userId" value={user.userId} />
+                      <label>
+                        <span className="visually-hidden">Rolle von {user.email}</span>
+                        <select name="role" defaultValue={user.role}>
+                          <option value="clerk">{ROLE_LABEL.clerk}</option>
+                          <option value="admin">{ROLE_LABEL.admin}</option>
+                        </select>
+                      </label>
+                      <button type="submit" className="btn-small">
+                        Rolle speichern
+                      </button>
+                    </form>
+                  </td>
+                  <td>
+                    <span className={user.active ? "pill pill-success" : "pill pill-neutral"}>{user.active ? "aktiv" : "deaktiviert"}</span>
+                  </td>
+                  <td>
+                    <form action={user.active ? deactivateAction : reactivateAction}>
+                      <input type="hidden" name="userId" value={user.userId} />
+                      <button type="submit" className={user.active ? "btn-danger btn-small" : "btn-small"}>
+                        {user.active ? "Deaktivieren" : "Reaktivieren"}
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section className="card" aria-labelledby="invitations-heading">
+        <h2 id="invitations-heading">Offene Einladungen</h2>
+        {view.invitations.length === 0 ? (
+          <p className="muted">Keine offenen Einladungen.</p>
+        ) : (
+          <ul className="doc-list">
+            {view.invitations.map((invitation) => (
+              <li key={invitation.id}>
+                {invitation.email} – {ROLE_LABEL[invitation.role] ?? invitation.role}, <span className="muted">gültig bis {dateFormat.format(invitation.expiresAt)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </main>
   );
 }

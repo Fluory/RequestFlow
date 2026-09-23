@@ -4,11 +4,14 @@ import { AuthForm } from "@/app/_components/auth-form";
 export default function LoginPage() {
   return (
     <main>
-      <h1>Anmelden</h1>
-      <AuthForm mode="sign-in" />
-      <p>
-        Eingeladen worden? <Link href="/signup">Konto anlegen</Link>
-      </p>
+      <div className="auth card">
+        <h1>Anmelden</h1>
+        <p className="lead">Mit Ihrem RequestFlow-Konto anmelden.</p>
+        <AuthForm mode="sign-in" />
+        <p className="muted">
+          Eingeladen worden? <Link href="/signup">Konto anlegen</Link>
+        </p>
+      </div>
     </main>
   );
 }

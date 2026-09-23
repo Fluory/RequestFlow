@@ -6,18 +6,20 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
   const { invitation } = await searchParams;
   return (
     <main>
-      <h1>Konto anlegen</h1>
-      {invitation ? (
-        <>
-          <p>Verwenden Sie die E-Mail-Adresse, an die die Einladung ging.</p>
-          <AuthForm mode="sign-up" invitationId={invitation} />
-        </>
-      ) : (
-        <p role="alert">Ein Konto kann nur über einen Einladungslink angelegt werden. Bitte wenden Sie sich an Ihre Administration.</p>
-      )}
-      <p>
-        <Link href="/login">Zur Anmeldung</Link>
-      </p>
+      <div className="auth card">
+        <h1>Konto anlegen</h1>
+        {invitation ? (
+          <>
+            <p className="lead">Verwenden Sie die E-Mail-Adresse, an die die Einladung ging.</p>
+            <AuthForm mode="sign-up" invitationId={invitation} />
+          </>
+        ) : (
+          <p role="alert">Ein Konto kann nur über einen Einladungslink angelegt werden. Bitte wenden Sie sich an Ihre Administration.</p>
+        )}
+        <p className="muted">
+          <Link href="/login">Zur Anmeldung</Link>
+        </p>
+      </div>
     </main>
   );
 }
