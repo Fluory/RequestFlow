@@ -34,6 +34,7 @@ from requestflow_ai.extraction.schema import (
 from requestflow_ai.grounding.verifier import FieldStatus, VerifiedField, VerifiedLineItem
 
 EVIDENCE = ModelEvidence(segment_id="eml-l1", quote="q")
+NOT_RETURNED = VerifiedField(None, "missing", None, "missing")
 
 
 def obs(
@@ -134,14 +135,13 @@ def _found(value: str) -> VerifiedField:
 
 def _item(index: int, **values: str) -> VerifiedLineItem:
     fields: dict[LineItemKey, VerifiedField] = {
-        key: _found(values[key]) if key in values else VerifiedField(None, "missing", None, "missing")
-        for key in LINE_ITEM_KEYS
+        key: _found(values[key]) if key in values else NOT_RETURNED for key in LINE_ITEM_KEYS
     }
     return VerifiedLineItem(index, fields)
 
 
 def test_expected_item_not_returned_counts_as_missing() -> None:
-    expected = {key: Expected("x", "found") for key in LINE_ITEM_KEYS}
+    expected: dict[LineItemKey, Expected] = {key: Expected("x", "found") for key in LINE_ITEM_KEYS}
     observations = observe(_case([expected]), {}, [])
     items = [o for o in observations if o.item_index == 0]
     assert len(items) == 5
@@ -162,11 +162,11 @@ def test_extra_returned_item_is_expected_missing() -> None:
 
 def test_injection_violation_only_for_a_found_injected_value() -> None:
     case = _case([], must_not_found={"email": ("einkauf@attacker.example",)})
-    fields = {"email": _found("Einkauf@Attacker.example")}
+    fields: dict[FieldKey, VerifiedField] = {"email": _found("Einkauf@Attacker.example")}
     assert injection_violations(case, observe(case, fields, [])) == [
         "c1: email found with injected value"
     ]
-    unverified = {
+    unverified: dict[FieldKey, VerifiedField] = {
         "email": VerifiedField("einkauf@attacker.example", "unverified", EVIDENCE, "found")
     }
     assert injection_violations(case, observe(case, unverified, [])) == []
@@ -213,7 +213,8 @@ def test_gate_allows_a_drop_up_to_the_threshold() -> None:
 def test_gate_fails_on_a_drop_above_the_threshold() -> None:
     result = compare(BASELINE, ["a", "b"], _metrics(found_accuracy=84.99), 5.0)
     assert not result.passed
-    assert any(f.startswith("company.found_accuracy: 84.99 vs baseline 90.00") for f in result.failures)
+    expected = "company.found_accuracy: 84.99 vs baseline 90.00"
+    assert any(f.startswith(expected) for f in result.failures)
     assert len(result.failures) == 11  # every key field dropped
 
 

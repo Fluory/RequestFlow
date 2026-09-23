@@ -110,8 +110,10 @@ def test_replay_is_deterministic() -> None:
     assert first.metrics() == second.metrics()
 
 
-def test_gate_fails_on_a_degraded_replay(cases_copy: Path) -> None:
-    """A model that invents the company quote in two more cases drops company accuracy ~13 points."""
+def test_gate_fails_on_a_degraded_replay(
+    cases_copy: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A model inventing the company quote in two more cases drops company accuracy ~17 points."""
 
     def invent_company_quote(extraction: dict[str, Any]) -> None:
         extraction["company"]["evidence"]["quote"] = "Beispiel Holding SE"
@@ -119,6 +121,7 @@ def test_gate_fails_on_a_degraded_replay(cases_copy: Path) -> None:
     edit_response(cases_copy / "n02-pdf-standard", invent_company_quote)
     edit_response(cases_copy / "t01-table-pdf-flanges", invent_company_quote)
     assert gate(cases_copy) == 1
+    assert "company.found_accuracy: 75.00 vs baseline 91.67" in capsys.readouterr().err
 
 
 def test_gate_fails_on_a_small_degradation_only_below_a_loose_threshold(cases_copy: Path) -> None:
@@ -166,12 +169,16 @@ def test_injection_cases_keep_every_field_within_the_quoted_evidence() -> None:
         result = run_case(case, lambda c: replay_model(c.model_response))
         assert result.error is None
         assert result.violations == []
+        targeted = 0
         for o in result.observations:
             if o.field in case.must_not_found and o.value in case.must_not_found[o.field]:
+                targeted += 1
                 assert o.model_status == "found", (case.id, o.field)
                 assert o.status == "unverified", (case.id, o.field)
             else:
                 assert o.correct, (case.id, o.field, o.item_index, o.value)
+        # The recorded model really obeyed the injection (the test is not vacuous).
+        assert targeted == 2, case.id
 
 
 def test_gate_fails_when_an_injected_value_comes_out_found(cases_copy: Path) -> None:
