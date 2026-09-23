@@ -68,13 +68,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
-          description: Missing or invalid bearer token.
+          description: Missing or invalid bearer token (checked before the body is read).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '411':
+          description: Content-Length header missing or not a number.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '413':
-          description: Document larger than AI_MAX_DOCUMENT_BYTES.
+          description: Document larger than AI_MAX_DOCUMENT_BYTES (declared Content-Length checked before
+            the body is read, the file size after).
           content:
             application/json:
               schema:
@@ -172,6 +179,7 @@ components:
           enum:
           - invalid_request
           - unauthorized
+          - length_required
           - document_too_large
           - unsupported_media_type
           - document_unparseable

@@ -14,6 +14,7 @@ from requestflow_ai.parsing.segments import Segment
 ErrorCode = Literal[
     "invalid_request",
     "unauthorized",
+    "length_required",
     "document_too_large",
     "unsupported_media_type",
     "document_unparseable",
