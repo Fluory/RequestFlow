@@ -66,7 +66,7 @@ export default async function RequestPage({
   if (!UUID.test(id)) notFound();
   const view = await loadReview(getRuntime().tenancy, actor, id);
   if (!view) notFound();
-  const { request, fields, documents, skippedDocuments } = view;
+  const { request, fields, documents, skippedDocuments, exportRecord } = view;
   const query = await searchParams;
   const selected = fields.find((field) => field.key === query.field);
   const inReview = request.status === "REVIEW";
@@ -86,6 +86,16 @@ export default async function RequestPage({
       {error && <p role="alert">{error}</p>}
       {request.status === "ERROR" && request.errorMessage && <p role="alert">Fehler: {request.errorMessage}</p>}
       {request.status === "REJECTED" && request.rejectionReason && <p>Abgelehnt: {request.rejectionReason}</p>}
+      {exportRecord?.erpReference && (
+        <p>
+          ERP-Referenz: <strong data-testid="erp-reference">{exportRecord.erpReference}</strong>
+        </p>
+      )}
+      {request.status === "APPROVED" && exportRecord?.lastError && (
+        <p role="status">
+          Export wird wiederholt ({exportRecord.attempts} Versuche bisher): {exportRecord.lastError}
+        </p>
+      )}
       {request.possibleDuplicate && request.duplicateOfId && (
         <p role="note">
           Mögliches Duplikat von <Link href={`/requests/${request.duplicateOfId}`}>dieser Anfrage</Link>.

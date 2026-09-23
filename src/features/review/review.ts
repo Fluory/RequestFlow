@@ -2,6 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { fieldCorrections } from "@/db/schema";
 import { recordAudit } from "@/features/audit";
 import { listDocuments, type DocumentRow } from "@/features/documents";
+import { getExportRecord, type ExportRecord } from "@/features/export";
 import { HEADER_FIELDS, latestRun, listSegments } from "@/features/extraction";
 import { authorize, type Actor } from "@/features/identity";
 import { enqueueRequestExport, type JobSender } from "@/features/jobs";
@@ -40,6 +41,8 @@ export interface ReviewView {
   fields: ReviewField[];
   documents: DocumentRow[];
   skippedDocuments: Array<{ documentId: string; reason: string }>;
+  /** Export state (#9): reference once exported, attempts and last error while retrying. */
+  exportRecord: ExportRecord | null;
 }
 
 export type ReviewRefusal = "not_in_review" | "unknown_field" | "reason_missing" | "reason_too_long";
@@ -81,8 +84,9 @@ export async function loadReview(tenancy: Tenancy, actor: Actor, requestId: stri
     const request = await getRequest(tx, requestId);
     if (!request) return null;
     const documents = await listDocuments(tx, requestId);
+    const exportRecord = await getExportRecord(tx, requestId);
     const extraction = await latestRun(tx, requestId);
-    if (!extraction) return { request, fields: [], documents, skippedDocuments: [] };
+    if (!extraction) return { request, fields: [], documents, skippedDocuments: [], exportRecord };
     const segments = await listSegments(tx, extraction.run.id);
     const corrections = await currentCorrections(tx, requestId);
     const byKey = new Map(extraction.fields.map((field) => [field.fieldKey, field]));
@@ -107,7 +111,7 @@ export async function loadReview(tenancy: Tenancy, actor: Actor, requestId: stri
     const skippedDocuments = (extraction.run.documents as Array<{ documentId: string; skipped?: string }>)
       .filter((entry) => entry.skipped)
       .map((entry) => ({ documentId: entry.documentId, reason: entry.skipped! }));
-    return { request, fields, documents, skippedDocuments };
+    return { request, fields, documents, skippedDocuments, exportRecord };
   });
 }
 

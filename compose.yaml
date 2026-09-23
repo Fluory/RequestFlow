@@ -59,6 +59,11 @@ services:
       APP_ENV: ${APP_ENV:-local}
       AI_SERVICE_URL: ${AI_SERVICE_URL:-http://ai:8080}
       AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-local-dev-only-ai-token-0123456789}
+      # ERP port (ADR-0001 D9): the worker exports to the mock inside `web`; the token is shared.
+      ERP_BASE_URL: ${ERP_BASE_URL:-http://web:3000/api/erp-mock}
+      ERP_TOKEN: ${ERP_TOKEN:-local-dev-only-erp-token-0123456789}
+      ERP_MOCK_ENABLED: ${ERP_MOCK_ENABLED:-true}
+      ERP_MOCK_FAULTS: ${ERP_MOCK_FAULTS:-}
     depends_on:
       postgres:
         condition: service_healthy

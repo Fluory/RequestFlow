@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 
-// Smoke: upload → worker + AI (stub) → review beside the source → correct → approve.
-test("a clerk uploads a request, reviews it beside its source, corrects a value and approves", async ({ page }) => {
+// Smoke: upload → worker + AI (stub) → review beside the source → correct → approve → export (ERP mock).
+test("a clerk uploads a request, reviews it beside its source, corrects a value, approves and it is exported", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel("E-Mail").fill("sachbearbeitung@musterbau.example.com");
   await page.getByLabel("Passwort").fill(process.env.SEED_PASSWORD!);
@@ -45,5 +45,13 @@ test("a clerk uploads a request, reviews it beside its source, corrects a value 
   await expect(page.getByTestId("value-company")).toContainText("Musterbau Beispiel GmbH & Co. KG");
 
   await page.getByRole("button", { name: "Freigeben" }).click();
-  await expect(page.getByTestId("request-status")).toHaveText("Freigegeben");
+  // The worker may already have exported it by the time the page renders.
+  await expect(page.getByTestId("request-status")).toHaveText(/^(Freigegeben|Exportiert)$/);
+
+  // The worker exports the approved request to the ERP mock exactly once (#9).
+  await expect(async () => {
+    await page.reload();
+    await expect(page.getByTestId("request-status")).toHaveText("Exportiert", { timeout: 1_000 });
+  }).toPass({ timeout: 30_000 });
+  await expect(page.getByTestId("erp-reference")).toHaveText(/^QR-[0-9A-F]{10}$/);
 });
