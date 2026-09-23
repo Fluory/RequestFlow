@@ -13,7 +13,10 @@ import { buildSourceView, type SourceView, type StoredSegment } from "./source-v
 export const FIELD_LABELS: Record<string, string> = {
   company: "Firma",
   contact_person: "Ansprechpartner:in",
+  email: "E-Mail",
+  phone: "Telefon",
   requested_delivery_date: "Gewünschter Liefertermin",
+  additional_requirements: "Zusätzliche Anforderungen",
 };
 
 export type FieldStatus = "found" | "uncertain" | "missing" | "unverified";

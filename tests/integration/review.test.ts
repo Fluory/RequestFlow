@@ -63,7 +63,10 @@ describe("review: fields beside their source, corrections, approve or reject", (
     expect(view?.fields.map((field) => [field.key, field.status])).toEqual([
       ["company", "unverified"],
       ["contact_person", "found"],
+      ["email", "found"],
+      ["phone", "missing"],
       ["requested_delivery_date", "found"],
+      ["additional_requirements", "missing"],
     ]);
     const contact = view!.fields[1]!;
     expect(contact.source).toMatchObject({ kind: "email", documentId, filename: "anfrage.eml" });

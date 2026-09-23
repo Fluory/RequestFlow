@@ -97,6 +97,15 @@ describe("AI service client", () => {
     ["evidence citing an unknown segment", (r: ReturnType<typeof syntheticExtractResponse>) => ({ ...r, fields: { ...r.fields, company: { ...r.fields.company, evidence: { segmentId: "s99", quote: "x" } } } })],
     ["duplicate segment ids", (r: ReturnType<typeof syntheticExtractResponse>) => ({ ...r, segments: [...r.segments, r.segments[0]!] })],
     ["a different documentId", (r: ReturnType<typeof syntheticExtractResponse>) => ({ ...r, documentId: "other" })],
+    [
+      "a line item citing an unknown segment",
+      (r: ReturnType<typeof syntheticExtractResponse>) => ({
+        ...r,
+        lineItems: [{ index: 0, description: { ...r.fields.company, evidence: { segmentId: "s99", quote: "x" } }, quantity: r.fields.phone, unit: r.fields.phone, material: r.fields.phone, dimensions: r.fields.phone }],
+      }),
+    ],
+    ["a found line-item field without evidence", (r: ReturnType<typeof syntheticExtractResponse>) => ({ ...r, lineItems: [{ index: 0, description: { ...r.fields.company, evidence: null }, quantity: r.fields.phone, unit: r.fields.phone, material: r.fields.phone, dimensions: r.fields.phone }] })],
+    ["a schema-1 response without line items", (r: ReturnType<typeof syntheticExtractResponse>) => ({ ...r, lineItems: undefined })],
   ])("rejects a response with %s as a contract violation (never retried)", async (_name, mutate) => {
     handler = (_request, response) => json(response, 200, mutate(syntheticExtractResponse("doc-1")));
     const client = createAiServiceClient({ baseUrl, token: "t".repeat(24), timeoutMs: 2000 });

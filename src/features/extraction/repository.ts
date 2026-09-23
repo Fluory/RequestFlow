@@ -2,7 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { extractedFields, extractionRuns, extractionSegments } from "@/db/schema";
 import { tenantOf, type TenantTx } from "@/features/tenancy";
 import type { ExtractResponse } from "./types";
-import { mergeFields } from "./merge";
+import { mergeFields, mergeLineItems } from "./merge";
 
 export interface DocumentOutcome {
   documentId: string;
