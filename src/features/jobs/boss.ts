@@ -45,9 +45,10 @@ export async function installJobQueues(ownerConnectionString: string): Promise<v
   boss.on("error", () => {});
   await boss.start();
   try {
-    for (const { name, ...options } of QUEUE_DEFINITIONS) {
+    for (const { name, policy, ...options } of QUEUE_DEFINITIONS) {
+      // The policy is fixed at creation; retries, expiry and dead letter can be updated in place.
       if (await boss.getQueue(name)) await boss.updateQueue(name, options);
-      else await boss.createQueue(name, options);
+      else await boss.createQueue(name, { policy, ...options });
     }
     const db = boss.getDb();
     for (const statement of [
