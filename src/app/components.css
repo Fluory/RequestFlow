@@ -1,5 +1,187 @@
-/* Pilot design system (#52), part 2: tables, status, review views and responsive rules.
+/* Pilot design system (#52), part 2: forms, buttons, tables, status, review views, responsive rules.
  * Tokens live in globals.css (imported first by the root layout). */
+
+/* ---------- Forms and buttons ---------- */
+
+label {
+  font-weight: 500;
+}
+input:not([type="checkbox"], [type="radio"], [type="hidden"], [type="file"]),
+select {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.6rem;
+  min-height: 2.25rem;
+  max-width: 100%;
+}
+input:not([type="checkbox"], [type="radio"], [type="hidden"], [type="file"]):hover,
+select:hover {
+  border-color: var(--text-muted);
+}
+input[type="file"] {
+  font: inherit;
+  max-width: 100%;
+}
+input[type="file"]::file-selector-button {
+  font: inherit;
+  font-weight: 500;
+  margin-right: 0.75rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 0.35rem 0.8rem;
+  cursor: pointer;
+}
+input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--brand);
+  vertical-align: -2px;
+}
+.field {
+  margin-bottom: 0.9rem;
+}
+.field label {
+  display: block;
+  margin-bottom: 0.3rem;
+}
+.field input,
+.field select {
+  width: 100%;
+}
+
+button {
+  font: inherit;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.9rem;
+  min-height: 2.25rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+button:hover {
+  background: var(--neutral-bg);
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+button.btn-primary {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+button.btn-primary:hover {
+  background: var(--brand-hover);
+  border-color: var(--brand-hover);
+}
+button.btn-danger {
+  background: var(--surface);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+button.btn-danger:hover {
+  background: var(--danger);
+  color: #fff;
+}
+button.btn-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+}
+button.btn-ghost:hover {
+  background: var(--neutral-bg);
+  color: var(--text);
+}
+button.btn-small {
+  min-height: 1.9rem;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.875rem;
+}
+
+a.btn-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.25rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: var(--radius-sm);
+  background: var(--brand);
+  color: #fff;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+a.btn-link:hover {
+  background: var(--brand-hover);
+  color: #fff;
+}
+
+.inline-form {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0;
+}
+.inline-form label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.9rem 1.4rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-muted);
+  margin: 0;
+}
+.toolbar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+.actions form {
+  margin: 0;
+}
+.upload {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.upload .dropzone {
+  flex: 1;
+  min-width: 16rem;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+  padding: 0.9rem 1rem;
+  margin: 0;
+}
+.upload .dropzone label {
+  display: block;
+  margin-bottom: 0.4rem;
+}
+.upload [role="status"],
+.upload [role="alert"] {
+  flex-basis: 100%;
+  margin: 0;
+}
 
 /* ---------- Tables ---------- */
 
@@ -286,8 +468,12 @@ mark {
     margin-left: -1rem;
     margin-right: -1rem;
   }
-  .account span {
-    display: none;
+  /* Company and role stay visible on phones: the account block takes its own row. */
+  .account {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
+    font-size: 0.85rem;
   }
 }
 

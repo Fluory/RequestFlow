@@ -63,7 +63,7 @@ export default async function RequestPage({
       {request.status === "ERROR" && request.errorMessage && <p role="alert">Fehler: {request.errorMessage}</p>}
       {request.status === "REJECTED" && request.rejectionReason && <p className="callout callout-info">Abgelehnt: {request.rejectionReason}</p>}
       {request.status === "APPROVED" && exportRecord?.lastError && (
-        <p role="status">
+        <p role="status" className="callout callout-warn">
           Export wird wiederholt ({exportRecord.attempts} Versuche bisher): {exportRecord.lastError}
         </p>
       )}
