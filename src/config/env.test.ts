@@ -74,4 +74,9 @@ describe("loadConfig", () => {
     expect(config.auth.ipAddressHeaders).toEqual(["x-real-ip", "x-forwarded-for"]);
     expect(config.auth.trustedProxies).toEqual(["10.0.0.2"]);
   });
+
+  it("accepts an AI-service token only with at least 24 characters", () => {
+    expect(loadConfig({ ...valid, AI_SERVICE_TOKEN: "x".repeat(24) }).aiService.token).toHaveLength(24);
+    expect(() => loadConfig({ ...valid, AI_SERVICE_TOKEN: "short" })).toThrow(/AI_SERVICE_TOKEN/);
+  });
 });

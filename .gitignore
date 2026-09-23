@@ -38,3 +38,6 @@ Thumbs.db
 
 # Agent worktrees (Claude Code)
 .claude/worktrees/
+
+# Local cloud credentials (never committed)
+.secrets/

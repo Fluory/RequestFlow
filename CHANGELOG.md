@@ -6,6 +6,9 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
+- Background processing: the worker sends each document to the AI service, stores the extracted
+  fields with their evidence and moves the request to review; failures retry with backoff and end
+  in a visible error with attempts and cause; failed requests can be reprocessed.
 - AI service (`services/ai`): `POST /v1/extract` turns an e-mail or PDF into segments with stable
   locators and extracts company, contact person and requested delivery date with evidence; a
   deterministic verifier marks every value whose quote is not in the cited segment as `unverified`.

@@ -1,2 +1,14 @@
-// Public API of the `requests` module: request aggregate (status machine follows with #7).
-export { createRequest, findDuplicate, lockDuplicateDetection, getRequest, listRequests, type NewRequest, type RequestRow } from "./repository";
+// Public API of the `requests` module: request aggregate and status machine.
+export {
+  createRequest,
+  findDuplicate,
+  getRequest,
+  listRequests,
+  lockDuplicateDetection,
+  lockRequest,
+  recordProcessingFailure,
+  transitionRequest,
+  type NewRequest,
+  type RequestRow,
+} from "./repository";
+export { canTransition, InvalidTransition, nextStatus, type ErrorStage, type RequestEvent } from "./status";
