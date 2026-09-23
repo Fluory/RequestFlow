@@ -13,7 +13,12 @@ class UnsupportedMediaTypeError(Exception):
 
 class DocumentTooLongError(Exception):
     """The document exceeds a size cap: PDF pages (``AI_MAX_PDF_PAGES``), pages to OCR, XLSX
-    sheets/rows/cells, DOCX blocks or segments of a whole message."""
+    sheets/rows/cells, DOCX blocks, OOXML part size or segments of a whole message."""
+
+
+class BudgetExceededError(DocumentTooLongError):
+    """The extracted document's shared budget (all attachments of a ``.msg`` together) is spent:
+    attachments, unzipped OOXML bytes or PDF pages. A top-level document never exceeds it."""
 
 
 class PdfPipelineInitError(Exception):

@@ -41,7 +41,7 @@ from requestflow_ai.parsing.msg import (
     message_attachments,
     message_segments,
 )
-from requestflow_ai.parsing.pdf import DEFAULT_MAX_PAGES, PdfOcr, PdfPipeline, parse_pdf
+from requestflow_ai.parsing.pdf import DEFAULT_MAX_PAGES, PdfOcr, PdfPipeline, parse_pdf_document
 from requestflow_ai.parsing.segments import AttachmentRef, MsgLocator, Segment
 from requestflow_ai.parsing.xlsx import parse_xlsx
 
@@ -85,6 +85,7 @@ class ParsedDocument:
     segments: list[Segment]
     attachments: list[AttachmentReport] = field(default_factory=list[AttachmentReport])
     pdf_parsed: bool = False  # a PDF was parsed (the document itself or an attachment)
+    ocr_pages_skipped: int = 0  # pages without text not OCR'd because of the OCR page cap
 
 
 def parse_document(
@@ -92,8 +93,12 @@ def parse_document(
 ) -> ParsedDocument:
     kind = detect_kind(data, declared_type)
     if kind == "pdf":
-        segments = parse_pdf(data, options.pdf_pipeline, options.max_pdf_pages, options.pdf_ocr)
-        return ParsedDocument(kind, segments, pdf_parsed=True)
+        pdf = parse_pdf_document(
+            data, options.pdf_pipeline, options.max_pdf_pages, options.pdf_ocr
+        )
+        return ParsedDocument(
+            kind, pdf.segments, pdf_parsed=True, ocr_pages_skipped=pdf.ocr_pages_skipped
+        )
     if kind == "xlsx":
         return ParsedDocument(kind, parse_xlsx(data))
     if kind == "docx":
@@ -150,6 +155,7 @@ def _parse_message(message: Message, options: ParseOptions, depth: int) -> Parse
     segments = message_segments(message)
     reports: list[AttachmentReport] = []
     pdf_parsed = False
+    ocr_pages_skipped = 0
 
     for raw in message_attachments(message, MAX_ATTACHMENTS):
         path = (raw.index,)
@@ -164,6 +170,7 @@ def _parse_message(message: Message, options: ParseOptions, depth: int) -> Parse
         ref = AttachmentRef(index=raw.index, name=raw.name)
         segments.extend(_wrap(segment, ref) for segment in child.segments)
         pdf_parsed = pdf_parsed or child.pdf_parsed
+        ocr_pages_skipped += child.ocr_pages_skipped
         reports.append(
             AttachmentReport(path, raw.name, child.kind, "parsed", None, len(child.segments))
         )
@@ -178,4 +185,4 @@ def _parse_message(message: Message, options: ParseOptions, depth: int) -> Parse
             )
             for nested in child.attachments
         )
-    return ParsedDocument("msg", segments, reports, pdf_parsed)
+    return ParsedDocument("msg", segments, reports, pdf_parsed, ocr_pages_skipped)

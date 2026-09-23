@@ -29,6 +29,7 @@ from requestflow_ai.parsing.errors import (
 )
 from requestflow_ai.parsing.pdf import (
     parse_pdf,
+    parse_pdf_document,
     parse_pdf_layout,
     parse_pdf_textlines,
     prepare_pdf_pipeline,
@@ -146,21 +147,24 @@ def test_pdf_layout_pipeline_blocks_have_page_and_bbox(fixtures_dir: Path) -> No
 # --- OCR for pages without a text layer (#23) -------------------------------------------------
 
 
-def _ocr_document(page_no: int, lines: list[str]) -> DoclingDocument:
-    """What docling's OCR pipeline returns for one page (built with docling-core, no model)."""
+def _ocr_document(page_numbers: list[int], lines: list[str]) -> DoclingDocument:
+    """What docling's OCR pipeline returns for a page range (built with docling-core, no model)."""
     document = DoclingDocument(name="document")
-    document.add_page(page_no=page_no, size=Size(width=595, height=842))
-    for number, text in enumerate(lines):
-        top = 780 - number * 30
-        document.add_text(
-            label=DocItemLabel.TEXT,
-            text=text,
-            prov=ProvenanceItem(
-                page_no=page_no,
-                bbox=DocBox(l=72, t=top, r=300, b=top - 14, coord_origin=CoordOrigin.BOTTOMLEFT),
-                charspan=(0, len(text)),
-            ),
-        )
+    for page_no in page_numbers:
+        document.add_page(page_no=page_no, size=Size(width=595, height=842))
+        for number, text in enumerate(lines):
+            top = 780 - number * 30
+            document.add_text(
+                label=DocItemLabel.TEXT,
+                text=text,
+                prov=ProvenanceItem(
+                    page_no=page_no,
+                    bbox=DocBox(
+                        l=72, t=top, r=300, b=top - 14, coord_origin=CoordOrigin.BOTTOMLEFT
+                    ),
+                    charspan=(0, len(text)),
+                ),
+            )
     return document
 
 
@@ -178,7 +182,8 @@ class _OcrConverter:
         assert raises_on_error is False
         self.page_ranges.append(page_range)
         return SimpleNamespace(
-            status=ConversionStatus.SUCCESS, document=_ocr_document(page_range[0], self.lines)
+            status=ConversionStatus.SUCCESS,
+            document=_ocr_document(list(range(page_range[0], page_range[1] + 1)), self.lines),
         )
 
     def initialize_pipeline(self, fmt: object) -> None:
@@ -238,11 +243,44 @@ def test_pdf_with_text_on_every_page_is_never_ocrd(
     assert len(parse_pdf(data, "textlines", ocr="auto")) == 8
 
 
-def test_ocr_page_cap(fixtures_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(pdf_module, "MAX_OCR_PAGES", 0)
-    monkeypatch.setattr(pdf_module, "_ocr_converter", lambda: _OcrConverter(["x"]))
-    with pytest.raises(DocumentTooLongError):
-        parse_pdf((fixtures_dir / "anfrage_scan.pdf").read_bytes(), "textlines", ocr="auto")
+def _pdf(pages: list[str | None]) -> bytes:
+    """One page per entry: a text line, or ``None`` for a page without text (a stand-in scan)."""
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4, invariant=True)
+    pdf.setFont("Helvetica", 12)
+    for text in pages:
+        if text is None:
+            pdf.rect(72, 600, 300, 150, stroke=1, fill=0)
+        else:
+            pdf.drawString(72, 780, text)
+        pdf.showPage()
+    pdf.save()
+    return buffer.getvalue()
+
+
+def test_ocr_page_cap_skips_the_rest_instead_of_failing(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Spec change (security review of #40): more pages without text than MAX_OCR_PAGES used to
+    # fail the whole PDF; now the first MAX_OCR_PAGES are OCR'd and the rest are reported.
+    monkeypatch.setattr(pdf_module, "MAX_OCR_PAGES", 2)
+    converter = _OcrConverter(["x"])
+    monkeypatch.setattr(pdf_module, "_ocr_converter", lambda: converter)
+    parsed = parse_pdf_document(_pdf(["Text", None, None, "Mehr", None]), "textlines", ocr="auto")
+
+    assert converter.page_ranges == [(2, 3)]  # consecutive pages in one conversion
+    assert [s.id for s in parsed.segments] == ["p1-l1", "p2-o1", "p3-o1", "p4-l1"]
+    assert (parsed.page_count, parsed.ocr_pages, parsed.ocr_pages_skipped) == (5, 2, 1)
+
+
+def test_ocr_page_cap_zero_skips_every_scanned_page(
+    fixtures_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def no_ocr() -> object:
+        raise AssertionError("no page may be OCR'd when the cap is 0")
+
+    monkeypatch.setattr(pdf_module, "_ocr_converter", no_ocr)
+    data = (fixtures_dir / "anfrage_scan.pdf").read_bytes()
+    parsed = parse_pdf_document(data, "textlines", ocr="auto", max_ocr_pages=0)
+    assert (parsed.segments, parsed.ocr_pages, parsed.ocr_pages_skipped) == ([], 0, 1)
 
 
 def test_ocr_pipeline_is_built_at_startup_and_fails_closed(
