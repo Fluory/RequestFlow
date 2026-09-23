@@ -3,11 +3,13 @@
 Numbers: German formats (``1.234,5``, ``1.250``, ``0,75``, ``1 234,5``) and plain decimals
 (``1234.5``). A dot followed by exactly three-digit groups is a thousands separator.
 Dates: ``DD.MM.YYYY``, ``D.M.YY`` (two-digit years are 20YY) and ISO ``YYYY-MM-DD``.
+Text: the normalised value must occur in the normalised quote on word boundaries.
 """
 
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Literal
@@ -96,13 +98,47 @@ def extract_dates(text: str) -> list[date]:
     return dates
 
 
-def value_consistent(kind: ValueKind, value: str, quote: str) -> bool:
-    """True when the value is supported by the quote (the quote itself is checked elsewhere)."""
+@dataclass(frozen=True)
+class ValueCheck:
+    """Result of checking a value against its quote.
+
+    ``normalized`` is the value to return when ``ok``: text trimmed, dates as ISO ``YYYY-MM-DD``,
+    numbers trimmed. ``ambiguous`` is set when the quote holds more than one distinct date, so
+    the quote alone cannot prove which one the value refers to.
+    """
+
+    ok: bool
+    normalized: str | None = None
+    ambiguous: bool = False
+
+
+_NOT_OK = ValueCheck(ok=False)
+
+
+def _contains_words(needle: str, haystack: str) -> bool:
+    # Whole tokens only: "G" or "bau GmbH" are not supported by "Musterbau GmbH".
+    return re.search(rf"(?<!\w){re.escape(needle)}(?!\w)", haystack) is not None
+
+
+def check_value(kind: ValueKind, value: str, quote: str) -> ValueCheck:
+    """Check that the value is supported by the quote (the quote itself is checked elsewhere)."""
     if kind == "text":
         needle = normalize_text(value)
-        return bool(needle) and needle in normalize_text(quote)
+        if not needle or not _contains_words(needle, normalize_text(quote)):
+            return _NOT_OK
+        return ValueCheck(ok=True, normalized=value.strip())
     if kind == "date":
         parsed_date = parse_date(value)
-        return parsed_date is not None and parsed_date in extract_dates(quote)
+        dates = set(extract_dates(quote))
+        if parsed_date is None or parsed_date not in dates:
+            return _NOT_OK
+        return ValueCheck(ok=True, normalized=parsed_date.isoformat(), ambiguous=len(dates) > 1)
     parsed_number = parse_number(value)
-    return parsed_number is not None and parsed_number in extract_numbers(quote)
+    if parsed_number is None or parsed_number not in extract_numbers(quote):
+        return _NOT_OK
+    return ValueCheck(ok=True, normalized=value.strip())
+
+
+def value_consistent(kind: ValueKind, value: str, quote: str) -> bool:
+    """True when the value is supported by the quote (the quote itself is checked elsewhere)."""
+    return check_value(kind, value, quote).ok

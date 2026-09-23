@@ -304,8 +304,9 @@ components:
           - type: string
           - type: 'null'
           title: Value
-          description: Extracted value (dates as YYYY-MM-DD). Kept for `unverified` so a human can review
-            the proposal; null for `missing`.
+          description: 'Extracted value. For `found` and verified `uncertain` it is normalised: trimmed
+            text, dates as YYYY-MM-DD. Kept as the model sent it for `unverified` (and for `uncertain`
+            without evidence) so a human can review the proposal; null for `missing`.'
         status:
           type: string
           enum:
@@ -339,9 +340,11 @@ components:
             - empty_quote
             - quote_not_in_segment
             - value_not_in_quote
+            - ambiguous_quote
           - type: 'null'
           title: Reason
-          description: Why the verifier set `unverified`; null otherwise.
+          description: Why the verifier set `unverified`, or `ambiguous_quote` when it downgraded `found`
+            to `uncertain` (the quote holds several dates); null otherwise.
       type: object
       required:
       - value
