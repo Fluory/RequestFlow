@@ -76,3 +76,13 @@ def test_broken_document_is_a_parse_error() -> None:
         archive.writestr("word/document.xml", "<not-a-document")
     with pytest.raises(DocumentParseError):
         parse_docx(buffer.getvalue())
+
+
+def test_every_visited_block_counts_against_the_block_cap(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Empty paragraphs and cells emit no segment, but parsing them still costs time.
+    monkeypatch.setattr(docx_module, "MAX_BLOCKS", 20)
+    with pytest.raises(DocumentTooLongError):
+        parse_docx(build_docx([""] * 30))
+    with pytest.raises(DocumentTooLongError):
+        parse_docx(build_docx([DocxTable(rows=[[""] * 5] * 5)]))
+    assert len(parse_docx(build_docx(["x"] * 10 + [DocxTable(rows=[["y"] * 3] * 3)]))) == 19

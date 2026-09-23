@@ -5,6 +5,9 @@ huge uncompressed) or carry thousands of entries. ``open_package`` reads only th
 directory and rejects the package when
 
 * it has more than ``MAX_ENTRIES`` entries,
+* a single entry declares more than ``MAX_PART_BYTES`` uncompressed (any entry: python-docx and
+  openpyxl pick the XML parser by content type, not by file name, so every part may be parsed;
+  a 16 MiB XML tree already costs a few hundred MB of memory),
 * the declared uncompressed sizes add up to more than ``MAX_UNCOMPRESSED_BYTES``, or
 * an entry larger than ``RATIO_CHECK_MIN_BYTES`` is compressed more than ``MAX_RATIO`` : 1.
 
@@ -19,11 +22,16 @@ import zipfile
 from io import BytesIO
 from typing import Literal
 
-from requestflow_ai.parsing.errors import DocumentParseError, UnsupportedMediaTypeError
+from requestflow_ai.parsing.errors import (
+    DocumentParseError,
+    DocumentTooLongError,
+    UnsupportedMediaTypeError,
+)
 
 MAX_ENTRIES = 2_000
 # Parsed XML trees cost several times the XML size in memory, per concurrent extraction slot.
 MAX_UNCOMPRESSED_BYTES = 64 * 1024 * 1024
+MAX_PART_BYTES = 16 * 1024 * 1024
 MAX_RATIO = 100
 RATIO_CHECK_MIN_BYTES = 1024 * 1024
 
@@ -42,6 +50,8 @@ def open_package(data: bytes) -> zipfile.ZipFile:
     total = 0
     for entry in entries:
         total += entry.file_size
+        if entry.file_size > MAX_PART_BYTES:
+            raise DocumentTooLongError("package part is too large when uncompressed")
         if entry.file_size > RATIO_CHECK_MIN_BYTES and entry.file_size > MAX_RATIO * max(
             entry.compress_size, 1
         ):
