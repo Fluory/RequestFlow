@@ -56,6 +56,7 @@ services:
       S3_FORCE_PATH_STYLE: "true"
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-local-dev-only-secret-change-me-0123456789}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      APP_ENV: ${APP_ENV:-local}
     depends_on:
       postgres:
         condition: service_healthy
