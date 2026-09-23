@@ -6,6 +6,8 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
+- Guard for tenant isolation: the build fails when a table with company data lacks enforced
+  row-level security or its company policy.
 - Export: approved requests are sent to the ERP (a simulated ERP in the pilot, contract
   `contracts/erp-export.openapi.yaml`) exactly once – retries after errors or lost answers never create a
   second record; the request page shows the ERP reference, running retries, and a visible error if the

@@ -31,7 +31,7 @@ Every new file belongs to one of these modules – otherwise add the module here
 | `export` | `src/features/export/` | ERP port + REST adapter, idempotency | outbound HTTP | confidential | idempotency key, unique export, timeout | built: REST adapter (timeout, error classes, contract validation), export handler under row lock, `drainExports()`, `request_exports` |
 | `erp-mock` | `src/features/erp-mock/` | simulated ERP REST API | route behind flag | synthetic | disabled unless `ERP_MOCK_ENABLED` | built: idempotent receiver (replay → same reference, 409 on a different body), fault injection, bounded in-memory store, route `/api/erp-mock/v1/quote-requests` |
 | `identity` | `src/features/identity/` | Better Auth, users, companies, roles | public login route | personal (staff) | rate limit, invite-only | partial: Better Auth (invite-only, organization + admin plugins), `authorize()`, invite, seed |
-| `tenancy` | `src/features/tenancy/` | `withTenant()`, RLS policies | internal | – | forced RLS, `app_rw` without BYPASSRLS | built: `withTenant()`, forced RLS on `app.*` |
+| `tenancy` | `src/features/tenancy/` | `withTenant()`, RLS policies | internal | – | forced RLS, `app_rw` without BYPASSRLS | built: `withTenant()`, forced RLS on `app.*`, guard test (every `app` table: `company_id`, forced RLS, only company policies; allow-list empty) |
 | `audit` | `src/features/audit/` | append-only audit events | internal | personal (staff) | INSERT/SELECT only | partial: `recordAudit()` (append-only enforced by grants) |
 | `jobs` | `src/features/jobs/`, entrypoint `src/worker.ts` | pg-boss, job handlers, `drain()`, worker entrypoint | internal | IDs only | transactional enqueue | built: queues, transactional enqueue, handler, `drain()`, dead letter → ERROR, reprocess, worker loop |
 | `storage` | `src/features/storage/` | `BlobStore` port + S3 adapter | internal | confidential | private bucket, access via app routes | built: S3 adapter (put/get/delete, bucket setup, ping) |
@@ -44,7 +44,7 @@ Every new file belongs to one of these modules – otherwise add the module here
 
 ## Exceptions register
 
-Deliberately accepted risks – without an entry here a deviation counts as a defect.
+Deliberately accepted risks – without an entry here a deviation counts as a defect. Global (non-tenant) tables in schema `app` additionally need an entry in `GLOBAL_APP_TABLES` (`src/features/tenancy/rls-guard.ts`) – the guard test (#29) fails otherwise.
 
 | Exception | Why accepted | Owner | Expires |
 |---|---|---|---|
