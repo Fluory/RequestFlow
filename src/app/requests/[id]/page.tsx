@@ -11,6 +11,16 @@ export const dynamic = "force-dynamic";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const ATTACHMENT_ERROR: Record<string, string> = {
+  unsupported_media_type: "Format nicht unterstützt",
+  document_unparseable: "Datei beschädigt oder unlesbar",
+  document_too_long: "zu umfangreich",
+  nesting_too_deep: "zu tief verschachtelt",
+  too_many_attachments: "zu viele Anhänge",
+  not_attached_by_value: "nur verlinkt, nicht angehängt",
+  budget_exceeded: "Verarbeitungsgrenze der Nachricht erreicht",
+};
+
 const STATUS_LABEL: Record<ReviewStatus, string> = {
   corrected: "korrigiert",
   found: "belegt",
@@ -66,7 +76,7 @@ export default async function RequestPage({
   if (!UUID.test(id)) notFound();
   const view = await loadReview(getRuntime().tenancy, actor, id);
   if (!view) notFound();
-  const { request, fields, documents, skippedDocuments, exportRecord } = view;
+  const { request, fields, documents, skippedDocuments, documentNotes, exportRecord } = view;
   const query = await searchParams;
   const selected = fields.find((field) => field.key === query.field);
   const inReview = request.status === "REVIEW";
@@ -170,10 +180,21 @@ export default async function RequestPage({
       <ul>
         {documents.map((document) => {
           const skipped = skippedDocuments.find((entry) => entry.documentId === document.id);
+          const notes = documentNotes.find((entry) => entry.documentId === document.id);
           return (
             <li key={document.id}>
               <a href={`/api/documents/${document.id}`}>{document.filename}</a> ({Math.ceil(document.sizeBytes / 1024)} KB)
               {skipped && <small> – nicht automatisch ausgewertet</small>}
+              {notes && notes.warnings.includes("ocr_pages_skipped") && <small> – nur die ersten Scan-Seiten wurden per Texterkennung gelesen</small>}
+              {notes && notes.failedAttachments.length > 0 && (
+                <ul>
+                  {notes.failedAttachments.map((attachment, index) => (
+                    <li key={index} role="note">
+                      ⚠ Anhang „{attachment.name ?? `Nr. ${index + 1}`}“ konnte nicht gelesen werden ({ATTACHMENT_ERROR[attachment.error ?? ""] ?? "unbekannter Grund"}) – bitte im Original prüfen.
+                    </li>
+                  ))}
+                </ul>
+              )}
             </li>
           );
         })}
