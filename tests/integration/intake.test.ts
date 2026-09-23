@@ -5,7 +5,7 @@ import { listAuditEvents } from "@/features/audit";
 import { listDocuments } from "@/features/documents";
 import { getActor, type Actor } from "@/features/identity";
 import { submitUpload, UploadRejected, type IntakeDeps } from "@/features/intake";
-import { createJobQueue } from "@/db/job-queue";
+import { createJobQueue } from "@/db/job-queue-client";
 import { QUEUES } from "@/features/jobs";
 import { getRequest } from "@/features/requests";
 import { S3BlobStore } from "@/features/storage";
