@@ -55,7 +55,9 @@ export async function call(
     .getSetCookie()
     .map((line) => line.split(";")[0])
     .join("; ");
-  return { status: response.status, body: text ? JSON.parse(text) : null, cookie };
+  // Disabled endpoints answer a plain-text 404 ("Not Found").
+  const body = response.headers.get("content-type")?.includes("json") && text ? JSON.parse(text) : text || null;
+  return { status: response.status, body, cookie };
 }
 
 export async function signUp(auth: Auth, email: string, invitationId?: string) {

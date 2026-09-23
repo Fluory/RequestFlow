@@ -32,7 +32,7 @@ export default async function HomePage() {
       </p>
       {actor.role === "admin" && (
         <p>
-          <Link href="/invite">Mitarbeitende einladen</Link>
+          <Link href="/users">Benutzer verwalten</Link> · <Link href="/invite">Mitarbeitende einladen</Link>
         </p>
       )}
       <SignOutButton />

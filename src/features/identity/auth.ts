@@ -5,7 +5,7 @@ import { admin, organization } from "better-auth/plugins";
 import { and, asc, eq, gt, sql } from "drizzle-orm";
 import type { Database } from "@/db";
 import * as schema from "@/db/schema";
-import { organizationAc, organizationRoles, PLATFORM_ADMIN_ROLE, platformRoles } from "./access";
+import { DISABLED_AUTH_PATHS, organizationAc, organizationRoles, PLATFORM_ADMIN_ROLE, platformRoles } from "./access";
 import { isCompanyRole } from "./authorize";
 
 export interface AuthSettings {
@@ -57,6 +57,7 @@ export function createAuth(db: Database, settings: AuthSettings) {
     secret: settings.secret,
     baseURL: settings.baseURL,
     basePath: "/api/auth",
+    disabledPaths: DISABLED_AUTH_PATHS,
     database: drizzleAdapter(db, { provider: "pg", schema, transaction: true }),
     advanced: {
       database: { generateId: "uuid" },
@@ -80,7 +81,10 @@ export function createAuth(db: Database, settings: AuthSettings) {
     plugins: [
       organization({
         allowUserToCreateOrganization: false,
-        creatorRole: "admin",
+        // Better Auth gives the creator role ALL plugin permissions regardless of `roles`. Nobody may hold
+        // it: companies are created by `bootstrapCompany`, and the role hooks below refuse "owner" – so
+        // member and invitation changes can only go through the audited `identity` module (#30).
+        creatorRole: "owner",
         ac: organizationAc,
         roles: organizationRoles,
         disableOrganizationDeletion: true,

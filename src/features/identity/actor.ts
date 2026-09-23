@@ -13,7 +13,8 @@ import { isCompanyRole, type Actor } from "./authorize";
  */
 export async function getActor(auth: Auth, db: Database, headers: Headers): Promise<Actor | null> {
   const session = await auth.api.getSession({ headers });
-  if (!session) return null;
+  // A deactivated user (#30) has no sessions left and cannot sign in; checked here as well.
+  if (!session || (session.user as { banned?: boolean | null }).banned) return null;
   const [membership] = await db
     .select({ companyId: schema.member.organizationId, role: schema.member.role })
     .from(schema.member)

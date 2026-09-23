@@ -75,6 +75,15 @@ Invite-only: an admin creates an invitation on `/invite` and hands over the link
 (`/signup?invitation=<id>`, 7 days valid); e-mail delivery is not part of the pilot. There is no
 self-service password reset yet – recovery is an operator task (delete the user row, invite again).
 
+User management (#30): admins see their company's users on `/users`, change roles (`admin`/`clerk`),
+deactivate (sign-in blocked, all sessions ended at once) and reactivate. Every change – including an
+invitation – is an audit event (`user.invited` on the invitation, `user.role_changed`, `user.deactivated`,
+`user.reactivated`). The last active admin of a company can be neither demoted nor deactivated; if a
+company still ends up without one, an operator re-invites an admin with `bootstrapCompany`-style SQL
+(no cross-company UI). Admins cannot deactivate themselves. Better Auth's `/api/auth/organization/*`
+endpoints are disabled except `set-active` (404) – every change goes through the audited module. The
+`user.invited` audit event stores the role only; the invitation id points to the e-mail.
+
 ## Frequent failures
 
 | Symptom | Cause | Action |

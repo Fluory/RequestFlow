@@ -105,7 +105,7 @@ as the change.
 
 | Table | Content | Class | Purpose |
 |---|---|---|---|
-| `user` | name, e-mail, global role (`user`), ban fields | personal (staff) | login identity |
+| `user` | name, e-mail, global role (`user`), ban fields – `banned` = deactivated by a company admin (#30; blocks sign-in) | personal (staff) | login identity |
 | `account` | password hash (credential provider) | confidential | authentication |
 | `session` | token, expiry, IP, user agent, `active_organization_id` | personal (staff) | session; carries the active company |
 | `verification` | verification tokens | confidential | e-mail verification (unused in the pilot) |

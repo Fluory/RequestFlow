@@ -1,6 +1,8 @@
 import { and, eq, sql } from "drizzle-orm";
 import type { Database } from "@/db";
 import * as schema from "@/db/schema";
+import { recordAudit } from "@/features/audit";
+import { createTenancy } from "@/features/tenancy";
 import { authorize, isCompanyRole, type Actor, type CompanyRole } from "./authorize";
 
 const INVITATION_DAYS = 7;
@@ -48,7 +50,7 @@ export async function bootstrapCompany(
   });
 }
 
-/** Company admins invite staff into their own company only – the company comes from the actor. */
+/** Company admins invite staff into their own company only – the company comes from the actor. Audited (#30). */
 export async function inviteUser(
   db: Database,
   actor: Actor,
@@ -57,7 +59,7 @@ export async function inviteUser(
   authorize(actor, "users.invite");
   if (!isCompanyRole(input.role)) throw new Error("unknown role");
   const email = lower(input.email);
-  return db.transaction(async (tx) => {
+  return createTenancy(db).withTenant(actor.companyId, async (tx) => {
     // Re-inviting replaces a pending invitation of the same company.
     await tx
       .update(schema.invitation)
@@ -74,6 +76,8 @@ export async function inviteUser(
       .values({ organizationId: actor.companyId, email, role: input.role, status: "pending", expiresAt: expiry(), inviterId: actor.userId })
       .returning({ id: schema.invitation.id });
     if (!row) throw new Error("invitation insert returned no row");
+    // No e-mail in the append-only audit (it could never be erased); the invitation id points to it.
+    await recordAudit(tx, { actorUserId: actor.userId, action: "user.invited", entityType: "invitation", entityId: row.id, data: { role: input.role } });
     return { invitationId: row.id };
   });
 }
