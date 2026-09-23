@@ -244,6 +244,8 @@ export const fieldCorrections = appSchema
       companyId: uuid("company_id").notNull(),
       requestId: uuid("request_id").notNull(),
       fieldKey: text("field_key").notNull(),
+      /** Line item (#25): position of the corrected item field; null for header fields. */
+      itemIndex: integer("item_index"),
       oldValue: text("old_value"),
       newValue: text("new_value"),
       correctedBy: uuid("corrected_by").notNull(),
