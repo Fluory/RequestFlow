@@ -22,11 +22,15 @@ opens the directory with ``raise_defects=DEFECT_INCORRECT`` and rejects the file
 the mini stream (root entry) or all streams together declare more bytes than the container has.
 A stream's sectors lie inside the file, so no legitimate stream is larger than the file; with that
 bound a looped chain costs at most ``len(data)`` bytes per stream. (olefile has no cheap FAT loop
-detector; the size bound makes one unnecessary.) Errors never carry document content.
+detector; the size bound makes one unnecessary.) Before olefile even builds its FAT, the header's
+sector counts are bounded by the file size: olefile follows the DIFAT chain for as many FAT
+sectors as the header declares (with a quadratic array copy per sector), so a forged count on a
+looped DIFAT chain would otherwise hang the constructor. Errors never carry document content.
 """
 
 from __future__ import annotations
 
+import struct
 from dataclasses import dataclass
 from io import BytesIO
 from typing import Any, cast
@@ -71,11 +75,36 @@ class RawAttachment:
     over_cap: bool = False
 
 
+_HEADER_BYTES = 512
+_SECTOR_SHIFTS = (9, 12)  # [MS-CFB] 2.2: 512-byte (version 3) or 4096-byte (version 4) sectors
+
+
+def _check_header(data: bytes) -> None:
+    """Every sector count in the header must fit the file (see module doc)."""
+    if len(data) < _HEADER_BYTES:
+        raise DocumentParseError("OLE header truncated")
+    (shift,) = struct.unpack_from("<H", data, 30)
+    if shift not in _SECTOR_SHIFTS:
+        raise DocumentParseError("OLE sector size invalid")
+    sector_size = 1 << shift
+    sectors = (len(data) - _HEADER_BYTES + sector_size - 1) // sector_size
+    # directory (v4 only), FAT, mini FAT, DIFAT sector counts
+    directory, fat = struct.unpack_from("<II", data, 40)
+    (mini_fat,) = struct.unpack_from("<I", data, 64)
+    (difat,) = struct.unpack_from("<I", data, 72)
+    if max(directory, mini_fat, difat) > sectors:
+        raise DocumentParseError("OLE header declares more sectors than the file has")
+    # One FAT sector maps sector_size / 4 sectors; a few spare ones are tolerated.
+    if fat > sectors // (sector_size // 4) + 2:
+        raise DocumentParseError("OLE header declares more FAT sectors than the file needs")
+
+
 def check_ole_container(data: bytes) -> olefile.OleFileIO:
     """Open ``data`` as a compound file with every declared stream size bounded (see module doc).
 
     Returns the open container (the caller closes it); raises ``DocumentParseError``.
     """
+    _check_header(data)
     try:
         # Always a stream: olefile treats ``bytes`` shorter than 1536 as a *file name*.
         ole = olefile.OleFileIO(BytesIO(data), raise_defects=olefile.DEFECT_INCORRECT)

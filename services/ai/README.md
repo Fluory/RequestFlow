@@ -12,7 +12,7 @@ database, no storage credentials and no tenant logic; the only credentials it ho
 - Contract: [`contracts/ai-service.openapi.yaml`](../../contracts/ai-service.openapi.yaml)
   (OpenAPI 3.1, generated from the app, guarded by `tests/test_contract.py`).
 - Packages (`src/requestflow_ai/`): `parsing` (detect, `document` dispatcher, PDF incl. OCR, EML,
-  XLSX, DOCX, MSG, OOXML zip limits, segments), `extraction` (model-facing
+  XLSX, DOCX, MSG, OOXML zip limits, shared `budget` per document, segments), `extraction` (model-facing
   schema, versioned prompt, `ModelClient`), `grounding` (normalisation, value parsing, verifier),
   `api` (FastAPI app, response schemas, OpenAPI export), `pipeline.py`, `config.py`, `jsonlog.py`.
 
@@ -166,7 +166,10 @@ Every upload is untrusted. Beyond `AI_MAX_DOCUMENT_BYTES` and `AI_MAX_PDF_PAGES`
   FAT chain declaring gigabytes took 3.4 GB / 54 s). Before anything is read,
   `msg.check_ole_container` opens the directory with `raise_defects=DEFECT_INCORRECT` and rejects
   the file (422 `document_unparseable`) when any stream, the mini stream or all streams together
-  declare more bytes than the file has; a looped chain then costs at most the file size.
+  declare more bytes than the file has; a looped chain then costs at most the file size. Before
+  that, the header's sector counts (FAT, DIFAT, mini FAT, directory) must fit the file size:
+  olefile follows a declared FAT count along the DIFAT chain in its constructor, so a forged count
+  on a looped DIFAT chain would otherwise hang it.
   `DEFECT_INCORRECT` is stricter than olefile's default and may reject real Outlook files with
   spec violations (unverified: no real `.msg` sample yet). olefile always gets a stream (it
   treats `bytes` shorter than 1536 as a *file path*). Other OLE files (legacy `.doc`/`.xls`,

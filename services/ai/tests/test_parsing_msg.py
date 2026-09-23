@@ -5,6 +5,7 @@ from __future__ import annotations
 import struct
 import time
 import zipfile
+from collections.abc import Callable
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -247,6 +248,36 @@ def _looped_ole(stream_size: int, root_size: int = 0) -> bytes:
     directory = _dirent("Root Entry", 5, 1, 2 if root_size else _END, root_size)
     directory += _dirent("__properties_version1.0", 2, _FREE, 2, stream_size)
     return header + fat + directory.ljust(512, b"\0") + b"A" * 512
+
+
+def _looped_difat_ole() -> bytes:
+    """Header claims 12.7 million FAT sectors, listed by a DIFAT sector that links to itself."""
+    data = bytearray(_looped_ole(100))
+    difat_sectors = 100_000
+    struct.pack_into("<I", data, 44, 109 + difat_sectors * 127)  # FAT sectors
+    struct.pack_into("<I", data, 68, 3)  # first DIFAT sector: the one appended below
+    struct.pack_into("<I", data, 72, difat_sectors)
+    data += struct.pack("<I", 0) * 127 + struct.pack("<I", 3)
+    return bytes(data)
+
+
+def _too_many_fat_sectors_ole() -> bytes:
+    data = bytearray(_looped_ole(100))
+    struct.pack_into("<I", data, 44, 100)  # 100 FAT sectors for a 3-sector file
+    return bytes(data)
+
+
+@pytest.mark.parametrize("build", [_looped_difat_ole, _too_many_fat_sectors_ole])
+def test_ole_header_sector_counts_beyond_the_file_are_rejected_fast(
+    build: Callable[[], bytes],
+) -> None:
+    data = build()
+    started = time.perf_counter()
+    with pytest.raises(DocumentParseError):
+        detect_kind(data, None)
+    with pytest.raises(DocumentParseError):
+        parse_document(data, None, OPTIONS)
+    assert time.perf_counter() - started < 2
 
 
 @pytest.mark.parametrize(

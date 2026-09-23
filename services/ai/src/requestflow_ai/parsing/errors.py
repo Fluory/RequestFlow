@@ -12,7 +12,7 @@ class UnsupportedMediaTypeError(Exception):
 
 
 class DocumentTooLongError(Exception):
-    """The document exceeds a size cap: PDF pages (``AI_MAX_PDF_PAGES``), pages to OCR, XLSX
+    """The document exceeds a size cap: PDF pages (``AI_MAX_PDF_PAGES``), XLSX
     sheets/rows/cells, DOCX blocks, OOXML part size or segments of a whole message."""
 
 
