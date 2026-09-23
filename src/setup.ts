@@ -4,7 +4,7 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import { loadConfig } from "@/config/env";
 import { runMigrations } from "@/db/migrate";
-import { installJobQueues } from "@/db/job-queue";
+import { installJobQueues } from "@/db/job-queue-client";
 import { QUEUE_DEFINITIONS } from "@/features/jobs";
 import { S3BlobStore } from "@/features/storage";
 
