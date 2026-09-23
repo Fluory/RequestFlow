@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { currentActor, getRuntime } from "@/app/_server/runtime";
+import { getRuntime, requestActor } from "@/app/_server/runtime";
 import { listExportRecords } from "@/features/export";
 import { listRequests, type RequestFilter } from "@/features/requests";
 import { reprocessAction } from "./actions";
@@ -29,7 +28,7 @@ function filterOf(query: Record<string, string | undefined>): RequestFilter {
 
 // Request list (#26): status, attempts, last error with its stage, next retry; reprocess for ERROR.
 export default async function RequestsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const actor = await currentActor(await headers());
+  const actor = await requestActor();
   if (!actor) redirect("/login");
   const query = await searchParams;
   const filter = filterOf(query);

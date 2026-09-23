@@ -1,12 +1,11 @@
 import Link from "next/link";
-import { headers } from "next/headers";
-import { currentActor } from "@/app/_server/runtime";
+import { requestActor } from "@/app/_server/runtime";
 
 export const dynamic = "force-dynamic";
 
 // Start page: company, role and sign-out live in the app header (#52); this page points to the work.
 export default async function HomePage() {
-  const actor = await currentActor(await headers());
+  const actor = await requestActor();
   if (!actor) {
     return (
       <main>

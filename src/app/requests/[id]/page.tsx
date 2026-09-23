@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { currentActor, getRuntime } from "@/app/_server/runtime";
+import { getRuntime, requestActor } from "@/app/_server/runtime";
 import { duplicateDecidable, loadReview, REJECTION_REASON_MAX } from "@/features/review";
 import { StatusPill } from "../status-pill";
 import { DONE_MESSAGES, ERROR_MESSAGES, messageFor } from "./messages";
@@ -19,7 +18,7 @@ export default async function RequestPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const actor = await currentActor(await headers());
+  const actor = await requestActor();
   if (!actor) redirect("/login");
   const { id } = await params;
   if (!UUID.test(id)) notFound();

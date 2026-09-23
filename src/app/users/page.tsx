@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { currentActor, getRuntime } from "@/app/_server/runtime";
+import { getRuntime, requestActor } from "@/app/_server/runtime";
 import { AuthorizationError, listCompanyUsers } from "@/features/identity";
 import { changeRoleAction, deactivateAction, reactivateAction } from "./actions";
 
@@ -24,7 +23,7 @@ const pick = (table: Record<string, string>, code: string | undefined) => (code 
 
 // User management for company admins (#30). Clerks get 404 – server-side, on render and in every action.
 export default async function UsersPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const actor = await currentActor(await headers());
+  const actor = await requestActor();
   if (!actor) redirect("/login");
   let view: Awaited<ReturnType<typeof listCompanyUsers>>;
   try {
