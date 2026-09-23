@@ -23,7 +23,7 @@ async function main(): Promise<void> {
   const erp = createErpClient(config.erp);
   const database = createDatabase(config.databaseUrl, { max: 4 });
   const storage = new S3BlobStore(config.storage);
-  const boss = await createJobQueue(config.databaseUrl, { supervise: true });
+  const boss = await createJobQueue(config.databaseUrl, { supervise: true, onError: (error) => logEvent("error", "jobs.error", {}, { code: error.name }) });
   const tenancy = createTenancy(database.db);
   const deps = { tenancy, storage, ai, boss };
   // The export reads the reviewed values through the review module (injected – no module cycle).
@@ -58,6 +58,8 @@ async function main(): Promise<void> {
 
 main().catch((error: unknown) => {
   // Configuration errors name variables only (loadConfig/createAiServiceClient).
-  console.error(JSON.stringify({ level: "error", event: "worker.start_failed", message: error instanceof Error ? error.message : "unknown" }));
+  // Configuration errors name the variables (never values) – see loadConfig.
+  const names = error instanceof Error ? /configuration: (.+)$/.exec(error.message)?.[1]?.split(", ") : undefined;
+  logEvent("error", "worker.start_failed", {}, { code: error instanceof Error ? error.name : "unknown", names });
   process.exit(1);
 });

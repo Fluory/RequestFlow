@@ -8,7 +8,7 @@ export const PGBOSS_SCHEMA = "pgboss";
 /** Runtime client (`app_rw`): no schema creation or migration; polling, no LISTEN/NOTIFY. */
 export async function createJobQueue(
   connectionString: string,
-  options: { supervise?: boolean; monitorIntervalSeconds?: number } = {},
+  options: { supervise?: boolean; monitorIntervalSeconds?: number; onError?: (error: Error) => void } = {},
 ): Promise<PgBoss> {
   const boss = new PgBoss({
     connectionString,
@@ -22,7 +22,10 @@ export async function createJobQueue(
     persistQueueStats: false,
     ...(options.monitorIntervalSeconds ? { monitorIntervalSeconds: options.monitorIntervalSeconds } : {}),
   });
-  boss.on("error", (error: Error) => console.error(JSON.stringify({ level: "error", module: "jobs", message: error.message })));
+  // pg-boss/pg error messages can quote SQL or connection details: the composition root logs the
+  // error class only (IDs/codes rule, #28); the default writes nothing but the class either.
+  // eslint-disable-next-line no-console -- default for callers without a logger (tests, setup)
+  boss.on("error", options.onError ?? ((error: Error) => console.error(JSON.stringify({ level: "error", event: "jobs.error", code: error.name }))));
   await boss.start();
   return boss;
 }

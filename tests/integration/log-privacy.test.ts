@@ -88,7 +88,8 @@ describe("logs of a full synthetic run carry no content and no personal data", (
 
     // The run was logged (correlated by the request id) …
     const ours = lines.filter((line) => line.includes(requestId));
-    expect(ours.map((line) => JSON.parse(line).event)).toEqual(expect.arrayContaining(["request.exported"]));
+    // … from the web side (upload) through processing to the export …
+    expect(ours.map((line) => JSON.parse(line).event)).toEqual(expect.arrayContaining(["request.received", "job.processed", "request.exported"]));
     // … every line is structured JSON with the fixed key set …
     const allowed = new Set(["level", "time", "event", "requestId", "jobId", "companyId", "documentId", "attempt", "code", "status", "durationMs", "count"]);
     for (const line of lines) for (const key of Object.keys(JSON.parse(line))) expect(allowed, `${key} in ${line}`).toContain(key);

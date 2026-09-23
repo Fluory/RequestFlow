@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runHealthChecks } from "./health";
+import { cachedFor, runHealthChecks } from "./health";
 
 const ok = async () => {};
 const failing = async () => {
@@ -56,5 +56,24 @@ describe("runHealthChecks", () => {
     expect(result.report.backlog).toEqual({ "request-process": null });
     expect(JSON.stringify(result.report)).not.toMatch(/ECONNREFUSED|10\.0\.0\.5|app_rw/);
   });
-});
 
+  it("caches an informational load for its window and retries after a failure (cachedFor)", async () => {
+    let clock = 0;
+    let calls = 0;
+    const load = cachedFor(10_000, async () => ++calls, () => clock);
+
+    expect([await load(), await load()]).toEqual([1, 1]);
+    clock = 10_000;
+    expect(await load()).toBe(2);
+
+    let failing = true;
+    const flaky = cachedFor(10_000, async () => {
+      calls++;
+      if (failing) throw new Error("down");
+      return 7;
+    }, () => clock);
+    await expect(flaky()).rejects.toThrow("down");
+    failing = false;
+    expect(await flaky()).toBe(7);
+  });
+});

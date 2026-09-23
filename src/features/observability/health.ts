@@ -59,3 +59,22 @@ async function settle(check: HealthCheck, timeoutMs: number): Promise<CheckResul
     clearTimeout(timer);
   }
 }
+
+/**
+ * Memoises an informational check or gauge for `ttlMs` (#28 review): `/api/health` is public, so the
+ * AI-service ping and the backlog counts run at most once per window, not per call.
+ */
+export function cachedFor<T>(ttlMs: number, load: () => Promise<T>, now: () => number = Date.now): () => Promise<T> {
+  let entry: { at: number; value: Promise<T> } | undefined;
+  return () => {
+    if (!entry || now() - entry.at >= ttlMs) {
+      const value = load();
+      entry = { at: now(), value };
+      // A failed load is not cached: the next call tries again.
+      value.catch(() => {
+        if (entry?.value === value) entry = undefined;
+      });
+    }
+    return entry.value;
+  };
+}

@@ -18,6 +18,8 @@ export interface LogDetail {
   status?: number;
   durationMs?: number;
   count?: number;
+  /** Configuration variable NAMES only (never values), e.g. for a start or health failure. */
+  names?: string[];
 }
 
 export type LogLevel = "info" | "warn" | "error";
@@ -51,6 +53,10 @@ export function captureLogs(lines: string[]): () => void {
   };
 }
 
+// The key set is enforced at runtime too – a spread object with extra properties cannot leak
+// anything beyond these keys (#28 review).
+const ALLOWED_KEYS = new Set(["requestId", "jobId", "companyId", "documentId", "attempt", "code", "status", "durationMs", "count", "names"]);
+
 function pick(values: object): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined));
+  return Object.fromEntries(Object.entries(values).filter(([key, value]) => value !== undefined && ALLOWED_KEYS.has(key)));
 }

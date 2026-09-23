@@ -12,7 +12,10 @@
 | 503 | `{"status":"degraded","checks":{"config":"failed"}}` – invalid configuration (the server log names the variables) |
 
 - Each check has a 3 s time limit; `cache-control: no-store`.
-- Cost per call: one `select 1` and one S3 `HeadBucket`. No rate limit in the pilot (local runtime,
+- Cost per call: one `select 1` and one S3 `HeadBucket`; the informational parts (AI-service ping, two
+  backlog counts on `pgboss.job`) are cached for 10 s, so they run at most once per window. The backlog
+  is summed over all companies (no tenant data, but it shows overall activity to an unauthenticated
+  caller – acceptable for the local pilot; behind a proxy/auth before any public deployment). No rate limit in the pilot (local runtime,
   no public exposure); before any public deployment a rate limit or a short cache goes in front of it
   (showcase epic #19).
 - `dependencies` (AI service reachable: `ok`/`failed`) and `backlog` (waiting jobs per queue; `null` when
