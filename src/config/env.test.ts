@@ -8,6 +8,8 @@ const valid = {
   S3_BUCKET: "requestflow-documents",
   S3_ACCESS_KEY_ID: "local-key",
   S3_SECRET_ACCESS_KEY: "s3-secret-value",
+  BETTER_AUTH_SECRET: "test-only-secret-with-at-least-32-characters",
+  BETTER_AUTH_URL: "http://localhost:3000",
 };
 
 describe("loadConfig", () => {
