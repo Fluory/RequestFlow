@@ -1,0 +1,55 @@
+{
+  "id": "t02-table-pdf-mixed-units",
+  "categories": [
+    "table",
+    "missing"
+  ],
+  "description": "PDF table with m, kg, t, Stk. and mm; quantity and unit merged into one cell for some rows. No phone. Model mistake: quantity 12 read from the cell '120 m'.",
+  "document": "document.pdf",
+  "declared_type": "application/pdf",
+  "fields": {
+    "company": "Anlagenbau Muster AG",
+    "contact_person": "Lukas Muster",
+    "email": "lukas.muster@example.org",
+    "phone": null,
+    "requested_delivery_date": "2027-01-12",
+    "additional_requirements": "Anlieferung auf Europaletten, max. 1 t je Palette"
+  },
+  "line_items": [
+    {
+      "description": "Rundrohr",
+      "quantity": "120",
+      "unit": "m",
+      "material": "S235JR",
+      "dimensions": "48,3 x 3,2 mm"
+    },
+    {
+      "description": "Rundstahl",
+      "quantity": "250",
+      "unit": "kg",
+      "material": "C45",
+      "dimensions": "D 40 mm"
+    },
+    {
+      "description": "Flachstahl",
+      "quantity": "1.5",
+      "unit": "t",
+      "material": "S355J2",
+      "dimensions": "100 x 10 mm"
+    },
+    {
+      "description": "Sechskantschraube",
+      "quantity": "500",
+      "unit": "pcs",
+      "material": "8.8 verzinkt",
+      "dimensions": "M16 x 60"
+    },
+    {
+      "description": "Gewindestange",
+      "quantity": "3000",
+      "unit": "mm",
+      "material": "A2-70",
+      "dimensions": "M12"
+    }
+  ]
+}

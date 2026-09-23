@@ -1,5 +1,5 @@
 {
-  "id": "a4fcd661-6438-410b-9451-aa8b7351e18d",
+  "id": "da627915-d318-4791-8267-b80df23b56cf",
   "prevId": "1c5f0653-9e79-423e-85dc-5111111bb009",
   "version": "7",
   "dialect": "postgresql",
@@ -1494,6 +1494,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "item_index": {
+          "name": "item_index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "old_value": {
           "name": "old_value",
           "type": "text",
@@ -1831,12 +1837,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "duplicate_decision": {
-          "name": "duplicate_decision",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -1957,10 +1957,6 @@
         "requests_status_check": {
           "name": "requests_status_check",
           "value": "status in ('NEW', 'PROCESSING', 'REVIEW', 'APPROVED', 'EXPORTED', 'REJECTED', 'ERROR')"
-        },
-        "requests_duplicate_decision_check": {
-          "name": "requests_duplicate_decision_check",
-          "value": "duplicate_decision is null or duplicate_decision in ('distinct', 'duplicate')"
         }
       },
       "isRLSEnabled": true

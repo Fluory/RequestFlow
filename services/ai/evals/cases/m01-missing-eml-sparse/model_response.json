@@ -1,0 +1,25 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "text": "{\"company\": {\"value\": \"Gerätebau Muster GmbH\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l8\", \"quote\": \"Gerätebau Muster GmbH\"}}, \"contact_person\": {\"value\": \"Holger Muster\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l7\", \"quote\": \"Holger Muster\"}}, \"email\": {\"value\": \"holger.muster@example.com\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-h-from\", \"quote\": \"holger.muster@example.com\"}}, \"phone\": {\"value\": \"0621 4711\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l8\", \"quote\": \"Tel. 0621 4711\"}}, \"requested_delivery_date\": {\"value\": null, \"status\": \"missing\", \"evidence\": null}, \"additional_requirements\": {\"value\": \"Zeugnisse\", \"status\": \"uncertain\", \"evidence\": {\"segment_id\": \"eml-l4\", \"quote\": \"Termin und Zeugnisse klären wir nach Angebotseingang\"}}, \"line_items\": [{\"description\": {\"value\": \"Distanzhülse\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l3\", \"quote\": \"Distanzhülse\"}}, \"quantity\": {\"value\": \"75\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l3\", \"quote\": \"75 Stk.\"}}, \"unit\": {\"value\": \"Stk.\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l3\", \"quote\": \"75 Stk.\"}}, \"material\": {\"value\": \"1.0715\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l3\", \"quote\": \"Werkstoff 1.0715\"}}, \"dimensions\": {\"value\": null, \"status\": \"missing\", \"evidence\": null}}]}"
+          }
+        ]
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.0147
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 590,
+    "candidatesTokenCount": 333,
+    "totalTokenCount": 923,
+    "trafficType": "ON_DEMAND"
+  },
+  "modelVersion": "gemini-3.5-flash",
+  "createTime": "2026-09-23T09:04:00.000000Z",
+  "responseId": "synthetic-eval-m01-missing-eml-sparse"
+}

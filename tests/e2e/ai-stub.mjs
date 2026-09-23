@@ -50,7 +50,20 @@ createServer((request, response) => {
           phone: missing,
           additional_requirements: missing,
         },
-        lineItems: [],
+        // "Pos. 1: 1.250 Stk. Flansch DN 100" → one line item quoted from its own line (#25 smoke).
+        lineItems: segments
+          .filter((segment) => /^Pos\. \d+:/.test(segment.text))
+          .map((segment, index) => {
+            const [, quantity, unit, description] = /^Pos\. \d+: ([\d.,]+) (\S+) (.+)$/.exec(segment.text) ?? [];
+            return {
+              index,
+              description: description ? found(description, segment.id, description) : missing,
+              quantity: quantity ? found(quantity.replace(/\./g, ""), segment.id, quantity) : missing,
+              unit: unit ? found(unit === "Stk." ? "pcs" : unit, segment.id, unit) : missing,
+              material: missing,
+              dimensions: missing,
+            };
+          }),
         run: {
           modelId: "stub",
           modelVersion: null,

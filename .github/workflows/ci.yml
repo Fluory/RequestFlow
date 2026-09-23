@@ -108,8 +108,8 @@ jobs:
         if: steps.diff.outputs.code == 'true' && hashFiles('package.json') != '' && (steps.profile.outputs.stage == 'production' || contains(github.event.pull_request.labels.*.name, 'verify-full'))
 
       # --- Python AI service: path-targeted (services/ai, contracts) ---------------------------
-      # The AI eval gate (ADR-0001 D8) joins this block with Epic 2 (#17): it runs on every change
-      # under services/ai/ and needs Vertex credentials via Workload Identity Federation.
+      # The AI eval gate (ADR-0001 D8, #24) runs in replay mode on every change under services/ai/:
+      # recorded model responses, no credentials. Live evals (--live, Vertex) never run in CI.
       - name: Foundation phase (AI service)
         if: steps.diff.outputs.ai == 'true' && hashFiles('services/ai/pyproject.toml') == ''
         run: echo "No services/ai/pyproject.toml – AI service not created yet."
@@ -126,6 +126,14 @@ jobs:
           uv run ruff format --check .
           uv run pyright
           uv run pytest -q
+      # Eval gate: fails when a key field drops by more than EVAL_GATE_THRESHOLD points against
+      # services/ai/evals/baseline.json, on any injection violation or case error.
+      - name: AI eval gate (replay)
+        if: steps.diff.outputs.ai == 'true' && hashFiles('services/ai/pyproject.toml') != ''
+        working-directory: services/ai
+        env:
+          EVAL_GATE_THRESHOLD: "5"
+        run: uv run python -m requestflow_ai.evals --replay --report "$RUNNER_TEMP/eval-report.json"
 
   # Image + compose smoke (ADR-0001 D11): only when the Dockerfile or the compose file changes.
   compose-smoke:

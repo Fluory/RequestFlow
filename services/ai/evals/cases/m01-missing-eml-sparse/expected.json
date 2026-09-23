@@ -1,0 +1,26 @@
+{
+  "id": "m01-missing-eml-sparse",
+  "categories": [
+    "missing"
+  ],
+  "description": "Short mail: no phone, no date, no requirements, no dimensions. Model mistakes: invents a phone number with a quote that is not in the segment; proposes an additional requirement as uncertain although the mail defers it.",
+  "document": "document.eml",
+  "declared_type": "message/rfc822",
+  "fields": {
+    "company": "Gerätebau Muster GmbH",
+    "contact_person": "Holger Muster",
+    "email": "holger.muster@example.com",
+    "phone": null,
+    "requested_delivery_date": null,
+    "additional_requirements": null
+  },
+  "line_items": [
+    {
+      "description": "Distanzhülse",
+      "quantity": "75",
+      "unit": "pcs",
+      "material": "1.0715",
+      "dimensions": null
+    }
+  ]
+}
