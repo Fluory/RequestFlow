@@ -1,13 +1,15 @@
-// Worker entrypoint (module `jobs`, ADR-0001 D2): drains processing jobs in a loop. pg-boss
+// Worker entrypoint (module `jobs`, ADR-0001 D2): drains processing and export jobs in a loop. pg-boss
 // supervision (expiry → retry, retention) runs here. Start is fail-closed: missing configuration
-// (e.g. AI_SERVICE_TOKEN) stops the process instead of silently skipping work.
+// (e.g. AI_SERVICE_TOKEN, ERP_TOKEN) stops the process instead of silently skipping work.
 import { setTimeout as sleep } from "node:timers/promises";
 import { loadConfig } from "@/config/env";
 import { createDatabase } from "@/db";
 import { createJobQueue } from "@/db/job-queue-client";
+import { createErpClient, drainExports } from "@/features/export";
 import { createAiServiceClient } from "@/features/extraction";
 import { assertProcessingBudget, drain } from "@/features/jobs";
 import { logEvent } from "@/features/observability";
+import { currentFieldValues } from "@/features/review";
 import { S3BlobStore } from "@/features/storage";
 import { createTenancy } from "@/features/tenancy";
 
@@ -18,10 +20,14 @@ async function main(): Promise<void> {
   const config = loadConfig();
   assertProcessingBudget({ aiTimeoutMs: config.aiService.timeoutMs, maxFiles: config.upload.maxFiles });
   const ai = createAiServiceClient(config.aiService);
+  const erp = createErpClient(config.erp);
   const database = createDatabase(config.databaseUrl, { max: 4 });
   const storage = new S3BlobStore(config.storage);
   const boss = await createJobQueue(config.databaseUrl, { supervise: true });
-  const deps = { tenancy: createTenancy(database.db), storage, ai, boss };
+  const tenancy = createTenancy(database.db);
+  const deps = { tenancy, storage, ai, boss };
+  // The export reads the reviewed values through the review module (injected – no module cycle).
+  const exportDeps = { tenancy, erp, boss, fieldValues: currentFieldValues };
 
   let running = true;
   const stop = (signal: string) => {
@@ -34,8 +40,10 @@ async function main(): Promise<void> {
   logEvent("info", "worker.started");
   while (running) {
     try {
-      const result = await drain(deps, { maxMs: DRAIN_BUDGET_MS });
-      if (result.processed + result.failed + result.deadLettered === 0) await sleep(IDLE_MS);
+      const processing = await drain(deps, { maxMs: DRAIN_BUDGET_MS });
+      const exports = await drainExports(exportDeps, { maxMs: DRAIN_BUDGET_MS });
+      const handled = processing.processed + processing.failed + processing.deadLettered + exports.exported + exports.failed + exports.deadLettered;
+      if (handled === 0) await sleep(IDLE_MS);
     } catch (error) {
       // Infrastructure hiccup (database/storage): log the class only, back off, keep running.
       logEvent("error", "worker.drain_failed", {}, { code: error instanceof Error ? error.name : "unknown" });

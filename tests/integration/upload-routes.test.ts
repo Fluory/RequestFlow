@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { GET as download } from "@/app/api/documents/[id]/route";
+import { POST as erpMock } from "@/app/api/erp-mock/v1/quote-requests/route";
 import { POST as upload } from "@/app/api/requests/route";
 import { getJobClient, getRuntime } from "@/app/_server/runtime";
 import { listDocuments } from "@/features/documents";
@@ -85,5 +86,11 @@ describe("upload and download routes", () => {
 
   it("answers 404 for a malformed document id", async () => {
     expect((await get(cookieA, "../../etc/passwd")).status).toBe(404);
+  });
+
+  it("the ERP mock route does not exist unless ERP_MOCK_ENABLED=true (default off)", async () => {
+    const response = await erpMock(new Request("http://localhost:3000/api/erp-mock/v1/quote-requests", { method: "POST", body: "{}", headers: { "content-length": "2" } }));
+
+    expect(response.status).toBe(404);
   });
 });

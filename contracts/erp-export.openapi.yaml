@@ -55,6 +55,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "411":
+          description: Content-Length missing (the body size is checked before it is read).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413":
+          description: Body larger than 64 KiB.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "409":
           description: The key was used before with a different body.
           content:
