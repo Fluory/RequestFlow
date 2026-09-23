@@ -1,7 +1,11 @@
 import type { ExtractResponse, FieldResult } from "./types";
 
-export const HEADER_FIELDS = ["company", "contact_person", "requested_delivery_date"] as const;
+export const HEADER_FIELDS = ["company", "contact_person", "email", "phone", "requested_delivery_date", "additional_requirements"] as const;
 export type HeaderField = (typeof HEADER_FIELDS)[number];
+
+/** Fields of one line item (#22); each with its own status and evidence. */
+export const ITEM_FIELDS = ["description", "quantity", "unit", "material", "dimensions"] as const;
+export type ItemField = (typeof ITEM_FIELDS)[number];
 
 export interface MergedField extends FieldResult {
   documentId: string | null;
@@ -22,4 +26,21 @@ export function mergeFields(results: Array<{ documentId: string; response: Extra
     merged[key] = best;
   }
   return merged;
+}
+
+export interface MergedLineItem {
+  /** 0-based position within the run: documents in upload order, items in document order. */
+  itemIndex: number;
+  documentId: string;
+  fields: Record<ItemField, FieldResult>;
+}
+
+/**
+ * Line items of all documents, in upload order. Items are NOT merged across documents – two documents
+ * may list similar positions, and only a human can tell duplicates from real repeats (review, #25).
+ */
+export function mergeLineItems(results: Array<{ documentId: string; response: ExtractResponse }>): MergedLineItem[] {
+  return results.flatMap(({ documentId, response }) =>
+    [...response.lineItems].sort((a, b) => a.index - b.index).map(({ index: _index, ...fields }) => ({ documentId, fields })),
+  ).map((item, itemIndex) => ({ itemIndex, ...item }));
 }

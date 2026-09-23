@@ -49,7 +49,16 @@ def test_vertex_eu_request_shape_and_parsed_response() -> None:
     assert config["responseMimeType"] == "application/json"
     assert config["temperature"] == 0
     schema = config["responseSchema"]
-    assert set(schema["properties"]) == {"company", "contact_person", "requested_delivery_date"}
+    assert set(schema["properties"]) == {
+        "company",
+        "contact_person",
+        "email",
+        "phone",
+        "requested_delivery_date",
+        "additional_requirements",
+        "line_items",
+    }
+    assert schema["properties"]["line_items"]["type"].lower() == "array"
     # The model may not return "unverified": only the verifier sets it.
     assert "unverified" not in str(schema)
     assert "tools" not in sent

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { syntheticExtractResponse } from "./fixtures";
-import { mergeFields } from "./merge";
+import { mergeFields, mergeLineItems } from "./merge";
 
 const missing = { value: null, status: "missing" as const, evidence: null, modelStatus: "missing" as const, reason: null };
 const unverified = { value: "Fremdfirma", status: "unverified" as const, evidence: { segmentId: "s9", quote: "x" }, modelStatus: "found" as const, reason: "quote_not_in_segment" as const };
@@ -39,9 +39,35 @@ describe("mergeFields – one value per field across all documents of a request"
     expect(merged.requested_delivery_date).toMatchObject({ status: "missing", value: null, documentId: null });
   });
 
-  it("returns all three header fields as missing when no document could be processed", () => {
+  it("returns all six header fields as missing when no document could be processed", () => {
     const merged = mergeFields([]);
 
-    expect(Object.values(merged).map((field) => field.status)).toEqual(["missing", "missing", "missing"]);
+    expect(Object.keys(merged)).toEqual(["company", "contact_person", "email", "phone", "requested_delivery_date", "additional_requirements"]);
+    expect(Object.values(merged).map((field) => field.status)).toEqual(["missing", "missing", "missing", "missing", "missing", "missing"]);
+  });
+
+  it("keeps line items of all documents in upload order, sorted by their index, without merging them", () => {
+    const item = (index: number, description: string) => ({
+      index,
+      description: { value: description, status: "found" as const, evidence: { segmentId: "s2", quote: description }, modelStatus: "found" as const, reason: null },
+      quantity: missing,
+      unit: missing,
+      material: missing,
+      dimensions: missing,
+    });
+    const first = syntheticExtractResponse("d1", {}, [item(1, "Flansch DN 150"), item(0, "Flansch DN 100")]);
+    const second = syntheticExtractResponse("d2", {}, [item(0, "Flansch DN 100")]);
+
+    const items = mergeLineItems([
+      { documentId: "d1", response: first },
+      { documentId: "d2", response: second },
+    ]);
+
+    expect(items.map((entry) => [entry.itemIndex, entry.documentId, entry.fields.description.value])).toEqual([
+      [0, "d1", "Flansch DN 100"],
+      [1, "d1", "Flansch DN 150"],
+      [2, "d2", "Flansch DN 100"],
+    ]);
+    expect(mergeLineItems([])).toEqual([]);
   });
 });

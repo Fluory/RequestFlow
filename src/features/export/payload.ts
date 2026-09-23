@@ -16,12 +16,20 @@ export class ExportNotPossible extends Error {
 /** ERP limits of the contract (maxLength of subject and fields). */
 export const ERP_LIMITS = { subject: 300, field: 500 } as const;
 
+/** Header fields that go to the ERP (contracts/erp-export.openapi.yaml). */
+const EXPORTED_FIELDS = ["company", "contact_person", "requested_delivery_date"] as const;
+
 /**
  * Header fields whose reviewed value would break the ERP contract (too long). Checked at approval, so
  * the clerk can still correct the value – after approval corrections are closed (#9 review).
  */
 export function exportLimitViolations(subject: string | null, values: Record<string, string | null>): string[] {
-  const fields = Object.entries(values).filter(([, value]) => value !== null && value.length > ERP_LIMITS.field).map(([key]) => key);
+  // Only the fields the ERP receives (contract v1) – a long free text that is never exported must
+  // not block the approval (#22 review).
+  const fields = EXPORTED_FIELDS.filter((key) => {
+    const value = values[key];
+    return value != null && value.length > ERP_LIMITS.field;
+  });
   return subject !== null && subject.length > ERP_LIMITS.subject ? ["subject", ...fields] : fields;
 }
 

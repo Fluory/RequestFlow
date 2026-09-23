@@ -116,18 +116,32 @@ describe("processing: worker, AI service, retries and visible errors", () => {
   });
 
   it("processes a request: run, segments and fields persisted, REVIEW, audit – in one transaction", async () => {
-    reply = (documentId) => ({ status: 200, body: syntheticExtractResponse(documentId) });
+    const found = (value: string) => ({ value, status: "found" as const, evidence: { segmentId: "s2", quote: "Musterbau Beispiel GmbH" }, modelStatus: "found" as const, reason: null });
+    const none = { value: null, status: "missing" as const, evidence: null, modelStatus: "missing" as const, reason: null };
+    const items = [
+      { index: 0, description: found("Musterbau Beispiel GmbH"), quantity: none, unit: none, material: none, dimensions: none },
+      { index: 1, description: { ...none }, quantity: none, unit: none, material: none, dimensions: none },
+    ];
+    reply = (documentId) => ({ status: 200, body: syntheticExtractResponse(documentId, {}, items) });
     const { requestId } = await newRequest(admin, [{ name: "anfrage.eml", kind: "eml", bytes: MAIL }]);
 
     await drainUntil(async () => (await requestOf(admin, requestId))?.status === "REVIEW");
 
     const run = await runOf(admin, requestId);
     expect(run?.fields.map((field) => [field.fieldKey, field.status]).sort()).toEqual([
+      ["additional_requirements", "missing"],
       ["company", "found"],
       ["contact_person", "found"],
+      ["email", "found"],
+      ["phone", "missing"],
       ["requested_delivery_date", "found"],
     ]);
-    expect(run?.run).toMatchObject({ modelId: "gemini-3.5-flash", promptVersion: "extract_header_v1", schemaVersion: "1" });
+    // Line items (#22): one row per item field with its position, status and evidence.
+    expect(run?.lineItems.map((item) => [item.itemIndex, item.fields.map((field) => [field.fieldKey, field.status, field.segmentId]).sort()])).toEqual([
+      [0, [["description", "found", "s2"], ["dimensions", "missing", null], ["material", "missing", null], ["quantity", "missing", null], ["unit", "missing", null]]],
+      [1, [["description", "missing", null], ["dimensions", "missing", null], ["material", "missing", null], ["quantity", "missing", null], ["unit", "missing", null]]],
+    ]);
+    expect(run?.run).toMatchObject({ modelId: "gemini-3.5-flash", promptVersion: "extract_v2", schemaVersion: "2" });
     expect(await countIn(admin, sql`select count(*)::int as n from app.extraction_segments where run_id = ${run!.run.id}`)).toBe(4);
     // Forced RLS: the same query without a company context sees nothing.
     const raw = await stack.database.pool.query("select count(*)::int as n from app.extraction_segments where run_id = $1", [run!.run.id]);

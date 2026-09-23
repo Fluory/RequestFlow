@@ -31,6 +31,7 @@ _ALLOWED_EXTRAS = (
     "inputTokens",
     "outputTokens",
     "fieldStatus",
+    "lineItemCount",
     "header",
     "note",
 )

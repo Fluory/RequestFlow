@@ -25,6 +25,7 @@ _FOLD = str.maketrans(
         "\u2018": "'",
         "\u2019": "'",
         "\u201a": "'",
+        "\u00d7": "x",  # multiplication sign in dimensions (200 x 100 mm)
     }
 )
 

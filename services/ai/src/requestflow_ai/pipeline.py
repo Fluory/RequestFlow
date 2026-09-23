@@ -9,7 +9,12 @@ from typing import Literal
 from requestflow_ai.extraction.model_client import ModelClient, ModelUsage
 from requestflow_ai.extraction.prompt import render_document, system_instruction
 from requestflow_ai.extraction.schema import FIELD_KEYS, FieldKey
-from requestflow_ai.grounding.verifier import VerifiedField, verify_extraction
+from requestflow_ai.grounding.verifier import (
+    VerifiedField,
+    VerifiedLineItem,
+    verify_extraction,
+    verify_line_items,
+)
 from requestflow_ai.parsing.detect import DocumentKind, detect_kind
 from requestflow_ai.parsing.eml import parse_eml
 from requestflow_ai.parsing.pdf import DEFAULT_MAX_PAGES, PdfPipeline, parse_pdf
@@ -23,6 +28,7 @@ class ExtractionRun:
     document_kind: DocumentKind
     segments: list[Segment]
     fields: dict[FieldKey, VerifiedField]
+    line_items: list[VerifiedLineItem]
     model_id: str
     model_version: str | None
     usage: ModelUsage
@@ -60,6 +66,7 @@ def run_extraction(
             document_kind=kind,
             segments=[],
             fields=missing,
+            line_items=[],
             model_id=model.model_id,
             model_version=None,
             usage=ModelUsage(None, None, None),
@@ -75,6 +82,7 @@ def run_extraction(
         document_kind=kind,
         segments=segments,
         fields=verify_extraction(response.extraction, segments),
+        line_items=verify_line_items(response.extraction, segments),
         model_id=model.model_id,
         model_version=response.model_version,
         usage=response.usage,

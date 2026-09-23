@@ -34,8 +34,8 @@ from requestflow_ai.api.schemas import (
     ErrorResponse,
     ExtractedFields,
     ExtractResponse,
-    FieldResult,
     HealthResponse,
+    LineItem,
     RunMetadata,
     TokenUsage,
 )
@@ -232,7 +232,7 @@ def build_api() -> FastAPI:
         response_model=ExtractResponse,
         operation_id="extract",
         tags=["extraction"],
-        summary="Parse one document, extract header fields, verify every quote.",
+        summary="Parse one document, extract header fields and line items, verify every quote.",
         dependencies=[Depends(require_token)],
         responses={
             400: _error_doc("Invalid form fields."),
@@ -328,6 +328,7 @@ def build_api() -> FastAPI:
                 "modelLatencyMs": run.model_latency_ms,
                 "latencyMs": latency_ms,
                 "fieldStatus": {key: field.status for key, field in run.fields.items()},
+                "lineItemCount": len(run.line_items),
             },
         )
         return ExtractResponse(
@@ -335,13 +336,8 @@ def build_api() -> FastAPI:
             document_id=document_id,
             document_kind=run.document_kind,
             segments=run.segments,
-            fields=ExtractedFields(
-                company=FieldResult.from_verified(run.fields["company"]),
-                contact_person=FieldResult.from_verified(run.fields["contact_person"]),
-                requested_delivery_date=FieldResult.from_verified(
-                    run.fields["requested_delivery_date"]
-                ),
-            ),
+            fields=ExtractedFields.from_verified(run.fields),
+            line_items=[LineItem.from_verified(item) for item in run.line_items],
             run=RunMetadata(
                 model_id=run.model_id,
                 model_version=run.model_version,

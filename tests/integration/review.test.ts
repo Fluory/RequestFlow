@@ -63,7 +63,10 @@ describe("review: fields beside their source, corrections, approve or reject", (
     expect(view?.fields.map((field) => [field.key, field.status])).toEqual([
       ["company", "unverified"],
       ["contact_person", "found"],
+      ["email", "found"],
+      ["phone", "missing"],
       ["requested_delivery_date", "found"],
+      ["additional_requirements", "missing"],
     ]);
     const contact = view!.fields[1]!;
     expect(contact.source).toMatchObject({ kind: "email", documentId, filename: "anfrage.eml" });
@@ -111,6 +114,16 @@ describe("review: fields beside their source, corrections, approve or reject", (
 
     await correctField(tenancy, clerk, requestId, "company", "Musterbau Beispiel GmbH");
     await approveRequest({ tenancy, boss }, clerk, requestId);
+    expect(await statusOf(clerk, requestId)).toBe("APPROVED");
+    await stack.database.pool.query("delete from pgboss.job where name = $1 and singleton_key = $2", [QUEUES.exportRequest, requestId]);
+  });
+
+  it("does not block approval for a long value that is never exported (additional requirements)", async () => {
+    const long = { value: "R".repeat(800), status: "uncertain" as const, evidence: null, modelStatus: "uncertain" as const, reason: null };
+    const { requestId } = await requestInReview(clerk, { additional_requirements: long });
+
+    await approveRequest({ tenancy, boss }, clerk, requestId);
+
     expect(await statusOf(clerk, requestId)).toBe("APPROVED");
     await stack.database.pool.query("delete from pgboss.job where name = $1 and singleton_key = $2", [QUEUES.exportRequest, requestId]);
   });

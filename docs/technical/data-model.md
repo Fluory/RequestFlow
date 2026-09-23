@@ -46,7 +46,7 @@ bypass RLS). Purpose: one quote request per row. Retention: open question for th
 |---|---|---|---|
 | `extraction_runs` | one row per processing job: model, prompt + schema version, tokens, latency, per-document metadata (or why a document was skipped) | internal | unique `job_id` → a redelivered job is a no-op |
 | `extraction_segments` | segment text + locator (page/bbox, mail line) per document | confidential + personal | source view of the review UI |
-| `extracted_fields` | one merged value per header field: value, status (`found` only with a verified quote – check constraint), model status, reason, document, segment, quote | confidential + personal | original extraction – never overwritten; corrections live in `field_corrections` |
+| `extracted_fields` | one merged value per header field (`item_index` null) and one row per line-item field (`item_index` = position in the run, #22): value, status (`found` only with a verified quote – check constraint), model status, reason, document, segment, quote; unique `(run_id, field_key, item_index)` NULLS NOT DISTINCT | confidential + personal | original extraction – never overwritten; corrections live in `field_corrections` |
 
 All three: `company_id`, forced RLS, composite FKs to the run and request of the same company;
 `extracted_fields` evidence `(run_id, document_id, segment_id)` must reference a stored segment.

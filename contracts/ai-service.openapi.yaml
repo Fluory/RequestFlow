@@ -6,8 +6,8 @@ info:
   title: RequestFlow AI service
   description: 'Stateless AI service of RequestFlow (ADR-0001 D8). The TS worker sends one document (PDF
     or RFC 5322 e-mail) plus opaque IDs; the service parses it into segments with stable locators, extracts
-    header fields with Gemini on Vertex AI (`eu`) and verifies every quote deterministically. The model
-    never has the final say on `found`.
+    header fields and line items with Gemini on Vertex AI (`eu`) and verifies every quote deterministically.
+    The model never has the final say on `found`.
 
 
     The service has no database, no storage and no tenant logic. Authentication: bearer token (`AI_SERVICE_TOKEN`)
@@ -31,7 +31,7 @@ paths:
     post:
       tags:
       - extraction
-      summary: Parse one document, extract header fields, verify every quote.
+      summary: Parse one document, extract header fields and line items, verify every quote.
       operationId: extract
       security:
       - bearerAuth: []
@@ -273,6 +273,12 @@ components:
           title: Segments
         fields:
           $ref: '#/components/schemas/ExtractedFields'
+        lineItems:
+          items:
+            $ref: '#/components/schemas/LineItem'
+          type: array
+          title: Lineitems
+          description: Requested positions in document order (schemaVersion 2); empty when none.
         run:
           $ref: '#/components/schemas/RunMetadata'
         warnings:
@@ -289,6 +295,7 @@ components:
       - documentKind
       - segments
       - fields
+      - lineItems
       - run
       - warnings
       title: ExtractResponse
@@ -296,15 +303,31 @@ components:
       properties:
         company:
           $ref: '#/components/schemas/FieldResult'
+          description: Requesting company; trimmed text.
         contact_person:
           $ref: '#/components/schemas/FieldResult'
+          description: Contact person; trimmed text.
+        email:
+          $ref: '#/components/schemas/FieldResult'
+          description: Requester's e-mail address; lowercased.
+        phone:
+          $ref: '#/components/schemas/FieldResult'
+          description: Requester's phone number; trimmed as written, no country code added.
         requested_delivery_date:
           $ref: '#/components/schemas/FieldResult'
+          description: Requested delivery date as YYYY-MM-DD; a calendar week without a date is at most
+            `uncertain` (reason `calendar_week_only`, value `KW 42` or `KW 42/2026`).
+        additional_requirements:
+          $ref: '#/components/schemas/FieldResult'
+          description: Additional requirements (certificates, tolerances, ...); trimmed text.
       type: object
       required:
       - company
       - contact_person
+      - email
+      - phone
       - requested_delivery_date
+      - additional_requirements
       title: ExtractedFields
       description: Field keys are fixed snake_case identifiers shared with the TS side.
     FieldResult:
@@ -315,7 +338,10 @@ components:
           - type: 'null'
           title: Value
           description: 'Extracted value. For `found` and verified `uncertain` it is normalised: trimmed
-            text, dates as YYYY-MM-DD. Kept as the model sent it for `unverified` (and for `uncertain`
+            text; dates as YYYY-MM-DD (a calendar week without a date stays a week, see `reason` `calendar_week_only`);
+            quantities as a plain decimal with a dot and no grouping ("1250", "2.5"); units canonical
+            (mm, cm, m, kg, t, pcs) or trimmed text for other units; e-mail lowercased; phone trimmed
+            as written (no country code added). Kept as the model sent it for `unverified` (and for `uncertain`
             without evidence) so a human can review the proposal; null for `missing`.'
         status:
           type: string
@@ -351,10 +377,13 @@ components:
             - quote_not_in_segment
             - value_not_in_quote
             - ambiguous_quote
+            - calendar_week_only
           - type: 'null'
           title: Reason
-          description: Why the verifier set `unverified`, or `ambiguous_quote` when it downgraded `found`
-            to `uncertain` (the quote holds several dates); null otherwise.
+          description: 'Why the verifier set `unverified`; for `uncertain`: `ambiguous_quote` when it
+            downgraded `found` (the quote holds several dates) or `calendar_week_only` when a date field
+            only has a calendar week (value then `KW <week>` or `KW <week>/<year>`, never a computed date);
+            null otherwise.'
       type: object
       required:
       - value
@@ -373,6 +402,39 @@ components:
       required:
       - status
       title: HealthResponse
+    LineItem:
+      properties:
+        index:
+          type: integer
+          minimum: 0.0
+          title: Index
+          description: 0-based position in the document order.
+        description:
+          $ref: '#/components/schemas/FieldResult'
+          description: Product or article; trimmed text.
+        quantity:
+          $ref: '#/components/schemas/FieldResult'
+          description: Quantity as a plain decimal with a dot and no grouping ("1250", "2.5").
+        unit:
+          $ref: '#/components/schemas/FieldResult'
+          description: 'Unit: one of mm, cm, m, kg, t, pcs (Stk., St., Stueck -> pcs) when known; otherwise
+            the unit as written, trimmed.'
+        material:
+          $ref: '#/components/schemas/FieldResult'
+          description: Material or material number; trimmed text.
+        dimensions:
+          $ref: '#/components/schemas/FieldResult'
+          description: Dimensions or nominal size; trimmed text.
+      type: object
+      required:
+      - index
+      - description
+      - quantity
+      - unit
+      - material
+      - dimensions
+      title: LineItem
+      description: One requested position; every field is verified on its own (same rules as header fields).
     PdfLocator:
       properties:
         kind:

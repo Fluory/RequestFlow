@@ -43,7 +43,18 @@ const responseSchema = z.object({
   documentId: z.string(),
   documentKind: z.enum(["pdf", "eml"]),
   segments: z.array(z.object({ id: z.string(), text: z.string(), locator: z.record(z.string(), z.unknown()) })),
-  fields: z.object({ company: fieldResult, contact_person: fieldResult, requested_delivery_date: fieldResult }),
+  fields: z.object({
+    company: fieldResult,
+    contact_person: fieldResult,
+    email: fieldResult,
+    phone: fieldResult,
+    requested_delivery_date: fieldResult,
+    additional_requirements: fieldResult,
+  }),
+  // Line items (#22, schema version 2): each item field carries its own status and evidence.
+  lineItems: z.array(
+    z.object({ index: z.number().int().min(0), description: fieldResult, quantity: fieldResult, unit: fieldResult, material: fieldResult, dimensions: fieldResult }),
+  ),
   run: z.object({ modelId: z.string(), promptVersion: z.string(), schemaVersion: z.string(), latencyMs: z.number() }).loose(),
   warnings: z.array(z.string()),
 }).loose();
@@ -60,7 +71,8 @@ function consistent(response: z.infer<typeof responseSchema>, documentId: string
   if (response.documentId !== documentId) return false;
   const ids = new Set(response.segments.map((segment) => segment.id));
   if (ids.size !== response.segments.length) return false;
-  return Object.values(response.fields).every(
+  const itemFields = response.lineItems.flatMap(({ index: _index, ...fields }) => Object.values(fields));
+  return [...Object.values(response.fields), ...itemFields].every(
     (field) => (field.status !== "found" || field.evidence !== null) && (field.evidence === null || ids.has(field.evidence.segmentId)),
   );
 }

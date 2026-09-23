@@ -49,5 +49,51 @@ def test_contract_field_status_includes_unverified_but_model_schema_does_not() -
     assert set(schemas["ExtractedFields"]["properties"]) == {
         "company",
         "contact_person",
+        "email",
+        "phone",
         "requested_delivery_date",
+        "additional_requirements",
     }
+
+
+V1_FIELD_KEYS = {"company", "contact_person", "requested_delivery_date"}
+LINE_ITEM_FIELDS = {"description", "quantity", "unit", "material", "dimensions"}
+
+
+def test_contract_v2_is_additive_and_every_key_is_required() -> None:
+    schemas = committed()["components"]["schemas"]
+    fields = schemas["ExtractedFields"]
+    # Backwards compatible: every v1 key is still there and still required.
+    assert set(fields["required"]) >= V1_FIELD_KEYS
+    assert set(fields["required"]) == set(fields["properties"])
+    for key in fields["properties"]:
+        assert fields["properties"][key]["$ref"] == "#/components/schemas/FieldResult"
+
+    response = schemas["ExtractResponse"]
+    assert "lineItems" in response["required"]
+    assert response["properties"]["lineItems"]["type"] == "array"
+    assert response["properties"]["lineItems"]["items"] == {"$ref": "#/components/schemas/LineItem"}
+
+    item = schemas["LineItem"]
+    assert set(item["properties"]) == {"index", *LINE_ITEM_FIELDS}
+    assert set(item["required"]) == {"index", *LINE_ITEM_FIELDS}
+    assert item["properties"]["index"]["type"] == "integer"
+    assert item["properties"]["index"]["minimum"] == 0
+    for key in LINE_ITEM_FIELDS:
+        assert item["properties"][key]["$ref"] == "#/components/schemas/FieldResult"
+
+
+def test_contract_reason_enum_grows_additively() -> None:
+    reason = committed()["components"]["schemas"]["FieldResult"]["properties"]["reason"]
+    values = [v for option in reason["anyOf"] for v in option.get("enum", [])]
+    assert values == [
+        "missing_with_value",
+        "no_value",
+        "no_evidence",
+        "unknown_segment",
+        "empty_quote",
+        "quote_not_in_segment",
+        "value_not_in_quote",
+        "ambiguous_quote",
+        "calendar_week_only",
+    ]

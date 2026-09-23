@@ -2,7 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { extractedFields, extractionRuns, extractionSegments } from "@/db/schema";
 import { tenantOf, type TenantTx } from "@/features/tenancy";
 import type { ExtractResponse } from "./types";
-import { mergeFields } from "./merge";
+import { mergeFields, mergeLineItems } from "./merge";
 
 export interface DocumentOutcome {
   documentId: string;
@@ -71,6 +71,25 @@ export async function persistExtractionRun(
       quote: field.evidence?.quote ?? null,
     })),
   );
+
+  // Line items (#22): one row per item field, `item_index` = position in the run; document = source.
+  const items = mergeLineItems(processed.map(({ documentId, response }) => ({ documentId, response }))).flatMap((item) =>
+    Object.entries(item.fields).map(([fieldKey, field]) => ({
+      companyId,
+      runId: run.id,
+      requestId: input.requestId,
+      fieldKey,
+      itemIndex: item.itemIndex,
+      value: field.value,
+      status: field.status,
+      modelStatus: field.modelStatus,
+      reason: field.reason,
+      documentId: item.documentId,
+      segmentId: field.evidence?.segmentId ?? null,
+      quote: field.evidence?.quote ?? null,
+    })),
+  );
+  for (let index = 0; index < items.length; index += 500) await tx.insert(extractedFields).values(items.slice(index, index + 500));
   return run.id;
 }
 
@@ -83,8 +102,13 @@ export async function latestRun(tx: TenantTx, requestId: string) {
     .orderBy(desc(extractionRuns.createdAt))
     .limit(1);
   if (!run) return null;
-  const fields = await tx.select().from(extractedFields).where(and(eq(extractedFields.runId, run.id)));
-  return { run, fields };
+  const rows = await tx.select().from(extractedFields).where(and(eq(extractedFields.runId, run.id)));
+  // Header fields as before; line items grouped by position (#22).
+  const fields = rows.filter((row) => row.itemIndex === null);
+  const byItem = new Map<number, typeof rows>();
+  for (const row of rows) if (row.itemIndex !== null) byItem.set(row.itemIndex, [...(byItem.get(row.itemIndex) ?? []), row]);
+  const lineItems = [...byItem.entries()].sort(([a], [b]) => a - b).map(([itemIndex, itemFields]) => ({ itemIndex, fields: itemFields }));
+  return { run, fields, lineItems };
 }
 
 export async function listSegments(tx: TenantTx, runId: string) {

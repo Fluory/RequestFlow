@@ -203,9 +203,12 @@ export const extractedFields = appSchema
       documentId: uuid("document_id"),
       segmentId: text("segment_id"),
       quote: text("quote"),
+      /** Line item (#22): 0-based position within the run; null for header fields. */
+      itemIndex: integer("item_index"),
     },
     (table) => [
-      unique("extracted_fields_run_field_unique").on(table.runId, table.fieldKey),
+      unique("extracted_fields_run_field_item_unique").on(table.runId, table.fieldKey, table.itemIndex).nullsNotDistinct(),
+      check("extracted_fields_item_index_check", sql`item_index is null or item_index >= 0`),
       index("extracted_fields_request_idx").on(table.companyId, table.requestId),
       check("extracted_fields_status_check", sql`status in ('found', 'uncertain', 'missing', 'unverified')`),
       check("extracted_fields_found_has_evidence", sql`status <> 'found' or (quote is not null and segment_id is not null)`),
