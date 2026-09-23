@@ -33,7 +33,7 @@ def test_contract_is_openapi_3_1_with_bearer_auth_on_extract() -> None:
     assert extract["operationId"] == "extract"
     assert extract["security"] == [{"bearerAuth": []}]
     assert "security" not in spec["paths"]["/healthz"]["get"]
-    for status in ("200", "400", "401", "413", "415", "422", "429", "502"):
+    for status in ("200", "400", "401", "411", "413", "415", "422", "429", "500", "502"):
         assert status in extract["responses"]
 
 

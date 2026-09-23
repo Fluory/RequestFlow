@@ -6,6 +6,7 @@ from decimal import Decimal
 import pytest
 
 from requestflow_ai.grounding.values import (
+    check_value,
     extract_dates,
     extract_numbers,
     parse_date,
@@ -88,3 +89,69 @@ def test_extract_dates_from_sentence() -> None:
 )
 def test_value_consistent(kind: str, value: str, quote: str, ok: bool) -> None:
     assert value_consistent(kind, value, quote) is ok  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("value", "quote"),
+    [
+        ("G", "Musterbau GmbH"),
+        ("bau GmbH", "Musterbau GmbH"),
+        ("Muster", "Musterbau GmbH"),
+        ("Muster", "Max Mustermann"),
+        ("mann", "Max Mustermann"),
+        ("ax Mustermann", "Max Mustermann"),
+    ],
+)
+def test_text_value_must_match_whole_words(value: str, quote: str) -> None:
+    assert value_consistent("text", value, quote) is False
+
+
+@pytest.mark.parametrize(
+    ("value", "quote"),
+    [
+        ("Musterbau GmbH", "Firma: Musterbau GmbH, Werk 2"),
+        ("Musterbau GmbH & Co. KG", "Musterbau GmbH & Co. KG"),
+        ("Max Mustermann", "Ansprechpartner: Max Mustermann."),
+        ("  Max Mustermann \n", "Max Mustermann"),
+    ],
+)
+def test_text_value_on_word_boundaries_is_consistent(value: str, quote: str) -> None:
+    assert value_consistent("text", value, quote) is True
+
+
+@pytest.mark.parametrize(
+    ("kind", "value", "quote", "normalized"),
+    [
+        ("text", "  Musterbau GmbH \n", "Musterbau GmbH", "Musterbau GmbH"),
+        ("date", "15.10.2026", "Liefertermin: 15.10.2026", "2026-10-15"),
+        ("date", "15.10.26", "Liefertermin: 15.10.26", "2026-10-15"),
+        ("date", " 2026-10-15 ", "bis 15.10.2026", "2026-10-15"),
+        ("date", "2026-10-15", "bis 2026-10-15", "2026-10-15"),
+    ],
+)
+def test_check_value_returns_the_normalised_value(
+    kind: str, value: str, quote: str, normalized: str
+) -> None:
+    result = check_value(kind, value, quote)  # type: ignore[arg-type]
+    assert result.ok
+    assert result.normalized == normalized
+    assert result.ambiguous is False
+
+
+def test_check_value_date_not_in_quote_is_not_ok() -> None:
+    result = check_value("date", "15.10.2026", "Liefertermin: 16.10.2026")
+    assert not result.ok
+    assert result.normalized is None
+
+
+def test_check_value_quote_with_two_dates_is_ambiguous() -> None:
+    result = check_value("date", "2026-11-15", "Liefertermin 15.11.2026, spaetestens 01.12.2026")
+    assert result.ok
+    assert result.ambiguous is True
+    assert result.normalized == "2026-11-15"
+
+
+def test_check_value_same_date_twice_is_not_ambiguous() -> None:
+    result = check_value("date", "2026-11-15", "15.11.2026 (2026-11-15)")
+    assert result.ok
+    assert result.ambiguous is False

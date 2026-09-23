@@ -14,9 +14,11 @@ from requestflow_ai.parsing.segments import Segment
 ErrorCode = Literal[
     "invalid_request",
     "unauthorized",
+    "length_required",
     "document_too_large",
     "unsupported_media_type",
     "document_unparseable",
+    "document_too_long",
     "busy",
     "model_error",
     "model_output_invalid",
@@ -39,8 +41,9 @@ class Evidence(_Camel):
 
 class FieldResult(_Camel):
     value: str | None = Field(
-        description="Extracted value (dates as YYYY-MM-DD). Kept for `unverified` so a human can "
-        "review the proposal; null for `missing`."
+        description="Extracted value. For `found` and verified `uncertain` it is normalised: "
+        "trimmed text, dates as YYYY-MM-DD. Kept as the model sent it for `unverified` (and for "
+        "`uncertain` without evidence) so a human can review the proposal; null for `missing`."
     )
     status: FieldStatus = Field(
         description="Final status after verification. `found` only if the verifier confirmed the "
@@ -49,7 +52,9 @@ class FieldResult(_Camel):
     evidence: Evidence | None
     model_status: ModelStatus = Field(description="What the model claimed before verification.")
     reason: UnverifiedReason | None = Field(
-        default=None, description="Why the verifier set `unverified`; null otherwise."
+        default=None,
+        description="Why the verifier set `unverified`, or `ambiguous_quote` when it downgraded "
+        "`found` to `uncertain` (the quote holds several dates); null otherwise.",
     )
 
     @classmethod

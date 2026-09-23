@@ -109,13 +109,32 @@ def test_gemini_api_key_alone_is_not_enough() -> None:
 
 def test_dev_flag_without_key_fails_closed() -> None:
     with pytest.raises(ModelClientInitError, match="GEMINI_API_KEY"):
-        build_model_client(make_settings(ai_allow_gemini_api_dev=True), credentials_loader=no_adc)
+        build_model_client(
+            make_settings(ai_allow_gemini_api_dev=True, vertex_project=None),
+            credentials_loader=no_adc,
+        )
+
+
+@pytest.mark.parametrize("gemini_api_key", [None, "synthetic-dev-key"])
+def test_dev_flag_together_with_vertex_project_fails_closed(gemini_api_key: str | None) -> None:
+    # Ambiguous: a deployment (VERTEX_PROJECT set) must never silently run on the free tier.
+    replay = Replay(body=recorded("musterbau_pdf.json"))
+    with pytest.raises(ModelClientInitError, match="VERTEX_PROJECT"):
+        build_model_client(
+            make_settings(ai_allow_gemini_api_dev=True, gemini_api_key=gemini_api_key),
+            credentials=fake_credentials(),
+            httpx_client=replay.client(),
+            credentials_loader=no_adc,
+        )
+    assert replay.requests == []
 
 
 def test_dev_flag_with_key_uses_gemini_api_explicitly() -> None:
     replay = Replay(body=recorded("musterbau_pdf.json"))
     client = build_model_client(
-        make_settings(ai_allow_gemini_api_dev=True, gemini_api_key="synthetic-dev-key"),
+        make_settings(
+            ai_allow_gemini_api_dev=True, gemini_api_key="synthetic-dev-key", vertex_project=None
+        ),
         httpx_client=replay.client(),
         credentials_loader=no_adc,
     )

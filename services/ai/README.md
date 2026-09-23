@@ -22,8 +22,11 @@ uv run uvicorn requestflow_ai.api.app:create_app --factory --port 8080 --no-acce
 ```
 
 Startup is **fail-closed**. The service does not start if the token is missing or shorter than 24
-characters, if `VERTEX_PROJECT` is missing, or if no Google credentials can be loaded
-(`google.auth.default()` runs at startup, not at the first request).
+characters, if `VERTEX_PROJECT` is missing, if no Google credentials can be loaded
+(`google.auth.default()` runs at startup, not at the first request), if `AI_ALLOW_GEMINI_API_DEV=true`
+and `VERTEX_PROJECT` are both set (ambiguous), or, with `AI_PDF_PIPELINE=layout`, if the layout
+model cannot be loaded (the converter and its model are built in `create_app`, not at the first
+request).
 
 Proof (the same commands as CI):
 `uv sync --frozen && uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run pytest -q`
@@ -37,10 +40,11 @@ Proof (the same commands as CI):
 | `VERTEX_LOCATION` | `eu` | Vertex location (`eu` multi-region; a region such as `europe-west3` also works). |
 | `VERTEX_MODEL` | `gemini-3.5-flash` | Model ID. |
 | `AI_MODEL_TIMEOUT_SECONDS` | `60` | Timeout of one model call. The SDK does not retry; retries belong to the worker (pg-boss). |
-| `AI_ALLOW_GEMINI_API_DEV` | `false` | **Local development with synthetic data only.** Uses the Gemini API (free tier) instead of Vertex. Needs this flag **and** `GEMINI_API_KEY`. It is never used as a fallback, and a key alone changes nothing. |
+| `AI_ALLOW_GEMINI_API_DEV` | `false` | **Local development with synthetic data only.** Uses the Gemini API (free tier) instead of Vertex. Needs this flag **and** `GEMINI_API_KEY`, and `VERTEX_PROJECT` must be unset (both set → the service refuses to start). It is never used as a fallback, and a key alone changes nothing. |
 | `GEMINI_API_KEY` | – | Only read when the dev flag is `true`. |
 | `AI_PDF_PIPELINE` | `textlines` | `textlines` (model-free) or `layout` (docling layout model, see below). |
-| `AI_MAX_DOCUMENT_BYTES` | `20971520` | Upload limit → 413. |
+| `AI_MAX_DOCUMENT_BYTES` | `20971520` | Upload limit → 413. Checked twice: the declared `Content-Length` before the body is read (limit + 16 KiB multipart allowance, `MULTIPART_OVERHEAD_BYTES`), then the exact file size. |
+| `AI_MAX_PDF_PAGES` | `50` | Page cap for PDFs → 422 `document_too_long`. Counted model-free (docling-parse) before any page is parsed and before the layout model runs. |
 | `AI_MAX_CONCURRENT_EXTRACTIONS` | `4` | Concurrent extractions per process → 429 when busy. |
 | `AI_LOG_LEVEL` | `INFO` | Root log level. |
 
@@ -52,10 +56,24 @@ also refuses to start if the client ends up in key mode (a test covers both).
 
 `POST /v1/extract` (multipart): `file` (bytes), `documentId` (`^[A-Za-z0-9._:-]{1,128}$`), optional
 `mediaType`; header `X-Request-Id` (same pattern; echoed, otherwise generated).
-Errors use one shape, `{error: {code, message}, requestId}`: 400 `invalid_request`,
-401 `unauthorized`, 413 `document_too_large`, 415 `unsupported_media_type`, 422 `document_unparseable`,
-429 `busy`, 502 `model_error` / `model_output_invalid`, 500 `internal_error`. Error messages are fixed
-texts and never echo the input.
+Errors use one shape, `{error: {code, message}, requestId}`, always with the `X-Request-Id` header:
+400 `invalid_request`, 401 `unauthorized`, 411 `length_required`, 413 `document_too_large`,
+415 `unsupported_media_type`, 422 `document_unparseable` / `document_too_long`, 429 `busy`,
+502 `model_error` / `model_output_invalid`, 500 `internal_error`. Error messages are fixed texts and
+never echo the input.
+
+**Before the body is read.** A pure ASGI middleware (`ExtractGuard` in `api/app.py`) runs for
+`/v1/extract` (matched on the route path, so also behind `--root-path`) before anything reads,
+spools or parses the multipart body: no valid bearer token →
+401 (constant-time compare); missing or non-numeric `Content-Length` (e.g. chunked uploads) → 411;
+declared length above `AI_MAX_DOCUMENT_BYTES` + 16 KiB → 413. The ASGI server (uvicorn) frames the
+body by `Content-Length`, so a client cannot send more than it declared. The FastAPI dependency
+`require_token` stays as a second check. A test calls the app with a body that fails the test if
+it is read.
+
+**Unexpected errors** are caught inside the request context: the log line `unhandled_error` has
+`requestId`, `documentId` (when known) and the exception type only; the 500 response carries
+`requestId` and `X-Request-Id`.
 
 Component schemas (names for the generated TS types): `ExtractRequest`, `ExtractResponse`, `Segment`,
 `PdfLocator`, `EmailLocator` (discriminated by `kind`), `BoundingBox`, `ExtractedFields`,
@@ -89,9 +107,20 @@ downgrades a status and never upgrades one:
   segments are single lines (whitespace collapsed), so that rule only affects quotes that contain a
   newline. A word hyphenated across two PDF lines lives in two segments and cannot be quoted as one
   (→ `unverified`). A hyphen followed by a space is kept on purpose ("Bau- und Maschinenteile").
-- The value is inconsistent with the quote → `unverified`. Text: the normalised value is a substring
-  of the quote. Date: `DD.MM.YYYY`, `D.M.YY` (→ 20YY) and ISO `YYYY-MM-DD` compared as dates. Number
-  (for later fields): German `1.234,5`, `1.250`, `0,75`, `1 234,5` and `1234.5` compared as decimals.
+- The value is inconsistent with the quote → `unverified`. Text: the normalised value occurs in the
+  normalised quote **on word boundaries** (`(?<!\w)value(?!\w)`), so partial tokens such as `"G"` or
+  `"bau GmbH"` for "Musterbau GmbH" are `unverified`. A whole word is still accepted: `"Max"` for
+  "Max Mustermann" passes this check (the quote proves the word is there, not that it is the whole
+  name; human review covers that). Date: `DD.MM.YYYY`, `D.M.YY` (→ 20YY) and ISO `YYYY-MM-DD`
+  compared as dates. Number (for later fields): German `1.234,5`, `1.250`, `0,75`, `1 234,5` and
+  `1234.5` compared as decimals.
+- A date quote with **more than one distinct date** ("15.11.2026, spaetestens 01.12.2026") cannot
+  prove which one is meant: `found` is downgraded to `uncertain` with reason `ambiguous_quote`.
+  The same date written twice is not ambiguous. Partial dates without a year ("15.11.") are not
+  counted.
+- A verified value (`found`, or `uncertain` with a verified quote) is returned **normalised**: text
+  trimmed, dates as ISO `YYYY-MM-DD` (`15.10.26` → `2026-10-15`). An `unverified` value, or an
+  `uncertain` one without evidence, is returned as the model sent it, for human review.
 - `missing` with a value → `unverified`. A `missing` field always has `value: null`.
 - `uncertain` with evidence is checked the same way; without evidence it stays `uncertain`.
 
@@ -117,14 +146,29 @@ messages are never logged; exceptions are reduced to their type. Settings valida
 their input values. `tests/test_api.py` asserts that no content or token appears in the log output.
 docling, httpx and google-genai loggers are raised to WARNING.
 
-## Tests and recorded responses
+**Native stderr (outside JSON logging).** docling-parse is a C++ extension that links qpdf and
+uses loguru; both write straight to file descriptor 2, bypassing Python logging and the JSON
+formatter. docling creates the parser with `loglevel="fatal"`, which silences loguru below fatal;
+whether qpdf's own warning output is governed by that level was not established (inferred from
+strings in the compiled extension, not from source). With the fixtures and deliberately damaged variants
+(truncated file, broken `xref`/`startxref`, mangled font dictionary) no stderr output was observed
+(2026-09-23). qpdf warnings usually name object numbers and byte offsets, but whether any native
+message can contain document text is **unknown** (not established from the code). Treat the
+container's stderr as potentially sensitive: do not ship it unfiltered to shared log sinks.
+
+## Tests and model response fixtures
 
 - No test calls a live endpoint or downloads a model (`HF_HUB_OFFLINE=1` is set in `conftest.py`).
 - The model boundary is tested through the **real google-genai SDK**. An `httpx.MockTransport` is
   injected via `HttpOptions(httpx_client=...)` and replays `tests/fixtures/vertex/*.json`
-  (`generateContent` response bodies). These bodies are **hand-written in the documented REST
-  response shape, not captured from a live call** (no credentials were available). The tests assert
-  the outgoing request: URL, bearer header, `responseSchema`, `responseMimeType`, temperature and no tools.
+  (`musterbau_pdf.json`, `musterbau_eml.json`, `injection_eml.json`: `generateContent` response
+  bodies). These files are **hand-written in the Vertex REST response format, not recorded from a
+  live call** (no credentials were available); names such as `Replay` or `recorded()` in the tests
+  mean "replayed at the HTTP boundary", not "captured". The tests assert the outgoing request: URL,
+  bearer header, `responseSchema`, `responseMimeType`, temperature and no tools.
+- The layout pipeline's startup check is tested model-free by simulating the missing model
+  (`tests/test_parsing_pdf.py`, `tests/test_api.py`); without a cached model the real check fails
+  with `LocalEntryNotFoundError` → `PdfPipelineInitError` (observed 2026-09-23).
 - Fixtures are synthetic. `scripts/make_fixtures.py` generates the PDFs deterministically with
   reportlab; the `.eml` files are hand-written text.
 - `tests/test_parsing_pdf.py::test_pdf_layout_pipeline_blocks_have_page_and_bbox` runs only with
@@ -166,7 +210,7 @@ docling, httpx and google-genai loggers are raised to WARNING.
 
 - **Live call:** no Vertex (or Gemini API) call was made; there were no credentials. Real
   `gemini-3.5-flash` behaviour with this `responseSchema` (nullable nested objects, enums), real
-  token counts and latency are unverified. The recorded responses are synthetic.
+  token counts and latency are unverified. The response fixtures are hand-written and synthetic.
 - Availability of `gemini-3.5-flash` in `eu` (taken from ADR-0001, not checked against the live API).
 - The Docker image was not built; its size and the `PREFETCH_LAYOUT_MODEL` step are unverified.
 - OCR for scans and table structure (docling OCR and TableFormer models) are not enabled or tested.
@@ -174,9 +218,8 @@ docling, httpx and google-genai loggers are raised to WARNING.
   without a model call.
 - `.msg` via docling's EMAIL backend (possible, but no line provenance) and other attachment formats
   (DOCX/XLSX) are not wired yet.
-- The multipart body is parsed before the bearer check runs (FastAPI resolves the form first). An
-  unauthenticated client can therefore upload up to the proxy limit; put a body-size limit in front
-  of the service.
+- Slow-body clients: the early checks bound how much a client may send, not how slowly. Timeouts
+  for slow uploads belong to the ASGI server / proxy in front of the service.
 
 ## Dependencies (pinned, see `uv.lock`)
 

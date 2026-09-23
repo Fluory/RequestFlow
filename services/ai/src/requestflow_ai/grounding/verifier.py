@@ -6,7 +6,10 @@ Rules, applied in order:
   evidence is dropped.
 * ``found``: needs a value and evidence. The cited segment must exist, the normalised quote must
   occur in the normalised segment text, and the value must be consistent with the quote (text,
-  number or date semantics per field). Any failure -> ``unverified`` with a reason.
+  number or date semantics per field). Any failure -> ``unverified`` with a reason. Text must
+  match on word boundaries; a verified value is returned normalised (trimmed text, dates as ISO
+  ``YYYY-MM-DD``). A date quote with more than one distinct date proves nothing about which one
+  is meant: ``found`` is downgraded to ``uncertain`` (reason ``ambiguous_quote``).
 * ``uncertain``: evidence, when given, is checked the same way (failure -> ``unverified``).
   Without evidence it stays ``uncertain``. It is never promoted to ``found``.
 
@@ -28,7 +31,7 @@ from requestflow_ai.extraction.schema import (
     ModelStatus,
 )
 from requestflow_ai.grounding.normalize import normalize_text
-from requestflow_ai.grounding.values import ValueKind, value_consistent
+from requestflow_ai.grounding.values import ValueCheck, ValueKind, check_value
 from requestflow_ai.parsing.segments import Segment
 
 FieldStatus = Literal["found", "uncertain", "missing", "unverified"]
@@ -40,6 +43,9 @@ UnverifiedReason = Literal[
     "empty_quote",
     "quote_not_in_segment",
     "value_not_in_quote",
+    # Not unverified: a ``found`` date whose quote holds several dates is downgraded to
+    # ``uncertain`` with this reason.
+    "ambiguous_quote",
 ]
 
 FIELD_KINDS: dict[FieldKey, ValueKind] = {
@@ -60,7 +66,8 @@ class VerifiedField:
 
 def _check_evidence(
     value: str | None, evidence: ModelEvidence, kind: ValueKind, segments: Mapping[str, Segment]
-) -> UnverifiedReason | None:
+) -> UnverifiedReason | ValueCheck:
+    """A reason when the evidence fails; otherwise the value check (``ok`` for a null value)."""
     segment = segments.get(evidence.segment_id)
     if segment is None:
         return "unknown_segment"
@@ -69,9 +76,12 @@ def _check_evidence(
         return "empty_quote"
     if quote not in normalize_text(segment.text):
         return "quote_not_in_segment"
-    if value is not None and not value_consistent(kind, value, evidence.quote):
+    if value is None:
+        return ValueCheck(ok=True)
+    check = check_value(kind, value, evidence.quote)
+    if not check.ok:
         return "value_not_in_quote"
-    return None
+    return check
 
 
 def verify_field(
@@ -96,10 +106,14 @@ def verify_field(
         return unverified("no_value")
 
     # uncertain without a value: the quote is still checked, the value check is skipped.
-    reason = _check_evidence(field.value, field.evidence, kind, segments)
-    if reason is not None:
-        return unverified(reason)
-    return VerifiedField(field.value, model_status, field.evidence, model_status)
+    check = _check_evidence(field.value, field.evidence, kind, segments)
+    if not isinstance(check, ValueCheck):
+        return unverified(check)
+    # A verified value is returned normalised (trimmed text, ISO date), never the raw model text.
+    value = check.normalized if check.normalized is not None else field.value
+    if check.ambiguous and model_status == "found":
+        return VerifiedField(value, "uncertain", field.evidence, model_status, "ambiguous_quote")
+    return VerifiedField(value, model_status, field.evidence, model_status)
 
 
 def verify_extraction(

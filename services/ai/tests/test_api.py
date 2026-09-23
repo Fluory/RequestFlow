@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import logging
@@ -14,7 +15,7 @@ from conftest import TEST_TOKEN, Replay, fake_credentials, make_settings, no_adc
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from requestflow_ai.api.app import create_app
+from requestflow_ai.api.app import MULTIPART_OVERHEAD_BYTES, create_app
 from requestflow_ai.extraction.model_client import build_model_client
 from requestflow_ai.jsonlog import JsonFormatter
 
@@ -265,6 +266,218 @@ def test_logs_are_json_with_ids_only_never_content_or_token(
         "Liefertermin",
     ):
         assert secret_or_content not in output
+
+
+def call_asgi(
+    app: FastAPI, headers: dict[str, str], *, path: str = "/v1/extract", root_path: str = ""
+) -> tuple[int, dict[str, str], dict[str, Any]]:
+    """Call the app without a client, with a body that fails the test if anything reads it."""
+    sent: list[dict[str, Any]] = []
+    reads: list[bool] = []
+
+    async def receive() -> dict[str, Any]:
+        # Recorded as well as raised: the app might swallow the exception.
+        reads.append(True)
+        raise AssertionError("the request body must not be read")
+
+    async def send(message: dict[str, Any]) -> None:
+        sent.append(message)
+
+    scope: dict[str, Any] = {
+        "type": "http",
+        # spec 2.4: responses do not listen for a disconnect (which would call receive).
+        "asgi": {"version": "3.0", "spec_version": "2.4"},
+        "http_version": "1.1",
+        "method": "POST",
+        "scheme": "http",
+        "path": path,
+        "raw_path": path.encode(),
+        "query_string": b"",
+        "root_path": root_path,
+        "headers": [(k.lower().encode(), v.encode()) for k, v in headers.items()],
+        "client": ("127.0.0.1", 50000),
+        "server": ("testserver", 80),
+    }
+    asyncio.run(app(scope, receive, send))  # type: ignore[arg-type]
+    assert reads == [], "the request body was read"
+    start = next(m for m in sent if m["type"] == "http.response.start")
+    body = b"".join(m.get("body", b"") for m in sent if m["type"] == "http.response.body")
+    response_headers = {k.decode().lower(): v.decode() for k, v in start["headers"]}
+    return start["status"], response_headers, json.loads(body)
+
+
+MULTIPART = {"content-type": "multipart/form-data; boundary=synthetic"}
+
+
+@pytest.mark.parametrize(
+    "auth",
+    [
+        {},
+        {"authorization": "Bearer wrong-token-wrong-token-wrong"},
+        {"authorization": f"Basic {TEST_TOKEN}"},
+    ],
+)
+def test_unauthenticated_request_is_rejected_before_the_body_is_read(
+    replay: Replay, auth: dict[str, str]
+) -> None:
+    # A huge declared body: without a valid token nothing is read, spooled or parsed.
+    app = build_app(replay)
+    headers = {**MULTIPART, **auth, "content-length": str(10**12), "x-request-id": "req-401-1"}
+    status, response_headers, body = call_asgi(app, headers)
+    assert status == 401
+    assert response_headers["www-authenticate"] == "Bearer"
+    assert response_headers["x-request-id"] == "req-401-1"
+    assert body == {
+        "error": {"code": "unauthorized", "message": "missing or invalid bearer token"},
+        "requestId": "req-401-1",
+    }
+    assert replay.requests == []
+
+
+def test_guard_also_applies_behind_a_proxy_root_path(replay: Replay) -> None:
+    # uvicorn --root-path /ai: scope["path"] includes the prefix.
+    headers = {**MULTIPART, "content-length": str(10**12)}
+    status, _, body = call_asgi(build_app(replay), headers, path="/ai/v1/extract", root_path="/ai")
+    assert status == 401
+    assert body["error"]["code"] == "unauthorized"
+
+
+@pytest.mark.parametrize("length", [None, "", "abc", "-1", "1e3", "12 34"])
+def test_missing_or_invalid_content_length_is_411_before_reading(
+    replay: Replay, length: str | None
+) -> None:
+    headers = {**MULTIPART, "authorization": f"Bearer {TEST_TOKEN}"}
+    if length is not None:
+        headers["content-length"] = length
+    status, _, body = call_asgi(build_app(replay), headers)
+    assert status == 411
+    assert body["error"]["code"] == "length_required"
+    assert body["requestId"]
+
+
+def test_declared_length_above_the_limit_is_413_before_reading(replay: Replay) -> None:
+    app = build_app(replay, ai_max_document_bytes=1000)
+    headers = {
+        **MULTIPART,
+        "authorization": f"Bearer {TEST_TOKEN}",
+        "content-length": str(1000 + MULTIPART_OVERHEAD_BYTES + 1),
+    }
+    status, _, body = call_asgi(app, headers)
+    assert status == 413
+    assert body["error"]["code"] == "document_too_large"
+
+
+def test_body_within_declared_allowance_still_hits_the_exact_byte_limit(
+    fixtures_dir: Path, replay: Replay
+) -> None:
+    # Declared length passes the early check (overhead allowance); the file itself is too big.
+    data = pdf_bytes(fixtures_dir)
+    assert len(data) < MULTIPART_OVERHEAD_BYTES
+    with TestClient(build_app(replay, ai_max_document_bytes=len(data) - 1)) as client:
+        response = upload(client, data)
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "document_too_large"
+    assert replay.requests == []
+
+
+def capture_logs() -> tuple[io.StringIO, logging.Handler]:
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(JsonFormatter())
+    logging.getLogger().addHandler(handler)
+    return stream, handler
+
+
+def test_unexpected_error_in_extract_is_500_with_request_and_document_id(
+    client: TestClient, fixtures_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def boom(*_: Any, **__: Any) -> Any:
+        raise RuntimeError("secret document text Musterbau")
+
+    monkeypatch.setattr("requestflow_ai.api.app.run_extraction", boom)
+    stream, handler = capture_logs()
+    try:
+        response = upload(
+            client,
+            pdf_bytes(fixtures_dir),
+            headers={**AUTH, "X-Request-Id": "req-500-1"},
+            document_id="doc-500",
+        )
+    finally:
+        logging.getLogger().removeHandler(handler)
+
+    assert response.status_code == 500
+    assert response.headers["x-request-id"] == "req-500-1"
+    assert response.json() == {
+        "error": {"code": "internal_error", "message": "internal error"},
+        "requestId": "req-500-1",
+    }
+    output = stream.getvalue()
+    assert "secret document text" not in output
+    assert "Musterbau" not in output
+    records = [json.loads(line) for line in output.splitlines()]
+    error = next(r for r in records if r["event"] == "unhandled_error")
+    assert error["requestId"] == "req-500-1"
+    assert error["documentId"] == "doc-500"
+    assert error["excType"] == "RuntimeError"
+    # The slot was released: the next request can run.
+    monkeypatch.undo()
+    assert upload(client, pdf_bytes(fixtures_dir)).status_code == 200
+
+
+def test_unexpected_error_outside_extract_is_500_with_request_id(replay: Replay) -> None:
+    app = build_app(replay)
+
+    async def broken() -> None:
+        raise RuntimeError("secret detail")
+
+    app.add_api_route("/v1/broken", broken, methods=["GET"])
+    stream, handler = capture_logs()
+    try:
+        with TestClient(app, raise_server_exceptions=False) as client:
+            response = client.get("/v1/broken", headers={"X-Request-Id": "req-500-2"})
+    finally:
+        logging.getLogger().removeHandler(handler)
+
+    assert response.status_code == 500
+    assert response.headers["x-request-id"] == "req-500-2"
+    assert response.json()["requestId"] == "req-500-2"
+    assert response.json()["error"]["code"] == "internal_error"
+    output = stream.getvalue()
+    assert "secret detail" not in output
+    records = [json.loads(line) for line in output.splitlines()]
+    error = next(r for r in records if r["event"] == "unhandled_error")
+    assert error["requestId"] == "req-500-2"
+    assert error["excType"] == "RuntimeError"
+
+
+def test_pdf_over_the_page_cap_is_422_without_a_model_call(
+    fixtures_dir: Path, replay: Replay
+) -> None:
+    with TestClient(build_app(replay, ai_max_pdf_pages=1)) as client:
+        response = upload(client, pdf_bytes(fixtures_dir))  # 2 pages
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "document_too_long"
+    assert replay.requests == []
+
+
+def test_max_pdf_pages_defaults_to_50() -> None:
+    assert make_settings().ai_max_pdf_pages == 50
+
+
+def test_layout_pipeline_without_model_refuses_to_start(
+    replay: Replay, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from requestflow_ai.parsing import pdf as pdf_module
+    from requestflow_ai.parsing.errors import PdfPipelineInitError
+
+    class MissingModel:
+        def initialize_pipeline(self, _: object) -> None:
+            raise FileNotFoundError("layout model not found")
+
+    monkeypatch.setattr(pdf_module, "_layout_converter", MissingModel)
+    with pytest.raises(PdfPipelineInitError):
+        build_app(replay, ai_pdf_pipeline="layout")
 
 
 def test_service_refuses_to_start_without_token(monkeypatch: pytest.MonkeyPatch) -> None:
