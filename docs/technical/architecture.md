@@ -12,7 +12,9 @@ approve them, and exports each approved request exactly once to an ERP (mock in 
 It is a TypeScript modular monolith (`web` + `worker` from one codebase) on PostgreSQL, plus the
 AI service. Decisions and rationale: [ADR-0001](../decisions/ADR-0001-pilot-architecture.md).
 
-**Current state (2026-09-22): foundation only – no module is built yet.** Status per module below.
+**Current state (2026-09-22): app skeleton (#3)** – runnable stack, health endpoint, database roles and
+schema `app`, module skeletons with enforced boundaries. Status per module below (`skeleton` = public
+`index.ts` only).
 
 ## Modules
 
@@ -20,20 +22,22 @@ Every new file belongs to one of these modules – otherwise add the module here
 
 | Module | Location | Task | Exposure | Data class | Protection | Status |
 |---|---|---|---|---|---|---|
-| `intake` | `src/features/intake/` | upload, duplicate fingerprint, creates request + documents | authenticated UI/route | confidential + personal | session, tenant context, size/type limits | planned |
-| `documents` | `src/features/documents/` | document records, storage references, hashes | internal | confidential | tenant context | planned |
-| `extraction` | `src/features/extraction/` | AI-service client, persists runs/fields/evidence | internal | confidential + personal | tenant context, contract validation | planned |
-| `requests` | `src/features/requests/` | request aggregate, status machine | internal | confidential | tenant context | planned |
-| `review` | `src/features/review/` | review UI, corrections, approve/reject | authenticated UI | confidential + personal | session, role check, audit | planned |
-| `export` | `src/features/export/` | ERP port + REST adapter, idempotency | outbound HTTP | confidential | idempotency key, unique export, timeout | planned |
-| `erp-mock` | `src/features/erp-mock/` | simulated ERP REST API | route behind flag | synthetic | disabled unless `ERP_MOCK_ENABLED` | planned |
-| `identity` | `src/features/identity/` | Better Auth, users, companies, roles | public login route | personal (staff) | rate limit, invite-only | planned |
-| `tenancy` | `src/features/tenancy/` | `withTenant()`, RLS policies | internal | – | forced RLS, `app_rw` without BYPASSRLS | planned |
-| `audit` | `src/features/audit/` | append-only audit events | internal | personal (staff) | INSERT/SELECT only | planned |
-| `jobs` | `src/features/jobs/` | pg-boss, job handlers, `drain()`, worker entrypoint | internal | IDs only | transactional enqueue | planned |
-| `storage` | `src/features/storage/` | `BlobStore` port + S3 adapter | internal | confidential | private bucket, access via app routes | planned |
-| `observability` | `src/features/observability/` | logger, health, request-list ops data | `/api/health` | IDs only | no PII in logs | planned |
-| `db` | `src/db/` | Drizzle schema, migrations, DB roles | internal | – | migrations as owner role | planned |
+| `intake` | `src/features/intake/` | upload, duplicate fingerprint, creates request + documents | authenticated UI/route | confidential + personal | session, tenant context, size/type limits | skeleton |
+| `documents` | `src/features/documents/` | document records, storage references, hashes | internal | confidential | tenant context | skeleton |
+| `extraction` | `src/features/extraction/` | AI-service client, persists runs/fields/evidence | internal | confidential + personal | tenant context, contract validation | skeleton |
+| `requests` | `src/features/requests/` | request aggregate, status machine | internal | confidential | tenant context | skeleton |
+| `review` | `src/features/review/` | review UI, corrections, approve/reject | authenticated UI | confidential + personal | session, role check, audit | skeleton |
+| `export` | `src/features/export/` | ERP port + REST adapter, idempotency | outbound HTTP | confidential | idempotency key, unique export, timeout | skeleton |
+| `erp-mock` | `src/features/erp-mock/` | simulated ERP REST API | route behind flag | synthetic | disabled unless `ERP_MOCK_ENABLED` | skeleton |
+| `identity` | `src/features/identity/` | Better Auth, users, companies, roles | public login route | personal (staff) | rate limit, invite-only | skeleton |
+| `tenancy` | `src/features/tenancy/` | `withTenant()`, RLS policies | internal | – | forced RLS, `app_rw` without BYPASSRLS | skeleton |
+| `audit` | `src/features/audit/` | append-only audit events | internal | personal (staff) | INSERT/SELECT only | skeleton |
+| `jobs` | `src/features/jobs/`, entrypoint `src/worker.ts` | pg-boss, job handlers, `drain()`, worker entrypoint | internal | IDs only | transactional enqueue | skeleton (no-op worker) |
+| `storage` | `src/features/storage/` | `BlobStore` port + S3 adapter | internal | confidential | private bucket, access via app routes | partial: S3 adapter, bucket setup, health ping |
+| `observability` | `src/features/observability/` | logger, health, request-list ops data | `/api/health` | IDs only | no PII in logs | partial: health aggregation (database, storage) |
+| `db` | `src/db/`, deploy step `src/setup.ts` | Drizzle schema, migrations, DB roles | internal | – | migrations as owner role | built: roles check, schema `app`, default grants for `app_rw` |
+| `config` | `src/config/` | typed runtime configuration, validated at start (zod) | internal | secrets (in memory only) | errors name variables, never values | built |
+| `app` | `src/app/` | Next.js routes and pages; composition root `src/app/_server/` (pool, storage client) | `/`, `/api/health` | – | calls module APIs only (dependency-cruiser) | skeleton: placeholder page, health route |
 | AI service | `services/ai/` | docling parsing, extraction, grounding, evals | internal HTTP | confidential + personal (transient) | bearer token, stateless, no DB/storage access | planned |
 | Contracts | `contracts/` | OpenAPI: AI service, ERP export | – | – | contract tests | planned |
 
@@ -67,4 +71,13 @@ failure at any step ─► retry with backoff ─► dead letter ─► requests
 | Vertex AI (`eu` endpoint, gemini-3.5-flash) | extraction | showcase + customer; local dev may use the Gemini free tier with synthetic data |
 | ERP | export target | pilot: `erp-mock`; contract `contracts/erp-export.openapi.yaml` (planned) |
 
-No secrets in this document; configuration lives in `.env.example` (created with the first code issue).
+No secrets in this document; every variable is documented in `.env.example`.
+
+## Database roles
+
+| Role | Created by | Used by | Properties |
+|---|---|---|---|
+| `app_owner` | `docker/postgres/init/01-roles.sh` (password from env) | migrations (`src/setup.ts`, `MIGRATION_DATABASE_URL`) | owns schema `app`; no superuser, NOBYPASSRLS |
+| `app_rw` | same | web + worker (`DATABASE_URL`) | USAGE on `app`, no CREATE; DML via default privileges; no superuser, NOBYPASSRLS – RLS always applies |
+
+The first migration refuses to run if either role is missing or could bypass RLS.

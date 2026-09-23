@@ -78,6 +78,21 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
         if: steps.diff.outputs.code == 'true' && hashFiles('package.json') != ''
+      # Integration tests run against real PostgreSQL + SeaweedFS from compose.yaml (same images,
+      # init script and local-default credentials as on a developer machine – no CI secrets).
+      - name: Start PostgreSQL + SeaweedFS
+        if: steps.diff.outputs.code == 'true' && hashFiles('package.json') != ''
+        run: |
+          docker compose up -d postgres storage
+          for _ in $(seq 1 60); do
+            s3="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8333/ || true)"
+            if docker compose exec -T postgres pg_isready -h 127.0.0.1 -U postgres -d requestflow >/dev/null 2>&1 && [ "$s3" != "000" ]; then
+              echo "postgres ready, storage answers HTTP $s3"; exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs --tail 50
+          exit 1
       - run: pnpm verify
         if: steps.diff.outputs.code == 'true' && hashFiles('package.json') != ''
 
@@ -108,3 +123,38 @@ jobs:
           uv run ruff format --check .
           uv run pyright
           uv run pytest -q
+
+  # Image + compose smoke (ADR-0001 D11): only when the Dockerfile or the compose file changes.
+  compose-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Detect image changes
+        id: diff
+        run: |
+          if git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -qE '(^|/)Dockerfile$|^compose\.yaml$|^\.dockerignore$|^docker/'; then
+            echo "image=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "image=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: docker compose up → /api/health
+        if: steps.diff.outputs.image == 'true'
+        run: |
+          if ! docker compose up -d --build; then
+            docker compose ps -a
+            docker compose logs --tail 80
+            exit 1
+          fi
+          for _ in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/api/health; then echo; docker compose ps; exit 0; fi
+            sleep 3
+          done
+          docker compose ps
+          docker compose logs --tail 80
+          exit 1
+      - name: Worker is running
+        if: steps.diff.outputs.image == 'true'
+        run: docker compose ps --status running --services | grep -qx worker

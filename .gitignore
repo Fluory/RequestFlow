@@ -35,3 +35,6 @@ __pycache__/
 *.log
 .DS_Store
 Thumbs.db
+
+# Agent worktrees (Claude Code)
+.claude/worktrees/
