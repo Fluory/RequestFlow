@@ -6,6 +6,9 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
+- User management for admins (`/users`): see the company's users with role and status, change roles,
+  deactivate (sign-in blocked, sessions ended) and reactivate; invitations and every change are audited.
+  The last active admin of a company cannot be demoted or deactivated; clerks have no access.
 - Guard for tenant isolation: the build fails when a table with company data lacks enforced
   row-level security or its company policy.
 - Export: approved requests are sent to the ERP (a simulated ERP in the pilot, contract
