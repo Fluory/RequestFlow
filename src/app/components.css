@@ -1,0 +1,298 @@
+/* Pilot design system (#52), part 2: tables, status, review views and responsive rules.
+ * Tokens live in globals.css (imported first by the root layout). */
+
+/* ---------- Tables ---------- */
+
+.table-wrap {
+  overflow-x: auto;
+  /* Containing block for the absolutely positioned .visually-hidden labels inside cells – without
+     it they escape the scroll container and widen the page on narrow screens. */
+  position: relative;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.925rem;
+}
+th,
+td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.65rem 0.8rem;
+  text-align: left;
+  vertical-align: middle;
+}
+thead th {
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+tbody tr:last-child > * {
+  border-bottom: 0;
+}
+tbody tr:hover {
+  background: #fafbfc;
+}
+tbody th {
+  font-weight: 600;
+}
+td.num,
+th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+td.nowrap {
+  white-space: nowrap;
+}
+.muted {
+  color: var(--text-muted);
+}
+.empty {
+  padding: 2rem 1.4rem;
+  text-align: center;
+  color: var(--text-muted);
+  margin: 0;
+}
+tr.attention,
+td.attention {
+  background: #fffbeb;
+}
+tr.attention:hover {
+  background: #fff6d9;
+}
+.card > .table-wrap:first-child {
+  margin-top: -0.25rem;
+}
+.card:not(.card-flush) > .table-wrap {
+  margin-left: -1.4rem;
+  margin-right: -1.4rem;
+}
+.card:not(.card-flush) > .table-wrap th:first-child,
+.card:not(.card-flush) > .table-wrap td:first-child {
+  padding-left: 1.4rem;
+}
+
+/* ---------- Status ---------- */
+
+.badge,
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 999px;
+  padding: 0.08rem 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  vertical-align: middle;
+}
+.badge-found {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+.badge-missing {
+  background: var(--neutral-bg);
+  color: var(--neutral-text);
+}
+.badge-corrected {
+  background: var(--info-bg);
+  color: var(--info-text);
+}
+.badge-uncertain,
+.badge-unverified {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  border-color: var(--warn-border);
+  font-weight: 700;
+}
+.pill {
+  font-size: 0.8rem;
+  padding: 0.12rem 0.65rem;
+}
+.pill::before {
+  content: "";
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.8;
+}
+.pill-neutral {
+  background: var(--neutral-bg);
+  color: var(--neutral-text);
+}
+.pill-info {
+  background: var(--info-bg);
+  color: var(--info-text);
+}
+.pill-warn {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+.pill-success {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+.pill-danger {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+.stage {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+.hint {
+  font-size: 0.85rem;
+}
+.hint .badge {
+  white-space: normal;
+}
+.subject {
+  min-width: 15rem;
+}
+.subject a {
+  font-weight: 500;
+}
+
+/* ---------- Review: values, source ---------- */
+
+.value-cell a {
+  font-weight: 500;
+}
+.item-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.source {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+  padding: 1rem 1.2rem;
+  margin-top: 1rem;
+}
+.source h3 {
+  font-size: 0.95rem;
+}
+.source-lines {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem 0.5rem 2.75rem;
+  margin: 0 0 0.75rem;
+  overflow-x: auto;
+}
+.source-lines li {
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+}
+.source-lines li::marker {
+  color: var(--text-muted);
+}
+.source-lines li.cited {
+  background: var(--cited);
+  box-shadow: inset 3px 0 0 var(--mark);
+}
+.line-label {
+  color: var(--text-muted);
+  font-size: 0.8em;
+  font-family: var(--font);
+}
+mark {
+  background: var(--mark);
+  color: var(--text);
+  border-radius: 3px;
+  padding: 0 0.15rem;
+}
+.panel {
+  border-top: 1px solid var(--border);
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+.panel h3 {
+  font-size: 1.05rem;
+}
+.doc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.doc-list > li {
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.doc-list > li:last-child {
+  border-bottom: 0;
+}
+.doc-list ul {
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.doc-list [role="note"] {
+  margin: 0.25rem 0 0;
+}
+.facts {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  list-style: none;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+.facts strong {
+  color: var(--text);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  body {
+    font-size: 14.5px;
+  }
+  main {
+    padding: 1.25rem 0.9rem 2rem;
+  }
+  .card:not(.card-flush) {
+    padding: 1rem;
+  }
+  .toolbar {
+    padding: 0.75rem 1rem;
+  }
+  .card:not(.card-flush) > .table-wrap {
+    margin-left: -1rem;
+    margin-right: -1rem;
+  }
+  .account span {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
