@@ -1,0 +1,134 @@
+openapi: 3.1.0
+info:
+  title: RequestFlow ERP export
+  version: 1.0.0
+  description: |
+    Port between RequestFlow and the customer's ERP (ADR-0001 D9). In the pilot the ERP mock
+    (`/api/erp-mock`, active only with `ERP_MOCK_ENABLED=true`) implements it.
+
+    Idempotency: `Idempotency-Key` is the RequestFlow request id. A repeated call with the same key
+    and the same body returns the SAME `erpReference` (status 200 instead of 201) – never a second
+    record. The same key with a different body is refused with 409.
+servers:
+  - url: /api/erp-mock
+paths:
+  /v1/quote-requests:
+    post:
+      operationId: createQuoteRequest
+      security:
+        - bearer: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteRequest"
+      responses:
+        "201":
+          description: Created – the ERP stored the quote request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuoteRequestReceipt"
+        "200":
+          description: Replay – the key was seen before; same reference as the first call.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuoteRequestReceipt"
+        "400":
+          description: Invalid body or missing/invalid Idempotency-Key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Missing or wrong bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: The key was used before with a different body.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: Temporarily unavailable – retry with the same key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+  schemas:
+    QuoteRequest:
+      type: object
+      additionalProperties: false
+      required: [requestId, subject, approvedAt, fields]
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        subject:
+          type: [string, "null"]
+          maxLength: 300
+        approvedAt:
+          type: string
+          format: date-time
+        fields:
+          type: object
+          additionalProperties: false
+          required: [company, contactPerson, requestedDeliveryDate]
+          properties:
+            company:
+              type: [string, "null"]
+              maxLength: 500
+            contactPerson:
+              type: [string, "null"]
+              maxLength: 500
+            requestedDeliveryDate:
+              description: ISO date (YYYY-MM-DD) when the value is a date, else the reviewed text.
+              type: [string, "null"]
+              maxLength: 500
+    QuoteRequestReceipt:
+      type: object
+      additionalProperties: false
+      required: [erpReference, requestId, receivedAt]
+      properties:
+        erpReference:
+          type: string
+          minLength: 1
+          maxLength: 64
+        requestId:
+          type: string
+          format: uuid
+        receivedAt:
+          type: string
+          format: date-time
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [invalid_request, unauthorized, idempotency_conflict, unavailable]
+            message:
+              type: string
