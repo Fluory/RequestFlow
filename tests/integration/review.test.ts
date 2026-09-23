@@ -128,6 +128,45 @@ describe("review: fields beside their source, corrections, approve or reject", (
     await stack.database.pool.query("delete from pgboss.job where name = $1 and singleton_key = $2", [QUEUES.exportRequest, requestId]);
   });
 
+  it("shows line items with a status per field, and audits item corrections like header fields (#25)", async () => {
+    const found = (value: string, segmentId: string) => ({ value, status: "found" as const, evidence: { segmentId, quote: value }, modelStatus: "found" as const, reason: null });
+    const none = { value: null, status: "missing" as const, evidence: null, modelStatus: "missing" as const, reason: null };
+    const unverified = { value: "99999", status: "unverified" as const, evidence: { segmentId: "s2", quote: "x" }, modelStatus: "found" as const, reason: "quote_not_in_segment" as const };
+    const requestId = randomUUID();
+    const documentId = randomUUID();
+    await tenancy.withTenant(clerk.companyId, async (tx) => {
+      await createRequest(tx, { id: requestId, createdBy: clerk.userId });
+      await insertDocuments(tx, [
+        { id: documentId, requestId, filename: "anfrage.eml", contentType: "message/rfc822", kind: "eml", sizeBytes: 10, sha256: "x".repeat(64), storageKey: `${clerk.companyId}/${requestId}/${documentId}` },
+      ]);
+      const row = await transitionRequest(tx, (await lockRequest(tx, requestId))!, "processing.started", { attempts: 1 });
+      const items = [
+        { index: 0, description: found("Musterbau Beispiel GmbH", "s2"), quantity: unverified, unit: none, material: none, dimensions: none },
+        { index: 1, description: none, quantity: none, unit: none, material: none, dimensions: none },
+      ];
+      await persistExtractionRun(tx, { requestId, jobId: randomUUID(), outcomes: [{ documentId, response: syntheticExtractResponse(documentId, {}, items) }] });
+      await transitionRequest(tx, row, "processing.succeeded");
+    });
+
+    const view = await loadReview(tenancy, clerk, requestId);
+    expect(view?.lineItems.map((item) => [item.itemIndex, item.fields.map((field) => [field.key, field.status])])).toEqual([
+      [0, [["description", "found"], ["quantity", "unverified"], ["unit", "missing"], ["material", "missing"], ["dimensions", "missing"]]],
+      [1, [["description", "missing"], ["quantity", "missing"], ["unit", "missing"], ["material", "missing"], ["dimensions", "missing"]]],
+    ]);
+    expect(view?.lineItems[0]?.fields[0]?.source).toMatchObject({ kind: "email", documentId });
+
+    await correctField(tenancy, clerk, requestId, "quantity", "1250", 0);
+
+    const corrected = (await loadReview(tenancy, clerk, requestId))!.lineItems[0]!.fields.find((field) => field.key === "quantity");
+    expect(corrected).toMatchObject({ value: "1250", extractedValue: "99999", reviewStatus: "corrected", itemIndex: 0 });
+    // Header field with the same key space is untouched; the correction belongs to position 0 only.
+    expect((await loadReview(tenancy, clerk, requestId))!.lineItems[1]!.fields.find((field) => field.key === "quantity")?.value).toBeNull();
+    expect((await auditOf(clerk, requestId)).find((event) => event.action === "field.corrected")?.data).toEqual({ field: "quantity", item: 0, oldValue: "99999", newValue: "1250" });
+    await expect(correctField(tenancy, clerk, requestId, "quantity", "5", 7)).rejects.toMatchObject({ code: "unknown_field" });
+    await expect(correctField(tenancy, clerk, requestId, "company", "x", 0)).rejects.toMatchObject({ code: "unknown_field" });
+    await expect(correctField(tenancy, clerk, requestId, "quantity", "5")).rejects.toMatchObject({ code: "unknown_field" });
+  });
+
   it("approve: APPROVED and the export job in one transaction, audited", async () => {
     const { requestId } = await requestInReview(clerk);
 
