@@ -1,0 +1,2 @@
+ALTER TABLE "app"."extracted_fields" ADD CONSTRAINT "extracted_fields_request_same_company_fk" FOREIGN KEY ("request_id","company_id") REFERENCES "app"."requests"("id","company_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "app"."extracted_fields" ADD CONSTRAINT "extracted_fields_evidence_segment_fk" FOREIGN KEY ("run_id","document_id","segment_id") REFERENCES "app"."extraction_segments"("run_id","document_id","segment_id") ON DELETE no action ON UPDATE no action;
