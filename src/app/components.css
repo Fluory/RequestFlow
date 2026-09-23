@@ -264,11 +264,10 @@ td.attention {
   white-space: nowrap;
   vertical-align: middle;
 }
-.badge-found {
-  color: var(--success-text);
-}
+.badge-found,
 .badge-missing {
   color: var(--text-muted);
+  font-weight: 400;
 }
 .badge-corrected,
 .badge-uncertain,
@@ -283,6 +282,7 @@ td.attention {
 .badge-corrected {
   background: var(--info-bg);
   color: var(--info-text);
+  border-color: #bfdbfe;
 }
 .badge-uncertain,
 .badge-unverified {
@@ -301,22 +301,27 @@ td.attention {
 .pill-neutral {
   background: var(--neutral-bg);
   color: var(--neutral-text);
+  border-color: var(--border);
 }
 .pill-info {
   background: var(--info-bg);
   color: var(--info-text);
+  border-color: #bfdbfe;
 }
 .pill-warn {
   background: var(--warn-bg);
   color: var(--warn-text);
+  border-color: #fde68a;
 }
 .pill-success {
   background: var(--success-bg);
   color: var(--success-text);
+  border-color: #bbf7d0;
 }
 .pill-danger {
   background: var(--danger-bg);
   color: var(--danger-text);
+  border-color: #fecaca;
 }
 .stage {
   display: block;
