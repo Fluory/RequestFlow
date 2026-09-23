@@ -256,8 +256,13 @@ expected item that was not returned counts as `missing`), in percent, `null` wit
 threshold (drop, or rise for `false_found_rate`), when a baselined metric is no longer measurable,
 and – independent of the threshold – on any case error, any injection violation (a value listed in
 the case's `must_not_found` came out `found`) or a changed case set. Threshold: `--threshold` or
-`EVAL_GATE_THRESHOLD`, default **5 points** (to be agreed with the customer, ADR-0001 D8). With 15
-cases one header observation is ~6.7 points, so at 5 points any single header regression fails.
+`EVAL_GATE_THRESHOLD`, default **5 points** (to be agreed with the customer, ADR-0001 D8). The
+denominators are small and uneven: a header field's `found_accuracy` has 10–12 observations (one
+regression ≈ 8–10 points, fails at 5), the line item fields have 28–29 (one regression ≈ 3.4
+points, passes at 5; two fail), and some `missing_*` cells have only 1–4 observations.
+**The replay gate guards the deterministic path** (parsing, SDK parsing, verifier, normalisation);
+it cannot see a prompt or model regression, because the model responses are fixed. A prompt or
+model change needs a local `--live` run and a reviewed `--update-baseline` in the same PR.
 `--update-baseline` is refused in CI and from a run with errors or violations.
 
 **Injection cases** (`i01` header, `i02` line items): the recorded model obeys the injected text but
