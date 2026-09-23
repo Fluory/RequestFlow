@@ -53,7 +53,22 @@ export function createErpClient(settings: ErpSettings): ErpExporter {
         await response.body?.cancel().catch(() => undefined);
         throw new ErpExportError("http", RETRYABLE_STATUS.has(response.status), response.status);
       }
-      const parsed = receiptSchema.safeParse(await response.json().catch(() => undefined));
+      // A failure while READING the body (timeout, reset) leaves the outcome unknown → retry under the
+      // same key; only a body that was read and breaks the contract is permanent.
+      let body: string;
+      try {
+        body = await response.text();
+      } catch (error) {
+        const timedOut = error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError");
+        throw new ErpExportError(timedOut ? "timeout" : "unreachable", true, response.status);
+      }
+      let json: unknown;
+      try {
+        json = JSON.parse(body);
+      } catch {
+        json = undefined;
+      }
+      const parsed = receiptSchema.safeParse(json);
       if (!parsed.success || parsed.data.requestId.toLowerCase() !== request.requestId.toLowerCase()) {
         throw new ErpExportError("contract_violation", false, response.status);
       }

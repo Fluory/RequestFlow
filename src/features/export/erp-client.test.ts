@@ -71,6 +71,13 @@ describe("ERP REST adapter", () => {
     });
   });
 
+  it("treats a body that cannot be read (reset or timeout mid-body) as retryable – the outcome is unknown", async () => {
+    const broken = new ReadableStream({ start: (controller) => controller.error(new TypeError("terminated")) });
+    const client = createErpClient({ baseUrl: "http://x", token: TOKEN, timeoutMs: 100, fetch: async () => new Response(broken, { status: 201 }) });
+
+    expect(await failureOf(client.submit(payload()))).toMatchObject({ code: "unreachable", retryable: true });
+  });
+
   it("refuses to start without a token (fail closed)", () => {
     expect(() => createErpClient({ baseUrl: "http://x", token: undefined, timeoutMs: 100 })).toThrow(/ERP_TOKEN/);
   });

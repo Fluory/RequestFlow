@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 import { errorCodes, quoteRequestSchema, type QuoteRequestReceipt } from "@/features/export";
 
@@ -63,6 +63,9 @@ export interface ErpMock {
 type ErrorCode = (typeof errorCodes)[number];
 const json = (status: number, body: unknown) => Response.json(body, { status });
 const failure = (status: number, code: ErrorCode, message: string) => json(status, { error: { code, message } });
+const digest = (value: string) => createHash("sha256").update(value).digest();
+/** Constant-time comparison of the bearer token (digests have equal length). */
+const tokenMatches = (header: string | null, token: string) => timingSafeEqual(digest(header ?? ""), digest(`Bearer ${token}`));
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function createErpMock(options: ErpMockOptions): ErpMock {
@@ -74,7 +77,7 @@ export function createErpMock(options: ErpMockOptions): ErpMock {
   return {
     created: () => store.size(),
     async handle(request) {
-      if (request.headers.get("authorization") !== `Bearer ${options.token}`) return failure(401, "unauthorized", "missing or wrong bearer token");
+      if (!tokenMatches(request.headers.get("authorization"), options.token)) return failure(401, "unauthorized", "missing or wrong bearer token");
       const key = request.headers.get("idempotency-key") ?? "";
       if (!UUID.test(key)) return failure(400, "invalid_request", "Idempotency-Key must be a UUID");
       const parsed = quoteRequestSchema.safeParse(await request.json().catch(() => undefined));

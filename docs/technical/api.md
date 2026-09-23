@@ -54,7 +54,8 @@ flag or without `ERP_TOKEN` the route answers 404. `Authorization: Bearer <ERP_T
 | 503 | injected fault (`ERP_MOCK_FAULTS`) or the in-memory store is full (10 000 records) |
 
 Keys live in the web process's memory (decision-needed in #9): a restart forgets them, and only one
-web instance may serve the mock.
+web instance may serve the mock. Consequence: a restart between a stored-but-unanswered call and its
+retry creates a second mock record – exactly-once on our side (unique export row) is unaffected.
 
 ## `GET /api/documents/:id` (session required)
 

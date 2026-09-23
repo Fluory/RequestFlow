@@ -87,6 +87,9 @@ describe("loadConfig", () => {
     expect(loadConfig({ ...valid, ERP_MOCK_ENABLED: "true" }).erp.mock.enabled).toBe(true);
     expect(() => loadConfig({ ...valid, ERP_MOCK_ENABLED: "yes" })).toThrow(/ERP_MOCK_ENABLED/);
     expect(() => loadConfig({ ...valid, ERP_TOKEN: "short" })).toThrow(/ERP_TOKEN/);
+    expect(() => loadConfig({ ...valid, ERP_TIMEOUT_MS: "20001" })).toThrow(/ERP_TIMEOUT_MS/);
+    expect(loadConfig({ ...valid, ERP_MOCK_FAULTS: "503, lost" }).erp.mock.faults).toBe("503, lost");
+    expect(() => loadConfig({ ...valid, ERP_MOCK_FAULTS: "500" })).toThrow(/ERP_MOCK_FAULTS/);
   });
 
   it("refuses the committed local ERP token outside APP_ENV=local", () => {

@@ -13,6 +13,18 @@ export class ExportNotPossible extends Error {
   }
 }
 
+/** ERP limits of the contract (maxLength of subject and fields). */
+export const ERP_LIMITS = { subject: 300, field: 500 } as const;
+
+/**
+ * Header fields whose reviewed value would break the ERP contract (too long). Checked at approval, so
+ * the clerk can still correct the value – after approval corrections are closed (#9 review).
+ */
+export function exportLimitViolations(subject: string | null, values: Record<string, string | null>): string[] {
+  const fields = Object.entries(values).filter(([, value]) => value !== null && value.length > ERP_LIMITS.field).map(([key]) => key);
+  return subject !== null && subject.length > ERP_LIMITS.subject ? ["subject", ...fields] : fields;
+}
+
 /**
  * The ERP payload. Deterministic for an approved request (values are frozen after approval, the
  * approval time comes from its audit event), so a retry sends the same body under the same key.

@@ -2,7 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { fieldCorrections } from "@/db/schema";
 import { recordAudit } from "@/features/audit";
 import { listDocuments, type DocumentRow } from "@/features/documents";
-import { getExportRecord, type ExportRecord } from "@/features/export";
+import { exportLimitViolations, getExportRecord, type ExportRecord } from "@/features/export";
 import { HEADER_FIELDS, latestRun, listSegments } from "@/features/extraction";
 import { authorize, type Actor } from "@/features/identity";
 import { enqueueRequestExport, type JobSender } from "@/features/jobs";
@@ -45,7 +45,7 @@ export interface ReviewView {
   exportRecord: ExportRecord | null;
 }
 
-export type ReviewRefusal = "not_in_review" | "unknown_field" | "reason_missing" | "reason_too_long";
+export type ReviewRefusal = "not_in_review" | "unknown_field" | "reason_missing" | "reason_too_long" | "value_too_long";
 
 /** Refused action: request missing (or of another company – RLS), not in REVIEW, or invalid input. */
 export class ReviewRefused extends Error {
@@ -143,11 +143,16 @@ export async function correctField(tenancy: Tenancy, actor: Actor, requestId: st
   });
 }
 
-/** REVIEW → APPROVED and the export job in ONE transaction (ADR-0001 D9), audited. */
+/**
+ * REVIEW → APPROVED and the export job in ONE transaction (ADR-0001 D9), audited. Refused while a
+ * value would break the ERP contract – otherwise the export could never succeed and, after approval,
+ * the value can no longer be corrected.
+ */
 export async function approveRequest(deps: { tenancy: Tenancy; boss: JobSender }, actor: Actor, requestId: string): Promise<void> {
   authorize(actor, "requests.process");
   await deps.tenancy.withTenant(actor.companyId, async (tx) => {
     const request = await lockForReview(tx, requestId);
+    if (exportLimitViolations(request.subject, await currentFieldValues(tx, requestId)).length > 0) throw new ReviewRefused("value_too_long");
     await transitionRequest(tx, request, "approve");
     await enqueueRequestExport(deps.boss, tx, requestId);
     await recordAudit(tx, { actorUserId: actor.userId, action: "request.approved", entityType: "request", entityId: requestId });

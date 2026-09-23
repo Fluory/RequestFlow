@@ -11,6 +11,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   unknown_field: "Unbekanntes Feld.",
   reason_missing: "Bitte einen Grund für die Ablehnung angeben.",
   reason_too_long: "Der Grund ist zu lang (höchstens 1000 Zeichen).",
+  value_too_long: "Ein Wert ist zu lang für den ERP-Export (höchstens 500 Zeichen) – bitte zuerst korrigieren.",
   forbidden: "Keine Berechtigung.",
 };
 

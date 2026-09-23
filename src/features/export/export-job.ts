@@ -42,7 +42,11 @@ export async function exportRequestJob(deps: ExportDeps, job: Job): Promise<"exp
   const { requestId, companyId } = job.data;
   return deps.tenancy.withTenant(companyId, async (tx) => {
     const request = await lockRequest(tx, requestId);
-    if (!request || request.status !== "APPROVED") return "skipped";
+    if (!request || request.status !== "APPROVED") {
+      // IDs and a reason code only – a wrong company in the payload shows up here as `not_visible`.
+      logEvent("info", "export.skipped", { requestId, companyId, jobId: job.id }, { code: request ? `status_${request.status}` : "not_visible" });
+      return "skipped";
+    }
     await ensureExportRecord(tx, requestId);
     const payload = await buildQuoteRequest(tx, request, deps.fieldValues);
     const { receipt, replay } = await deps.erp.submit(payload);

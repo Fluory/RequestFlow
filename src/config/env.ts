@@ -24,9 +24,15 @@ const schema = z.object({
   // ERP port (ADR-0001 D9). The pilot points ERP_BASE_URL at the in-app mock.
   ERP_BASE_URL: z.url().default("http://127.0.0.1:3000/api/erp-mock"),
   ERP_TOKEN: z.string().min(24).optional(),
-  ERP_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+  // Capped below the database statement_timeout (30 s): the export holds the request's row lock during
+  // the call, and a redelivered job waiting on that lock must not time out first (#9 review).
+  ERP_TIMEOUT_MS: z.coerce.number().int().positive().max(20_000).default(10_000),
   ERP_MOCK_ENABLED: z.enum(["true", "false"]).default("false"),
-  ERP_MOCK_FAULTS: z.string().default(""),
+  // Fault injection of the mock: comma list of 503 | lost | timeout (checked at start, not per request).
+  ERP_MOCK_FAULTS: z
+    .string()
+    .default("")
+    .refine((value) => value.split(",").map((entry) => entry.trim()).filter(Boolean).every((entry) => ["503", "lost", "timeout"].includes(entry))),
 });
 
 const LOCAL_PLACEHOLDER_SECRETS = new Set(["local-dev-only-secret-change-me-0123456789"]);

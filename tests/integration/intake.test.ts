@@ -130,6 +130,14 @@ describe("intake: upload a request and enqueue processing atomically", () => {
     expect(second).toMatchObject({ possibleDuplicate: true, duplicateOfId: first.requestId });
   });
 
+  it("keeps a subject taken from a long file name within the ERP limit of 300 characters (file names are capped at 200)", async () => {
+    const name = `${"a".repeat(400)}.pdf`;
+    const result = await submitUpload(deps, clerkA, [{ name, bytes: pdf(unique("long")) }]);
+
+    const request = await deps.tenancy.withTenant(clerkA.companyId, (tx) => getRequest(tx, result.requestId));
+    expect(request?.subject).toBe(name.slice(-200));
+  });
+
   it("flags the same set of files as a possible duplicate, in any order", async () => {
     const one = pdf(unique("x"));
     const two = pdf(unique("y"));
