@@ -10,6 +10,12 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_rw' AND NOT rolsuper AND NOT rolbypassrls AND NOT rolcreaterole) THEN
     RAISE EXCEPTION 'role app_rw missing, superuser, able to create roles or allowed to bypass RLS';
   END IF;
+  IF EXISTS (
+    SELECT 1 FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.roleid
+     WHERE m.member = 'app_rw'::regrole AND (r.rolsuper OR r.rolbypassrls OR r.rolname = 'app_owner')
+  ) THEN
+    RAISE EXCEPTION 'app_rw must not inherit app_owner, superuser or BYPASSRLS';
+  END IF;
   IF current_user <> 'app_owner' THEN
     RAISE EXCEPTION 'migrations must run as app_owner, not %', current_user;
   END IF;

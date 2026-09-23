@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -49,5 +50,13 @@ describe("first migration", () => {
     const tables = rows.find((row) => row.kind === "r");
 
     expect(tables?.acl).toMatch(/app_rw=arwd\/app_owner/);
+  });
+
+  it("the role guard of the first migration aborts when it does not run as app_owner", async () => {
+    const sqlFile = readFileSync(new URL("../../src/db/migrations/0000_app_schema.sql", import.meta.url), "utf8");
+    const guard = sqlFile.split("--> statement-breakpoint")[0] ?? "";
+    expect(guard).toContain("DO $$");
+
+    await expect(rw.query(guard)).rejects.toThrow(/migrations must run as app_owner, not app_rw/);
   });
 });

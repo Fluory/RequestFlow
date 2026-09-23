@@ -21,8 +21,22 @@ module.exports = {
       name: "raw-db-client-only-in-db-and-tenancy",
       severity: "error",
       comment: "No raw database client outside src/db and src/features/tenancy (ADR-0001 D7); features get a tenant-scoped transaction.",
-      from: { path: "^src/", pathNot: ["^src/db/", "^src/features/tenancy/", "^src/app/_server/", "\\.test\\.ts$"] },
+      from: { path: "^src/", pathNot: ["^src/db/", "^src/features/tenancy/", "\\.test\\.ts$"] },
       to: { path: "(^|/)node_modules/(pg|postgres|drizzle-orm/node-postgres)(/|$)" },
+    },
+    {
+      name: "no-db-connection-in-features",
+      severity: "error",
+      comment: "Feature modules never open connections or run migrations: createDatabase()/runMigrations() belong to the composition roots (src/app/_server, src/*.ts entrypoints). Types and table definitions (src/db/schema) are fine.",
+      from: { path: "^src/features/" },
+      to: { path: "^src/db/(index|client|migrate)\\.ts$", dependencyTypesNot: ["type-only"] },
+    },
+    {
+      name: "not-to-unresolvable",
+      severity: "error",
+      comment: "Every import must resolve – otherwise the boundary rules above would silently check nothing.",
+      from: {},
+      to: { couldNotResolve: true },
     },
     {
       name: "features-do-not-import-app",

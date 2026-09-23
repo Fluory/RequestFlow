@@ -16,6 +16,12 @@ const log = (level: "info" | "error", message: string) =>
 const describe = (error: unknown) =>
   error instanceof Error ? error.message.replace(/\w+:\/\/\S+/g, "<url>") : "unknown error";
 
+// Only "not reachable yet" is worth waiting for; a misconfiguration (role guard, wrong credentials)
+// fails at once so its real cause is the last log line.
+const TRANSIENT = /ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ECONNRESET|timeout|starting up|not yet accepting|socket hang up/i;
+const isTransient = (error: unknown) =>
+  error instanceof Error && (TRANSIENT.test(error.message) || TRANSIENT.test(String((error as { code?: unknown }).code ?? "")));
+
 // Database and storage may still be starting (compose starts them in parallel); retry, bounded.
 async function withRetry(step: string, action: () => Promise<void>): Promise<void> {
   for (let attempt = 1; ; attempt++) {
@@ -23,7 +29,7 @@ async function withRetry(step: string, action: () => Promise<void>): Promise<voi
       await action();
       return;
     } catch (error) {
-      if (attempt >= ATTEMPTS) throw error;
+      if (attempt >= ATTEMPTS || !isTransient(error)) throw error;
       log("info", `${step} not ready (attempt ${attempt}/${ATTEMPTS}): ${describe(error)}`);
       await sleep(DELAY_MS);
     }

@@ -1,4 +1,4 @@
 {
-  "compilerOptions": { "module": "esnext", "moduleResolution": "bundler", "strict": true, "noEmit": true },
+  "compilerOptions": { "module": "esnext", "moduleResolution": "bundler", "strict": true, "noEmit": true, "paths": { "@/*": ["./src/*"] } },
   "include": ["src/**/*.ts"]
 }
