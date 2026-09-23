@@ -10,19 +10,7 @@ export const QUEUES = {
   exportRequestDead: "request-export-dead",
 } as const;
 
-export type QueueName = (typeof QUEUES)[keyof typeof QUEUES  // Export of approved requests (#9 adds the handler). Enqueued in the approval transaction (#8).
-  { name: QUEUES.exportRequestDead, policy: "standard", retentionSeconds: 60 * 60 * 24 * 14, retryLimit: 10, retryDelay: 60, retryBackoff: true },
-  {
-    name: QUEUES.exportRequest,
-    policy: "exclusive",
-    retryLimit: 8,
-    retryDelay: 30,
-    retryBackoff: true,
-    retryDelayMax: 60 * 30,
-    expireInSeconds: 60 * 15,
-    deadLetter: QUEUES.exportRequestDead,
-  },
-];
+export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];
 
 export interface RequestJob {
   requestId: string;
