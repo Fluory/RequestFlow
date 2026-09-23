@@ -58,24 +58,24 @@ describe("buildSourceView – where a value comes from", () => {
     expect(buildSourceView(mail, { segmentId: "nope", quote: "x" })).toBeNull();
   });
 
-  it("shows an XLSX cell with its sheet and cell, only cells of the same sheet as context (#25)", () => {
-    const cells: StoredSegment[] = [
-      { segmentId: "x1", position: 0, text: "Menge", locator: { kind: "xlsx", sheet: "Positionen", cell: "B1" } },
-      { segmentId: "x2", position: 1, text: "1.250", locator: { kind: "xlsx", sheet: "Positionen", cell: "B2" } },
-      { segmentId: "x3", position: 2, text: "Notiz", locator: { kind: "xlsx", sheet: "Hinweise", cell: "A1" } },
+  it("shows an XLSX row with its sheet and cell range, only rows of the same sheet as context (#25)", () => {
+    const rows: StoredSegment[] = [
+      { segmentId: "x1", position: 0, text: "Pos. | Menge | Einheit", locator: { kind: "xlsx", sheet: "Positionen", row: 1, cellRange: "A1:C1" } },
+      { segmentId: "x2", position: 1, text: "1 | 1.250 | Stk.", locator: { kind: "xlsx", sheet: "Positionen", row: 2, cellRange: "A2:C2" } },
+      { segmentId: "x3", position: 2, text: "Notiz", locator: { kind: "xlsx", sheet: "Hinweise", row: 1, cellRange: "A1" } },
     ];
 
-    const view = buildSourceView(cells, { segmentId: "x2", quote: "1.250" });
+    const view = buildSourceView(rows, { segmentId: "x2", quote: "1.250" });
 
     expect(view).toMatchObject({ kind: "xlsx", heading: "Tabellenblatt Positionen", ocr: false });
-    expect(view?.lines.map((line) => line.label)).toEqual(["Positionen!B1", "Positionen!B2"]);
-    expect(view?.lines[1]).toMatchObject({ cited: true, parts: [{ text: "1.250", mark: true }] });
+    expect(view?.lines.map((line) => line.label)).toEqual(["Positionen!A1:C1", "Positionen!A2:C2"]);
+    expect(view?.lines[1]).toMatchObject({ cited: true, parts: [{ text: "1 | ", mark: false }, { text: "1.250", mark: true }, { text: " | Stk.", mark: false }] });
   });
 
   it("shows DOCX paragraphs and table cells with their position (#25)", () => {
     const docx: StoredSegment[] = [
-      { segmentId: "d1", position: 0, text: "Sehr geehrte Damen und Herren,", locator: { kind: "docx", paragraph: 1 } },
-      { segmentId: "d2", position: 1, text: "Werkstoff 1.4301", locator: { kind: "docx", table: 1, row: 2, cell: 3 } },
+      { segmentId: "d1", position: 0, text: "Sehr geehrte Damen und Herren,", locator: { kind: "docx", part: "paragraph", paragraph: 1, table: null, row: null, cell: null } },
+      { segmentId: "d2", position: 1, text: "Werkstoff 1.4301", locator: { kind: "docx", part: "table_cell", paragraph: null, table: 1, row: 2, cell: 3 } },
     ];
 
     const view = buildSourceView(docx, { segmentId: "d2", quote: "1.4301" });
@@ -92,10 +92,29 @@ describe("buildSourceView – where a value comes from", () => {
     expect(view).toMatchObject({ kind: "pdf", heading: "Seite 1 (Texterkennung)", ocr: true });
   });
 
-  it("prefixes evidence from an e-mail attachment with the attachment name (#25)", () => {
-    const msg: StoredSegment[] = [{ segmentId: "a1", position: 0, text: "DN 100", locator: { kind: "xlsx", sheet: "Tabelle1", cell: "C4", attachment: "positionen.xlsx" } }];
+  it("shows an Outlook message like a mail and unwraps attachments, naming them in the heading (#25)", () => {
+    const attachment = (index: number, name: string) => ({ index, name });
+    const msg: StoredSegment[] = [
+      { segmentId: "m1", position: 0, text: "Bitte Angebot", locator: { kind: "msg", part: "body", line: 1, header: null, attachment: null, inner: null } },
+      {
+        segmentId: "m2",
+        position: 1,
+        text: "1 | DN 100 | 40",
+        locator: { kind: "msg", part: "attachment", line: null, header: null, attachment: attachment(0, "positionen.xlsx"), inner: { kind: "xlsx", sheet: "Tabelle1", row: 4, cellRange: "A4:C4" } },
+      },
+      {
+        segmentId: "m3",
+        position: 2,
+        text: "Seite eins",
+        locator: { kind: "msg", part: "attachment", line: null, header: null, attachment: attachment(1, "scan.pdf"), inner: { kind: "pdf", page: 1, ocr: true } },
+      },
+    ];
 
-    expect(buildSourceView(msg, { segmentId: "a1", quote: "DN 100" })?.heading).toBe("Anhang positionen.xlsx – Tabellenblatt Tabelle1");
+    expect(buildSourceView(msg, { segmentId: "m1", quote: "Angebot" })).toMatchObject({ kind: "email", heading: "E-Mail", lines: [{ label: "Zeile 1" }] });
+    const sheet = buildSourceView(msg, { segmentId: "m2", quote: "DN 100" });
+    expect(sheet).toMatchObject({ kind: "xlsx", heading: "Anhang positionen.xlsx – Tabellenblatt Tabelle1", ocr: false });
+    expect(sheet?.lines.map((line) => line.label)).toEqual(["Tabelle1!A4:C4"]);
+    expect(buildSourceView(msg, { segmentId: "m3", quote: "eins" })).toMatchObject({ kind: "pdf", heading: "Anhang scan.pdf – Seite 1 (Texterkennung)", ocr: true });
   });
 });
 
