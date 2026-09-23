@@ -34,4 +34,27 @@ describe("runHealthChecks", () => {
 
     expect(JSON.stringify(result.report)).not.toMatch(/ECONNREFUSED|10\.0\.0\.5|app_rw/);
   });
+
+  it("reports informational dependencies and backlog gauges without changing the HTTP status (#28)", async () => {
+    const result = await runHealthChecks(
+      { database: ok, storage: ok },
+      { timeoutMs: 20, dependencies: { aiService: failing }, backlog: { "request-process": async () => 3, "request-export": async () => { throw new Error("x"); } } },
+    );
+
+    expect(result.httpStatus).toBe(200);
+    expect(result.report).toEqual({
+      status: "ok",
+      checks: { database: "ok", storage: "ok" },
+      dependencies: { aiService: "failed" },
+      backlog: { "request-process": 3, "request-export": null },
+    });
+  });
+
+  it("times out a hanging gauge as unknown (null) and never leaks error text", async () => {
+    const result = await runHealthChecks({ database: ok }, { timeoutMs: 20, backlog: { "request-process": () => new Promise<number>(() => {}) } });
+
+    expect(result.report.backlog).toEqual({ "request-process": null });
+    expect(JSON.stringify(result.report)).not.toMatch(/ECONNREFUSED|10\.0\.0\.5|app_rw/);
+  });
 });
+

@@ -69,3 +69,9 @@ export async function installJobQueues(ownerConnectionString: string, definition
     await boss.stop({ graceful: false });
   }
 }
+
+/** Jobs waiting (created or retry) in one queue – health backlog (#28). Counts only, no payloads. */
+export async function countWaitingJobs(pool: { query: (text: string, values: unknown[]) => Promise<{ rows: Array<{ n: number }> }> }, queue: string): Promise<number> {
+  const { rows } = await pool.query(`select count(*)::int as n from ${PGBOSS_SCHEMA}.job where name = $1 and state in ('created', 'retry')`, [queue]);
+  return rows[0]?.n ?? 0;
+}
