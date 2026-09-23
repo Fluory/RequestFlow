@@ -33,5 +33,6 @@ class Settings(BaseSettings):
 
     ai_pdf_pipeline: Literal["textlines", "layout"] = "textlines"
     ai_max_document_bytes: int = Field(default=20 * 1024 * 1024, gt=0)
+    ai_max_pdf_pages: int = Field(default=50, gt=0)
     ai_max_concurrent_extractions: int = Field(default=4, gt=0)
     ai_log_level: str = "INFO"

@@ -18,6 +18,7 @@ ErrorCode = Literal[
     "document_too_large",
     "unsupported_media_type",
     "document_unparseable",
+    "document_too_long",
     "busy",
     "model_error",
     "model_output_invalid",

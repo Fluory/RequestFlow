@@ -10,7 +10,11 @@ Two pipelines (``AI_PDF_PIPELINE``):
   (~164 MB, fetched on first use or pre-fetched into the image). One segment per layout block.
 
 docling is imported lazily: importing it pulls in torch and takes seconds, which ``/healthz`` and
-the EML path should not pay.
+the EML path should not pay. With ``layout`` the converter and its model are built at startup
+(``prepare_pdf_pipeline``), so a missing model stops the service instead of failing each request.
+
+Both pipelines reject a PDF with more than ``max_pages`` pages (``AI_MAX_PDF_PAGES``) before any
+page is parsed; the page count comes from docling-parse, without a model.
 """
 
 from __future__ import annotations
@@ -19,16 +23,22 @@ import functools
 from io import BytesIO
 from typing import TYPE_CHECKING, Any, Literal
 
-from requestflow_ai.parsing.errors import DocumentParseError
+from requestflow_ai.parsing.errors import (
+    DocumentParseError,
+    DocumentTooLongError,
+    PdfPipelineInitError,
+)
 from requestflow_ai.parsing.segments import BoundingBox, PdfLocator, Segment
 
 if TYPE_CHECKING:
     from docling.document_converter import DocumentConverter
 
 PdfPipeline = Literal["textlines", "layout"]
+DEFAULT_MAX_PAGES = 50
 
 
-def parse_pdf_textlines(data: bytes) -> list[Segment]:
+def _load_pdf(data: bytes, max_pages: int) -> Any:
+    """Load the PDF with docling-parse (no model), enforce the page cap, return the backend."""
     from docling.backend.docling_parse_backend import ThreadedDoclingParseDocumentBackend
     from docling.datamodel.backend_options import ThreadedDoclingParseBackendOptions
     from docling.datamodel.base_models import InputFormat
@@ -49,7 +59,14 @@ def parse_pdf_textlines(data: bytes) -> list[Segment]:
     backend: Any = getattr(in_doc, "_backend", None)
     if not in_doc.valid or backend is None:
         raise DocumentParseError("could not load PDF")
+    if in_doc.page_count > max_pages:
+        backend.unload()
+        raise DocumentTooLongError(f"document has more than {max_pages} pages")
+    return backend
 
+
+def parse_pdf_textlines(data: bytes, max_pages: int = DEFAULT_MAX_PAGES) -> list[Segment]:
+    backend = _load_pdf(data, max_pages)
     pages: dict[int, list[Segment]] = {}
     try:
         for page in backend.iter_pages():
@@ -102,9 +119,26 @@ def _layout_converter() -> DocumentConverter:
     )
 
 
-def parse_pdf_layout(data: bytes) -> list[Segment]:
+def prepare_pdf_pipeline(pipeline: PdfPipeline) -> None:
+    """Build what the pipeline needs at startup; raise ``PdfPipelineInitError`` (fail-closed)."""
+    if pipeline != "layout":
+        return  # textlines needs no model
+    from docling.datamodel.base_models import InputFormat
+
+    try:
+        # Instantiates docling's standard PDF pipeline, which loads the layout model.
+        _layout_converter().initialize_pipeline(InputFormat.PDF)
+    except Exception as exc:
+        raise PdfPipelineInitError(
+            f"layout PDF pipeline unavailable ({type(exc).__name__}); refusing to start"
+        ) from exc
+
+
+def parse_pdf_layout(data: bytes, max_pages: int = DEFAULT_MAX_PAGES) -> list[Segment]:
     from docling.datamodel.base_models import ConversionStatus, DocumentStream
 
+    # Model-free page count first: a too long PDF never reaches the layout model.
+    _load_pdf(data, max_pages).unload()
     try:
         result = _layout_converter().convert(
             DocumentStream(name="document.pdf", stream=BytesIO(data)), raises_on_error=False
@@ -142,7 +176,9 @@ def parse_pdf_layout(data: bytes) -> list[Segment]:
     return segments
 
 
-def parse_pdf(data: bytes, pipeline: PdfPipeline) -> list[Segment]:
+def parse_pdf(
+    data: bytes, pipeline: PdfPipeline, max_pages: int = DEFAULT_MAX_PAGES
+) -> list[Segment]:
     if pipeline == "layout":
-        return parse_pdf_layout(data)
-    return parse_pdf_textlines(data)
+        return parse_pdf_layout(data, max_pages)
+    return parse_pdf_textlines(data, max_pages)

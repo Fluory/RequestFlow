@@ -12,7 +12,7 @@ from requestflow_ai.extraction.schema import FIELD_KEYS, FieldKey
 from requestflow_ai.grounding.verifier import VerifiedField, verify_extraction
 from requestflow_ai.parsing.detect import DocumentKind, detect_kind
 from requestflow_ai.parsing.eml import parse_eml
-from requestflow_ai.parsing.pdf import PdfPipeline, parse_pdf
+from requestflow_ai.parsing.pdf import DEFAULT_MAX_PAGES, PdfPipeline, parse_pdf
 from requestflow_ai.parsing.segments import Segment
 
 Warning = Literal["no_text"]
@@ -31,11 +31,14 @@ class ExtractionRun:
 
 
 def parse_document(
-    data: bytes, declared_type: str | None, pdf_pipeline: PdfPipeline
+    data: bytes,
+    declared_type: str | None,
+    pdf_pipeline: PdfPipeline,
+    max_pdf_pages: int = DEFAULT_MAX_PAGES,
 ) -> tuple[DocumentKind, list[Segment]]:
     kind = detect_kind(data, declared_type)
     if kind == "pdf":
-        return kind, parse_pdf(data, pdf_pipeline)
+        return kind, parse_pdf(data, pdf_pipeline, max_pdf_pages)
     return kind, parse_eml(data)
 
 
@@ -44,8 +47,9 @@ def run_extraction(
     declared_type: str | None,
     model: ModelClient,
     pdf_pipeline: PdfPipeline,
+    max_pdf_pages: int = DEFAULT_MAX_PAGES,
 ) -> ExtractionRun:
-    kind, segments = parse_document(data, declared_type, pdf_pipeline)
+    kind, segments = parse_document(data, declared_type, pdf_pipeline, max_pdf_pages)
 
     if not segments:
         # Nothing to cite, so nothing can be found; do not spend a model call on it.

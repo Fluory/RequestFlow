@@ -1,7 +1,8 @@
 """FastAPI app. Run: ``uvicorn requestflow_ai.api.app:create_app --factory``.
 
-Startup is fail-closed: missing ``AI_SERVICE_TOKEN`` (settings validation) or a model client that
-cannot be built raises before the server accepts requests.
+Startup is fail-closed: missing ``AI_SERVICE_TOKEN`` (settings validation), a model client that
+cannot be built or (with ``AI_PDF_PIPELINE=layout``) a missing layout model raises before the
+server accepts requests.
 
 ``/v1/extract`` is guarded by a pure ASGI middleware (``ExtractGuard``) that checks the bearer token
 and the declared ``Content-Length`` before a single body byte is read or spooled.
@@ -47,7 +48,12 @@ from requestflow_ai.extraction.model_client import (
 from requestflow_ai.extraction.prompt import PROMPT_VERSION
 from requestflow_ai.extraction.schema import SCHEMA_VERSION
 from requestflow_ai.jsonlog import configure_logging, document_id_var, request_id_var
-from requestflow_ai.parsing.errors import DocumentParseError, UnsupportedMediaTypeError
+from requestflow_ai.parsing.errors import (
+    DocumentParseError,
+    DocumentTooLongError,
+    UnsupportedMediaTypeError,
+)
+from requestflow_ai.parsing.pdf import prepare_pdf_pipeline
 from requestflow_ai.pipeline import run_extraction
 
 _log = logging.getLogger("requestflow_ai.api")
@@ -235,7 +241,10 @@ def build_api() -> FastAPI:
                 "before the body is read, the file size after)."
             ),
             415: _error_doc("Not a PDF or RFC 5322 e-mail (.msg is not supported yet)."),
-            422: _error_doc("The document could not be parsed."),
+            422: _error_doc(
+                "The document could not be parsed (`document_unparseable`) or has more pages "
+                "than AI_MAX_PDF_PAGES (`document_too_long`)."
+            ),
             429: _error_doc("All extraction slots busy; retry later."),
             500: _error_doc("Unexpected error."),
             502: _error_doc("The model call failed or returned invalid output; retry later."),
@@ -282,8 +291,16 @@ def build_api() -> FastAPI:
             raise ApiError(429, "busy", "all extraction slots are busy")
         try:
             data = _read_limited(file, settings.ai_max_document_bytes)
-            run = run_extraction(data, media_type, model, settings.ai_pdf_pipeline)
-        except (UnsupportedMediaTypeError, DocumentParseError, ModelClientError, ApiError) as exc:
+            run = run_extraction(
+                data, media_type, model, settings.ai_pdf_pipeline, settings.ai_max_pdf_pages
+            )
+        except (
+            UnsupportedMediaTypeError,
+            DocumentParseError,
+            DocumentTooLongError,
+            ModelClientError,
+            ApiError,
+        ) as exc:
             error = _map_error(exc)
             _log.warning(
                 "extraction_failed", extra={"errorCode": error.code, "status": error.status}
@@ -348,6 +365,8 @@ def _map_error(exc: Exception) -> ApiError:
         return exc
     if isinstance(exc, UnsupportedMediaTypeError):
         return ApiError(415, "unsupported_media_type", "unsupported document type")
+    if isinstance(exc, DocumentTooLongError):
+        return ApiError(422, "document_too_long", "the document has too many pages")
     if isinstance(exc, DocumentParseError):
         return ApiError(422, "document_unparseable", "the document could not be parsed")
     if isinstance(exc, ModelOutputError):
@@ -362,6 +381,7 @@ def create_app(
     configure_logging(settings.ai_log_level)
     if model_client is None:
         model_client = build_model_client(settings)
+    prepare_pdf_pipeline(settings.ai_pdf_pipeline)
     app = build_api()
     app.state.settings = settings
     app.state.model_client = model_client

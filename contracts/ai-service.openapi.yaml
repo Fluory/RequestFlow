@@ -93,7 +93,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '422':
-          description: The document could not be parsed.
+          description: The document could not be parsed (`document_unparseable`) or has more pages than
+            AI_MAX_PDF_PAGES (`document_too_long`).
           content:
             application/json:
               schema:
@@ -183,6 +184,7 @@ components:
           - document_too_large
           - unsupported_media_type
           - document_unparseable
+          - document_too_long
           - busy
           - model_error
           - model_output_invalid
