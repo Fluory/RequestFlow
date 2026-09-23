@@ -9,7 +9,6 @@ from typing import Any
 
 import pytest
 from builders import DocxTable, MsgAttachment, MsgSpec, build_docx, build_msg, build_xlsx
-
 from oxmsg.attachment import Attachment
 
 from requestflow_ai.parsing import document as document_module

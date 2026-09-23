@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from io import BytesIO
-from typing import Any
+from typing import Any, cast
 
 import olefile
 from olefile.olefile import STGTY_STREAM
@@ -84,13 +84,16 @@ def check_ole_container(data: bytes) -> olefile.OleFileIO:
     try:
         limit = len(data)
         total = 0
-        for entry in ole.direntries:
+        # olefile ships no type information for its directory entries.
+        directory: list[Any] = cast(Any, ole).direntries  # every entry reachable from the root
+        root_size = int(cast(Any, ole.root).size)
+        for entry in directory:
             if entry is None or entry.entry_type != STGTY_STREAM:
                 continue
             if entry.size > limit:
                 raise DocumentParseError("OLE stream larger than its container")
             total += entry.size
-        if total > limit or ole.root.size > limit:
+        if total > limit or root_size > limit:
             raise DocumentParseError("OLE streams larger than their container")
     except BaseException:
         ole.close()
