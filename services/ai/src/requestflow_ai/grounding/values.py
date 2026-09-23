@@ -274,7 +274,7 @@ def _check_phone(value: str, quote: str) -> ValueCheck:
         return _NOT_OK
     if all(_phone_digits(m.group(0)) != digits for m in _PHONE_IN_TEXT.finditer(quote)):
         return _NOT_OK
-    return ValueCheck(ok=True, normalized=" ".join(value.split()))
+    return ValueCheck(ok=True, normalized=value.strip())
 
 
 def check_value(kind: ValueKind, value: str, quote: str) -> ValueCheck:
