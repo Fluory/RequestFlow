@@ -42,7 +42,19 @@ export async function persistExtractionRun(
       latencyMs: processed.reduce((sum, { response }) => sum + Math.round(response.run.latencyMs), 0),
       documents: input.outcomes.map(({ documentId, response, skipped }) =>
         response
-          ? { documentId, kind: response.documentKind, modelId: response.run.modelId, promptVersion: response.run.promptVersion, schemaVersion: response.run.schemaVersion, tokens: response.run.tokens, latencyMs: response.run.latencyMs, warnings: response.warnings, segments: response.segments.length }
+          ? {
+              documentId,
+              kind: response.documentKind,
+              modelId: response.run.modelId,
+              promptVersion: response.run.promptVersion,
+              schemaVersion: response.run.schemaVersion,
+              tokens: response.run.tokens,
+              latencyMs: response.run.latencyMs,
+              warnings: response.warnings,
+              segments: response.segments.length,
+              // Attachments of an Outlook message that could not be read (#23): shown in the review.
+              failedAttachments: (response.attachments ?? []).filter((attachment) => attachment.status === "failed").map((attachment) => ({ name: attachment.name, error: attachment.error })),
+            }
           : { documentId, skipped },
       ),
     })

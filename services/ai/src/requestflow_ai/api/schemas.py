@@ -200,10 +200,12 @@ class ExtractResponse(_Camel):
         description="Requested positions in document order (schemaVersion 2); empty when none."
     )
     run: RunMetadata
-    warnings: list[Literal["no_text", "attachment_failed"]] = Field(
+    warnings: list[Literal["no_text", "attachment_failed", "ocr_pages_skipped"]] = Field(
         description="`no_text`: the document has no text (e.g. a scan without OCR); no model "
         "call made. `attachment_failed`: at least one attachment of a `.msg` could not be "
-        "parsed (see `attachments`); the rest was processed."
+        "parsed (see `attachments`); the rest was processed. `ocr_pages_skipped`: more PDF "
+        "pages without text than the OCR page cap (10 per document, `.msg` attachments "
+        "together); the first ones were OCR'd, the rest stayed empty."
     )
     attachments: list[AttachmentResult] = Field(
         default_factory=list[AttachmentResult],
