@@ -6,6 +6,9 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
+- Extraction schema v2: e-mail, phone and additional requirements as header fields, plus line items
+  (description, quantity, unit, material, dimensions), each with its own status and source quote; German
+  number formats, units and dates are normalised, a bare calendar week ("KW 42") stays at most uncertain.
 - User management for admins (`/users`): see the company's users with role and status, change roles,
   deactivate (sign-in blocked, sessions ended) and reactivate; invitations and every change are audited.
   The last active admin of a company cannot be demoted or deactivated; clerks have no access.
