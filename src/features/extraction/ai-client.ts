@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { ExtractResponse } from "./index";
+import type { ExtractResponse } from "./types";
 
 // Client of the stateless AI service (contract: contracts/ai-service.openapi.yaml, types generated in
 // ./ai-service.contract.ts). Every call has a timeout. Errors are classified for the job runner:

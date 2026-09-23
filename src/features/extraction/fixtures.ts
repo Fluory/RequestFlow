@@ -1,4 +1,4 @@
-import type { ExtractResponse } from "./index";
+import type { ExtractResponse } from "./types";
 
 // Synthetic AI-service response in the contract shape (tests and local demos only; no real data).
 export function syntheticExtractResponse(documentId: string, overrides: Partial<ExtractResponse["fields"]> = {}): ExtractResponse {

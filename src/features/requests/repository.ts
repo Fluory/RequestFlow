@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, or, sql, type SQL } from "drizzle-orm";
 import { requests, type RequestStatus } from "@/db/schema";
 import { tenantOf, type TenantTx } from "@/features/tenancy";
+import { nextStatus, type RequestEvent } from "./status";
 
 export type RequestRow = typeof requests.$inferSelect;
 
@@ -61,4 +62,28 @@ export async function findDuplicate(
     .orderBy(asc(requests.createdAt))
     .limit(1);
   return row ?? null;
+}
+
+/** Locks the request row for the rest of the transaction (status changes are serialised). */
+export async function lockRequest(tx: TenantTx, id: string): Promise<RequestRow | null> {
+  tenantOf(tx);
+  const [row] = await tx.select().from(requests).where(eq(requests.id, id)).for("update");
+  return row ?? null;
+}
+
+type StatePatch = Partial<Pick<RequestRow, "errorStage" | "errorMessage" | "attempts" | "nextRetryAt">>;
+
+/** Applies a status-machine event to a locked row; illegal transitions throw before any write. */
+export async function transitionRequest(tx: TenantTx, row: RequestRow, event: RequestEvent, patch: StatePatch = {}): Promise<RequestRow> {
+  tenantOf(tx);
+  const status = nextStatus(row.status, event);
+  const [updated] = await tx.update(requests).set({ status, ...patch }).where(eq(requests.id, row.id)).returning();
+  if (!updated) throw new Error("request vanished during transition");
+  return updated;
+}
+
+/** Keeps the last failure visible while a retry is pending (status unchanged). */
+export async function recordProcessingFailure(tx: TenantTx, id: string, failure: { message: string; nextRetryAt: Date | null }): Promise<void> {
+  tenantOf(tx);
+  await tx.update(requests).set({ errorMessage: failure.message, nextRetryAt: failure.nextRetryAt }).where(eq(requests.id, id));
 }

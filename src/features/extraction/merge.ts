@@ -1,4 +1,4 @@
-import type { ExtractResponse, FieldResult } from "./index";
+import type { ExtractResponse, FieldResult } from "./types";
 
 export const HEADER_FIELDS = ["company", "contact_person", "requested_delivery_date"] as const;
 export type HeaderField = (typeof HEADER_FIELDS)[number];
