@@ -26,6 +26,14 @@ export interface PendingInvitation {
   expiresAt: Date;
 }
 
+/** An admin cannot deactivate their own access (like Better Auth's own ban refuses self-bans). */
+export class SelfDeactivation extends Error {
+  constructor() {
+    super("an admin cannot deactivate their own access");
+    this.name = "SelfDeactivation";
+  }
+}
+
 /** Target user is not a member of the actor's company (or does not exist) – same answer for both. */
 export class UserNotInCompany extends Error {
   constructor() {
@@ -97,6 +105,7 @@ export async function changeUserRole(db: Database, actor: Actor, userId: string,
 
 /** Deactivate: blocks sign-in and ends every session now. Reactivate: sign-in works again. */
 export async function setUserActive(db: Database, actor: Actor, userId: string, active: boolean): Promise<void> {
+  if (!active && userId === actor.userId) throw new SelfDeactivation();
   await manage(db, actor, userId, { userId, active }, async (tx, before) => {
     if (before.active === active) return null;
     await tx
