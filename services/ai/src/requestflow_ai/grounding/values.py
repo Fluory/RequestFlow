@@ -1,8 +1,18 @@
 """Value parsing for the consistency check between a field value and its quote.
 
 Numbers: German formats (``1.234,5``, ``1.250``, ``0,75``, ``1 234,5``) and plain decimals
-(``1234.5``). A dot followed by exactly three-digit groups is a thousands separator.
-Dates: ``DD.MM.YYYY``, ``D.M.YY`` (two-digit years are 20YY) and ISO ``YYYY-MM-DD``.
+(``1234.5``). A dot followed by exactly three-digit groups is a thousands separator. A verified
+number is returned as a plain decimal with a dot and no grouping (``1250``, ``2.5``).
+Dates: ``DD.MM.YYYY``, ``D.M.YY`` (two-digit years are 20YY) and ISO ``YYYY-MM-DD``; returned as
+``YYYY-MM-DD``. A calendar week (``KW 42``, ``KW 42/2026``, ``Kalenderwoche 42``) is no date: it is
+only accepted as a week value (returned as ``KW 42`` / ``KW 42/2026``) and flagged, so the verifier
+caps it at ``uncertain``. A date computed from a week is not in the quote and is rejected.
+Units: a small canonical set (``mm``, ``cm``, ``m``, ``kg``, ``t``, ``pcs``) with German and
+English spellings (``Stk.``, ``Stück``, ``Meter``, ...); unknown units are checked as text and
+returned trimmed.
+E-mail: case-insensitive match on address boundaries; returned lowercased.
+Phone: the digits (with a leading ``+``) must equal one phone-like number in the quote; returned
+trimmed as written (no country code is added).
 Text: the normalised value must occur in the normalised quote on word boundaries.
 """
 
@@ -16,7 +26,7 @@ from typing import Literal
 
 from requestflow_ai.grounding.normalize import normalize_text
 
-ValueKind = Literal["text", "number", "date"]
+ValueKind = Literal["text", "number", "date", "email", "phone", "unit"]
 
 _GROUP_SPACES = " \u00a0\u202f"
 _NUMBER_BODY = (
@@ -34,6 +44,36 @@ _ISO_DATE = r"(?P<iy>\d{4})-(?P<im>\d{2})-(?P<id>\d{2})"
 _DE_DATE = r"(?P<dd>\d{1,2})\.(?P<dm>\d{1,2})\.(?P<dy>\d{4}|\d{2})"
 _DATE_FULL = re.compile(rf"(?:{_ISO_DATE}|{_DE_DATE})")
 _DATE_IN_TEXT = re.compile(rf"(?<![\d.\-])(?:{_ISO_DATE}|{_DE_DATE})(?![\d]|-\d)")
+
+# "KW 42", "KW42", "KW. 42", "Kalenderwoche 42", "CW 42"; optional year "/2026", "/26", " 2026".
+_CALENDAR_WEEK = re.compile(
+    r"(?<!\w)(?:kw|kalenderwoche|cw)\.?\s*(?P<week>\d{1,2})"
+    r"(?:\s*/\s*(?P<slash_year>\d{4}|\d{2})|\s+(?P<space_year>20\d{2}))?(?!\d)",
+    re.IGNORECASE,
+)
+
+# Canonical unit -> spellings (compared after normalize_text, trailing dot removed).
+_UNIT_SPELLINGS: dict[str, tuple[str, ...]] = {
+    "mm": ("mm", "millimeter", "millimetre"),
+    "cm": ("cm", "zentimeter", "centimeter", "centimetre"),
+    "m": ("m", "meter", "metre"),
+    "kg": ("kg", "kilogramm", "kilogram"),
+    "t": ("t", "tonne", "tonnen", "tonnes"),
+    "pcs": ("pcs", "pc", "piece", "pieces", "stk", "stck", "st", "stück", "stueck"),
+}
+_UNITS: dict[str, str] = {
+    spelling: canonical
+    for canonical, spellings in _UNIT_SPELLINGS.items()
+    for spelling in spellings
+}
+# A unit token in running text: letters only, at the start, after whitespace, "(" or a digit
+# ("250mm"); not inside "ISO 2768-m" or a word.
+_UNIT_TOKEN = re.compile(r"(?<![^\s(\d])[^\W\d_]+\.?(?![^\W_])")
+
+_EMAIL_SHAPE = re.compile(r"[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+")
+# A phone-like number: digits with spaces, "/", "-", "." or parentheses between them.
+_PHONE_IN_TEXT = re.compile(r"(?<![\w+])\+?\d[\d \u00a0/().\-]*\d(?!\w)")
+_MIN_PHONE_DIGITS = 6
 
 
 def _to_decimal(token: str) -> Decimal | None:
@@ -70,6 +110,12 @@ def extract_numbers(text: str) -> list[Decimal]:
     return numbers
 
 
+def format_number(value: Decimal) -> str:
+    """Plain decimal with a dot, no grouping, no exponent, no trailing zeros (``1250``, ``2.5``)."""
+    text = format(value.normalize(), "f")
+    return "0" if text == "-0" else text
+
+
 def _match_to_date(match: re.Match[str]) -> date | None:
     if match.group("iy") is not None:
         year, month, day = int(match["iy"]), int(match["im"]), int(match["id"])
@@ -99,17 +145,66 @@ def extract_dates(text: str) -> list[date]:
 
 
 @dataclass(frozen=True)
+class CalendarWeek:
+    week: int
+    year: int | None
+
+    def label(self) -> str:
+        return f"KW {self.week}" if self.year is None else f"KW {self.week}/{self.year}"
+
+
+def _match_to_week(match: re.Match[str]) -> CalendarWeek | None:
+    week = int(match["week"])
+    if not 1 <= week <= 53:
+        return None
+    year_text = match["slash_year"] or match["space_year"]
+    year = None
+    if year_text is not None:
+        year = int(year_text) + (2000 if len(year_text) == 2 else 0)
+    return CalendarWeek(week, year)
+
+
+def parse_calendar_week(text: str) -> CalendarWeek | None:
+    """Parse a whole string as one calendar week, or return None."""
+    match = _CALENDAR_WEEK.fullmatch(text.strip())
+    return _match_to_week(match) if match else None
+
+
+def extract_calendar_weeks(text: str) -> list[CalendarWeek]:
+    weeks: list[CalendarWeek] = []
+    for match in _CALENDAR_WEEK.finditer(text):
+        value = _match_to_week(match)
+        if value is not None:
+            weeks.append(value)
+    return weeks
+
+
+def canonical_unit(text: str) -> str | None:
+    """The canonical unit (mm, cm, m, kg, t, pcs) for a known spelling, else None."""
+    key = normalize_text(text).removesuffix(".")
+    return _UNITS.get(key)
+
+
+def _phone_digits(text: str) -> str:
+    text = text.strip()
+    digits = re.sub(r"\D", "", text)
+    return f"+{digits}" if text.startswith("+") else digits
+
+
+@dataclass(frozen=True)
 class ValueCheck:
     """Result of checking a value against its quote.
 
-    ``normalized`` is the value to return when ``ok``: text trimmed, dates as ISO ``YYYY-MM-DD``,
-    numbers trimmed. ``ambiguous`` is set when the quote holds more than one distinct date, so
-    the quote alone cannot prove which one the value refers to.
+    ``normalized`` is the value to return when ``ok`` (see the module docstring per kind).
+    ``ambiguous`` is set when the quote holds more than one distinct date, so the quote alone
+    cannot prove which one the value refers to. ``calendar_week`` is set when a date field only
+    has a calendar week: consistent with the quote, but no date.
     """
 
     ok: bool
     normalized: str | None = None
     ambiguous: bool = False
+    calendar_week: bool = False
 
 
 _NOT_OK = ValueCheck(ok=False)
@@ -120,23 +215,81 @@ def _contains_words(needle: str, haystack: str) -> bool:
     return re.search(rf"(?<!\w){re.escape(needle)}(?!\w)", haystack) is not None
 
 
-def check_value(kind: ValueKind, value: str, quote: str) -> ValueCheck:
-    """Check that the value is supported by the quote (the quote itself is checked elsewhere)."""
-    if kind == "text":
-        needle = normalize_text(value)
-        if not needle or not _contains_words(needle, normalize_text(quote)):
-            return _NOT_OK
-        return ValueCheck(ok=True, normalized=value.strip())
-    if kind == "date":
-        parsed_date = parse_date(value)
+def _check_text(value: str, quote: str) -> ValueCheck:
+    needle = normalize_text(value)
+    if not needle or not _contains_words(needle, normalize_text(quote)):
+        return _NOT_OK
+    return ValueCheck(ok=True, normalized=value.strip())
+
+
+def _check_date(value: str, quote: str) -> ValueCheck:
+    parsed_date = parse_date(value)
+    if parsed_date is not None:
         dates = set(extract_dates(quote))
-        if parsed_date is None or parsed_date not in dates:
+        if parsed_date not in dates:
             return _NOT_OK
         return ValueCheck(ok=True, normalized=parsed_date.isoformat(), ambiguous=len(dates) > 1)
+    week = parse_calendar_week(value)
+    if week is None:
+        return _NOT_OK
+    for quoted in extract_calendar_weeks(quote):
+        # A year the quote does not state was added by the model.
+        if quoted.week == week.week and (week.year is None or week.year == quoted.year):
+            return ValueCheck(ok=True, normalized=week.label(), calendar_week=True)
+    return _NOT_OK
+
+
+def _check_number(value: str, quote: str) -> ValueCheck:
     parsed_number = parse_number(value)
     if parsed_number is None or parsed_number not in extract_numbers(quote):
         return _NOT_OK
-    return ValueCheck(ok=True, normalized=value.strip())
+    return ValueCheck(ok=True, normalized=format_number(parsed_number))
+
+
+def _check_unit(value: str, quote: str) -> ValueCheck:
+    canonical = canonical_unit(value)
+    if canonical is None:
+        return _check_text(value, quote)
+    for token in _UNIT_TOKEN.findall(quote):
+        if canonical_unit(token) == canonical:
+            return ValueCheck(ok=True, normalized=canonical)
+    return _NOT_OK
+
+
+def _check_email(value: str, quote: str) -> ValueCheck:
+    address = value.strip().lower()
+    if not _EMAIL_SHAPE.fullmatch(address):
+        return _NOT_OK
+    pattern = rf"(?<![\w.+\-]){re.escape(address)}(?![\w\-]|\.\w)"
+    if re.search(pattern, quote.casefold()) is None:
+        return _NOT_OK
+    return ValueCheck(ok=True, normalized=address)
+
+
+def _check_phone(value: str, quote: str) -> ValueCheck:
+    digits = _phone_digits(value)
+    if len(digits.lstrip("+")) < _MIN_PHONE_DIGITS or not re.fullmatch(
+        r"\+?[\d \u00a0/().\-]+", value.strip()
+    ):
+        return _NOT_OK
+    if all(_phone_digits(m.group(0)) != digits for m in _PHONE_IN_TEXT.finditer(quote)):
+        return _NOT_OK
+    return ValueCheck(ok=True, normalized=" ".join(value.split()))
+
+
+def check_value(kind: ValueKind, value: str, quote: str) -> ValueCheck:
+    """Check that the value is supported by the quote (the quote itself is checked elsewhere)."""
+    if kind == "text":
+        return _check_text(value, quote)
+    if kind == "date":
+        return _check_date(value, quote)
+    if kind == "number":
+        return _check_number(value, quote)
+    if kind == "unit":
+        return _check_unit(value, quote)
+    if kind == "email":
+        return _check_email(value, quote)
+    return _check_phone(value, quote)
 
 
 def value_consistent(kind: ValueKind, value: str, quote: str) -> bool:
