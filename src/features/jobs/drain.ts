@@ -80,13 +80,19 @@ async function runJob(deps: DrainDeps, queue: string, job: { id: string; data: R
       return false;
     }
     await deps.boss.fail(queue, job.id, { error: code });
-    const updated = await deps.boss.getJobById(queue, job.id);
-    await deps.tenancy.withTenant(job.data.companyId, (tx) =>
-      recordProcessingFailure(tx, job.data.requestId, {
-        message: cause,
-        nextRetryAt: updated?.state === "retry" && updated.startAfter ? new Date(updated.startAfter) : null,
-      }),
-    );
+    // Bookkeeping must never abort the drain: a job with unusable IDs (e.g. not a UUID) is already
+    // failed above and ends in retry/dead letter like any other.
+    try {
+      const updated = await deps.boss.getJobById(queue, job.id);
+      await deps.tenancy.withTenant(job.data.companyId, (tx) =>
+        recordProcessingFailure(tx, job.data.requestId, {
+          message: cause,
+          nextRetryAt: updated?.state === "retry" && updated.startAfter ? new Date(updated.startAfter) : null,
+        }),
+      );
+    } catch (bookkeeping) {
+      logEvent("error", "job.bookkeeping_failed", ids, { code: bookkeeping instanceof Error ? bookkeeping.name : "unknown" });
+    }
     return false;
   }
 }

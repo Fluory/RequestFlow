@@ -244,6 +244,15 @@ describe("processing: worker, AI service, retries and visible errors", () => {
     expect(await requestOf(admin, requestId)).toMatchObject({ status: "NEW", attempts: 0 });
   });
 
+  it("a job with unusable IDs never aborts the drain: it is failed like any other job", async () => {
+    const jobId = await boss.send(TEST_QUEUES.process, { requestId: "not-a-uuid", companyId: "not-a-uuid" });
+
+    await expect(drain(deps, { maxMs: 2_000, queues: TEST_QUEUES })).resolves.toMatchObject({ failed: expect.any(Number) });
+
+    const job = await boss.getJobById(TEST_QUEUES.process, jobId!);
+    expect(["retry", "failed"]).toContain(job?.state);
+  });
+
   it("recovers a request whose worker crashed mid-job: pg-boss expires the job, supervise() as app_rw retries it", async () => {
     reply = (documentId) => ({ status: 200, body: syntheticExtractResponse(documentId) });
     const { requestId, jobId } = await newRequest(admin, [{ name: "a.eml", kind: "eml", bytes: MAIL }], RECOVERY_QUEUES.process);
