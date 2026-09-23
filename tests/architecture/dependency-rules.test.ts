@@ -32,6 +32,20 @@ describe("module boundary rules", () => {
     expect(output).toContain("raw-db-client-only-in-db-and-tenancy");
   });
 
+  it("rejects a deep import through the @/ path alias", () => {
+    const { status, output } = cruise("src/features/epsilon");
+
+    expect(status).not.toBe(0);
+    expect(output).toContain("no-deep-import-across-modules");
+  });
+
+  it("rejects a feature module opening its own database connection", () => {
+    const { status, output } = cruise("src/features/zeta");
+
+    expect(status).not.toBe(0);
+    expect(output).toContain("no-db-connection-in-features");
+  });
+
   it("accepts an import through the other module's index.ts", () => {
     const { status, output } = cruise("src/features/gamma");
 

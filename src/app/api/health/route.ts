@@ -16,8 +16,10 @@ export async function GET(): Promise<Response> {
       { database: () => pingDatabase(database.pool), storage: () => storage.ping() },
       { timeoutMs: CHECK_TIMEOUT_MS },
     );
-  } catch {
-    // Invalid configuration: report degraded without revealing which variable is wrong.
+  } catch (error) {
+    // Invalid configuration: the response stays generic; the log names the variables (never values,
+    // see loadConfig) so operators can fix it.
+    console.error(JSON.stringify({ level: "error", route: "/api/health", message: error instanceof Error ? error.message : "configuration error" }));
     result = { httpStatus: 503 as const, report: { status: "degraded" as const, checks: { config: "failed" as const } } };
   }
   return Response.json(result.report, { status: result.httpStatus, headers: { "cache-control": "no-store" } });

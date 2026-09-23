@@ -19,6 +19,12 @@ bucket. It is explicit and idempotent; `web` and `worker` start only after it su
 migration aborts if `app_owner`/`app_rw` are missing or could bypass RLS – fix the roles
 (`docker/postgres/init/01-roles.sh` runs only on an empty data directory), never the check.
 
+## Database roles outside Docker
+
+`docker/postgres/init/01-roles.sh` runs only in the local container. On any other PostgreSQL (showcase,
+customer) an operator creates `app_owner` and `app_rw` once with the same statements (passwords from
+the secret manager), before the first `setup` run; the first migration refuses to run otherwise.
+
 ## Frequent failures
 
 | Symptom | Cause | Action |
