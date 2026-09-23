@@ -269,7 +269,7 @@ def test_logs_are_json_with_ids_only_never_content_or_token(
 
 
 def call_asgi(
-    app: FastAPI, headers: dict[str, str], *, path: str = "/v1/extract"
+    app: FastAPI, headers: dict[str, str], *, path: str = "/v1/extract", root_path: str = ""
 ) -> tuple[int, dict[str, str], dict[str, Any]]:
     """Call the app without a client, with a body that fails the test if anything reads it."""
     sent: list[dict[str, Any]] = []
@@ -293,7 +293,7 @@ def call_asgi(
         "path": path,
         "raw_path": path.encode(),
         "query_string": b"",
-        "root_path": "",
+        "root_path": root_path,
         "headers": [(k.lower().encode(), v.encode()) for k, v in headers.items()],
         "client": ("127.0.0.1", 50000),
         "server": ("testserver", 80),
@@ -332,6 +332,16 @@ def test_unauthenticated_request_is_rejected_before_the_body_is_read(
         "requestId": "req-401-1",
     }
     assert replay.requests == []
+
+
+def test_guard_also_applies_behind_a_proxy_root_path(replay: Replay) -> None:
+    # uvicorn --root-path /ai: scope["path"] includes the prefix.
+    headers = {**MULTIPART, "content-length": str(10**12)}
+    status, _, body = call_asgi(
+        build_app(replay), headers, path="/ai/v1/extract", root_path="/ai"
+    )
+    assert status == 401
+    assert body["error"]["code"] == "unauthorized"
 
 
 @pytest.mark.parametrize("length", [None, "", "abc", "-1", "1e3", "12 34"])
