@@ -1,7 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import { currentActor, getJobClient, getRuntime } from "@/app/_server/runtime";
 import { AuthorizationError } from "@/features/identity";
@@ -17,39 +17,46 @@ async function actorOrLogin() {
   return actor;
 }
 
-function back(requestId: string, params: Record<string, string>): never {
+function requestIdOf(formData: FormData): string {
+  const parsed = id.safeParse(formData.get("requestId"));
+  if (!parsed.success) notFound();
+  return parsed.data;
+}
+
+// Only fixed codes go into the URL; the page maps them to texts (messages.ts).
+function back(requestId: string, params: { done: string } | { error: string }): never {
   redirect(`/requests/${requestId}?${new URLSearchParams(params).toString()}`);
 }
 
-async function guarded(requestId: string, action: () => Promise<void>, success: string): Promise<never> {
+async function guarded(requestId: string, action: () => Promise<void>, done: "corrected" | "approved" | "rejected"): Promise<never> {
   try {
     await action();
   } catch (error) {
-    if (error instanceof ReviewRefused) back(requestId, { error: error.message });
-    if (error instanceof AuthorizationError) back(requestId, { error: "Keine Berechtigung." });
+    if (error instanceof ReviewRefused) back(requestId, { error: error.code });
+    if (error instanceof AuthorizationError) back(requestId, { error: "forbidden" });
     throw error;
   }
-  back(requestId, { done: success });
+  back(requestId, { done });
 }
 
 export async function correctFieldAction(formData: FormData): Promise<void> {
   const actor = await actorOrLogin();
-  const requestId = id.parse(formData.get("requestId"));
+  const requestId = requestIdOf(formData);
   const fieldKey = String(formData.get("field") ?? "");
   const raw = String(formData.get("value") ?? "");
-  await guarded(requestId, () => correctField(getRuntime().tenancy, actor, requestId, fieldKey, raw === "" ? null : raw), "Korrektur gespeichert.");
+  await guarded(requestId, () => correctField(getRuntime().tenancy, actor, requestId, fieldKey, raw === "" ? null : raw), "corrected");
 }
 
 export async function approveAction(formData: FormData): Promise<void> {
   const actor = await actorOrLogin();
-  const requestId = id.parse(formData.get("requestId"));
+  const requestId = requestIdOf(formData);
   const boss = await getJobClient();
-  await guarded(requestId, () => approveRequest({ tenancy: getRuntime().tenancy, boss }, actor, requestId), "Freigegeben – der Export ist eingeplant.");
+  await guarded(requestId, () => approveRequest({ tenancy: getRuntime().tenancy, boss }, actor, requestId), "approved");
 }
 
 export async function rejectAction(formData: FormData): Promise<void> {
   const actor = await actorOrLogin();
-  const requestId = id.parse(formData.get("requestId"));
+  const requestId = requestIdOf(formData);
   const reason = String(formData.get("reason") ?? "");
-  await guarded(requestId, () => rejectRequest(getRuntime().tenancy, actor, requestId, reason), "Abgelehnt.");
+  await guarded(requestId, () => rejectRequest(getRuntime().tenancy, actor, requestId, reason), "rejected");
 }

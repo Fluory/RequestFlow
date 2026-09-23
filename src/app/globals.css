@@ -6,6 +6,7 @@ th, td { border-bottom: 1px solid #ccc; padding: 0.4rem; text-align: left; verti
 .badge { border-radius: 0.3rem; padding: 0.1rem 0.4rem; font-size: 0.9em; white-space: nowrap; }
 .badge-found { background: #e6f4ea; color: #1e4620; }
 .badge-missing { background: #eee; color: #333; }
+.badge-corrected { background: #e8eefc; color: #1a2f66; }
 .badge-uncertain, .badge-unverified { background: #fff3cd; color: #5c3c00; font-weight: 700; border: 1px solid #b58100; }
 tr.attention { background: #fffaf0; }
 .source { border: 1px solid #ccc; border-radius: 0.4rem; padding: 0.5rem 1rem; margin-top: 1rem; }

@@ -43,6 +43,16 @@ describe("buildSourceView – where a value comes from", () => {
     expect(view?.lines[2]?.parts).toEqual([{ text: "bitte bis KW 42 liefern.", mark: true }]);
   });
 
+  it("never marks a shifted range when lowercasing changes the text length (e.g. \"İ\")", () => {
+    const segments: StoredSegment[] = [{ segmentId: "b1", position: 0, text: "İzmir Werk: KW 42", locator: { kind: "email", part: "body", line: 1, header: null } }];
+
+    expect(buildSourceView(segments, { segmentId: "b1", quote: "kw 42" })?.lines[0]?.parts).toEqual([{ text: "İzmir Werk: KW 42", mark: true }]);
+    expect(buildSourceView(segments, { segmentId: "b1", quote: "KW 42" })?.lines[0]?.parts).toEqual([
+      { text: "İzmir Werk: ", mark: false },
+      { text: "KW 42", mark: true },
+    ]);
+  });
+
   it("returns null when the field has no evidence or the segment is unknown", () => {
     expect(buildSourceView(mail, null)).toBeNull();
     expect(buildSourceView(mail, { segmentId: "nope", quote: "x" })).toBeNull();

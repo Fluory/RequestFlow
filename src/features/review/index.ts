@@ -5,9 +5,12 @@ export {
   correctionHistory,
   FIELD_LABELS,
   loadReview,
+  REJECTION_REASON_MAX,
   rejectRequest,
   ReviewRefused,
   type FieldStatus,
+  type ReviewRefusal,
+  type ReviewStatus,
   type ReviewField,
   type ReviewView,
 } from "./review";

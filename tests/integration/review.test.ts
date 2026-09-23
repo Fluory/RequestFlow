@@ -84,6 +84,15 @@ describe("review: fields beside their source, corrections, approve or reject", (
     expect(view!.fields[0]).toMatchObject({ value: "Musterbau Beispiel GmbH & Co. KG", extractedValue: "Musterbau Beispiel GmbH", corrected: { by: clerk.userId } });
   });
 
+  it("shows a corrected value as corrected – never as found – and keeps the extraction status separately", async () => {
+    const { requestId } = await requestInReview(clerk);
+    expect((await loadReview(tenancy, clerk, requestId))!.fields[0]).toMatchObject({ status: "found", reviewStatus: "found" });
+
+    await correctField(tenancy, clerk, requestId, "company", "Andere Firma GmbH");
+
+    expect((await loadReview(tenancy, clerk, requestId))!.fields[0]).toMatchObject({ status: "found", reviewStatus: "corrected" });
+  });
+
   it("writes neither correction nor audit when the correction is refused (unknown field)", async () => {
     const { requestId } = await requestInReview(clerk);
 
@@ -141,7 +150,35 @@ describe("review: fields beside their source, corrections, approve or reject", (
 
     expect(await loadReview(tenancy, otherCompany, requestId)).toBeNull();
     await expect(approveRequest({ tenancy, boss }, otherCompany, requestId)).rejects.toBeInstanceOf(ReviewRefused);
+    await expect(rejectRequest(tenancy, otherCompany, requestId, "fremd")).rejects.toBeInstanceOf(ReviewRefused);
+    await expect(correctField(tenancy, otherCompany, requestId, "company", "fremd")).rejects.toBeInstanceOf(ReviewRefused);
     await expect(correctField(tenancy, { ...clerk, role: "viewer" as never }, requestId, "company", "x")).rejects.toBeInstanceOf(AuthorizationError);
+    expect(await statusOf(clerk, requestId)).toBe("REVIEW");
+  });
+
+  it("keeps corrections company-private: another company sees none and cannot write one for a foreign company (RLS)", async () => {
+    const { requestId } = await requestInReview(clerk);
+    await correctField(tenancy, clerk, requestId, "company", "Nur für uns GmbH");
+
+    expect(await correctionHistory(tenancy, otherCompany, requestId)).toEqual([]);
+    const client = await stack.database.pool.connect();
+    try {
+      await client.query("begin");
+      await client.query("select set_config('app.company_id', $1, true)", [otherCompany.companyId]);
+      await expect(
+        client.query("insert into app.field_corrections (company_id, request_id, field_key, new_value, corrected_by) values ($1, $2, 'company', 'x', $3)", [clerk.companyId, requestId, otherCompany.userId]),
+      ).rejects.toThrow(/row-level security/);
+      await client.query("rollback");
+    } finally {
+      client.release();
+    }
+    expect(await correctionHistory(tenancy, clerk, requestId)).toHaveLength(1);
+  });
+
+  it("refuses an overlong rejection reason instead of cutting it", async () => {
+    const { requestId } = await requestInReview(clerk);
+
+    await expect(rejectRequest(tenancy, clerk, requestId, "x".repeat(1001))).rejects.toMatchObject({ code: "reason_too_long" });
     expect(await statusOf(clerk, requestId)).toBe("REVIEW");
   });
 

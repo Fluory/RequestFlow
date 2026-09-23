@@ -30,7 +30,12 @@ function label(locator: Record<string, unknown>): string {
 }
 
 function markQuote(text: string, quote: string): SourceLine["parts"] {
-  const at = quote ? text.toLowerCase().indexOf(quote.toLowerCase()) : -1;
+  // Exact match first; the case-insensitive fallback only when lowercasing keeps the length, so the
+  // index is valid in the original text (e.g. "İ" grows) – otherwise the whole segment is marked.
+  let at = quote ? text.indexOf(quote) : -1;
+  if (at < 0 && quote && text.toLowerCase().length === text.length && quote.toLowerCase().length === quote.length) {
+    at = text.toLowerCase().indexOf(quote.toLowerCase());
+  }
   if (at < 0) return [{ text, mark: true }];
   return [
     { text: text.slice(0, at), mark: false },

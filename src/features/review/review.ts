@@ -16,6 +16,10 @@ export const FIELD_LABELS: Record<string, string> = {
 };
 
 export type FieldStatus = "found" | "uncertain" | "missing" | "unverified";
+/** What the clerk sees: a corrected value is never shown as "found" – its proof is the correction history. */
+export type ReviewStatus = FieldStatus | "corrected";
+
+export const REJECTION_REASON_MAX = 1000;
 
 export interface ReviewField {
   key: string;
@@ -23,7 +27,9 @@ export interface ReviewField {
   /** Current value: the latest correction, else the extracted value. */
   value: string | null;
   extractedValue: string | null;
+  /** Status of the extracted value (grounding verifier). */
   status: FieldStatus;
+  reviewStatus: ReviewStatus;
   reason: string | null;
   corrected: { by: string; at: Date } | null;
   source: (SourceView & { documentId: string; filename: string }) | null;
@@ -36,10 +42,12 @@ export interface ReviewView {
   skippedDocuments: Array<{ documentId: string; reason: string }>;
 }
 
-/** Refused action: request missing (or of another company – RLS), or not in REVIEW. */
+export type ReviewRefusal = "not_in_review" | "unknown_field" | "reason_missing" | "reason_too_long";
+
+/** Refused action: request missing (or of another company – RLS), not in REVIEW, or invalid input. */
 export class ReviewRefused extends Error {
-  constructor(message = "Diese Anfrage kann in ihrem aktuellen Status nicht geprüft werden.") {
-    super(message);
+  constructor(readonly code: ReviewRefusal = "not_in_review") {
+    super(`review refused: ${code}`);
     this.name = "ReviewRefused";
   }
 }
@@ -75,6 +83,7 @@ export async function loadReview(tenancy: Tenancy, actor: Actor, requestId: stri
         value: correction ? correction.newValue : (field?.value ?? null),
         extractedValue: field?.value ?? null,
         status: (field?.status ?? "missing") as FieldStatus,
+        reviewStatus: correction ? "corrected" : ((field?.status ?? "missing") as FieldStatus),
         reason: field?.reason ?? null,
         corrected: correction ? { by: correction.correctedBy, at: correction.createdAt } : null,
         source: view && document ? { ...view, documentId: document.id, filename: document.filename } : null,
@@ -96,7 +105,7 @@ async function lockForReview(tx: TenantTx, requestId: string): Promise<RequestRo
 /** Stores a correction and its audit event (old value, new value, user, time) in ONE transaction. */
 export async function correctField(tenancy: Tenancy, actor: Actor, requestId: string, fieldKey: string, newValue: string | null): Promise<void> {
   authorize(actor, "requests.process");
-  if (!(HEADER_FIELDS as readonly string[]).includes(fieldKey)) throw new ReviewRefused("Unbekanntes Feld.");
+  if (!(HEADER_FIELDS as readonly string[]).includes(fieldKey)) throw new ReviewRefused("unknown_field");
   const value = newValue === null ? null : newValue.trim().slice(0, 500) || null;
   await tenancy.withTenant(actor.companyId, async (tx) => {
     await lockForReview(tx, requestId);
@@ -129,8 +138,9 @@ export async function approveRequest(deps: { tenancy: Tenancy; boss: JobSender }
 /** REVIEW → REJECTED with a mandatory reason, audited. */
 export async function rejectRequest(tenancy: Tenancy, actor: Actor, requestId: string, reason: string): Promise<void> {
   authorize(actor, "requests.process");
-  const text = reason.trim().slice(0, 1000);
-  if (!text) throw new ReviewRefused("Bitte einen Grund für die Ablehnung angeben.");
+  const text = reason.trim();
+  if (!text) throw new ReviewRefused("reason_missing");
+  if (text.length > REJECTION_REASON_MAX) throw new ReviewRefused("reason_too_long");
   await tenancy.withTenant(actor.companyId, async (tx) => {
     const request = await lockForReview(tx, requestId);
     await transitionRequest(tx, request, "reject", { rejectionReason: text });

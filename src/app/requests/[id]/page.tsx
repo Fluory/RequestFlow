@@ -2,22 +2,24 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { currentActor, getRuntime } from "@/app/_server/runtime";
-import { loadReview, type FieldStatus, type ReviewField } from "@/features/review";
+import { loadReview, REJECTION_REASON_MAX, type ReviewField, type ReviewStatus } from "@/features/review";
 import { requestStatusLabel } from "../status-labels";
+import { DONE_MESSAGES, ERROR_MESSAGES, messageFor } from "./messages";
 import { approveAction, correctFieldAction, rejectAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const STATUS_LABEL: Record<FieldStatus, string> = {
+const STATUS_LABEL: Record<ReviewStatus, string> = {
+  corrected: "korrigiert",
   found: "belegt",
   uncertain: "unsicher",
   missing: "fehlt",
   unverified: "nicht bestätigt",
 };
 
-function StatusBadge({ status }: { status: FieldStatus }) {
+function StatusBadge({ status }: { status: ReviewStatus }) {
   // Uncertain and unverified are the ones a clerk must look at: prominent colour + text, never colour only.
   return (
     <span className={`badge badge-${status}`} data-testid={`status-${status}`}>
@@ -35,6 +37,7 @@ function Source({ field }: { field: ReviewField }) {
       <h3 id="source-heading">
         Quelle: {source.filename} – {source.heading}
       </h3>
+      {field.corrected && <p>Fundstelle des erkannten Werts „{field.extractedValue ?? "–"}“ – der aktuelle Wert wurde manuell korrigiert.</p>}
       <ol className="source-lines">
         {source.lines.map((line) => (
           <li key={line.segmentId} className={line.cited ? "cited" : undefined} aria-current={line.cited ? "true" : undefined}>
@@ -67,6 +70,8 @@ export default async function RequestPage({
   const query = await searchParams;
   const selected = fields.find((field) => field.key === query.field);
   const inReview = request.status === "REVIEW";
+  const done = messageFor(DONE_MESSAGES, query.done);
+  const error = messageFor(ERROR_MESSAGES, query.error);
 
   return (
     <main>
@@ -77,8 +82,8 @@ export default async function RequestPage({
       <p>
         Status: <strong data-testid="request-status">{requestStatusLabel(request.status)}</strong>
       </p>
-      {query.done && <p role="status">{query.done}</p>}
-      {query.error && <p role="alert">{query.error}</p>}
+      {done && <p role="status">{done}</p>}
+      {error && <p role="alert">{error}</p>}
       {request.status === "ERROR" && request.errorMessage && <p role="alert">Fehler: {request.errorMessage}</p>}
       {request.status === "REJECTED" && request.rejectionReason && <p>Abgelehnt: {request.rejectionReason}</p>}
       {request.possibleDuplicate && request.duplicateOfId && (
@@ -102,14 +107,15 @@ export default async function RequestPage({
             </thead>
             <tbody>
               {fields.map((field) => (
-                <tr key={field.key} className={field.status === "unverified" || field.status === "uncertain" ? "attention" : undefined}>
+                <tr key={field.key} className={field.reviewStatus === "unverified" || field.reviewStatus === "uncertain" ? "attention" : undefined}>
                   <th scope="row">{field.label}</th>
                   <td data-testid={`value-${field.key}`}>
                     {field.value ?? "–"}
                     {field.corrected && <small> (korrigiert; erkannt: {field.extractedValue ?? "–"})</small>}
                   </td>
                   <td>
-                    <StatusBadge status={field.status} />
+                    <StatusBadge status={field.reviewStatus} />
+                    {field.corrected && <small> (erkannt: {STATUS_LABEL[field.status]})</small>}
                   </td>
                   <td>{field.source ? <Link href={`/requests/${request.id}?field=${field.key}`}>Quelle anzeigen</Link> : "–"}</td>
                   {inReview && (
@@ -143,7 +149,7 @@ export default async function RequestPage({
           <form action={rejectAction}>
             <input type="hidden" name="requestId" value={request.id} />
             <label>
-              Grund der Ablehnung <input name="reason" required maxLength={1000} />
+              Grund der Ablehnung <input name="reason" required maxLength={REJECTION_REASON_MAX} />
             </label>{" "}
             <button type="submit">Ablehnen</button>
           </form>
