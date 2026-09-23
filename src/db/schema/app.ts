@@ -46,6 +46,8 @@ export const requests = appSchema
       errorMessage: text("error_message"),
       attempts: integer("attempts").default(0).notNull(),
       nextRetryAt: timestamp("next_retry_at", { withTimezone: true }),
+      // Review decision (#8).
+      rejectionReason: text("rejection_reason"),
     },
     (table) => [
       index("requests_company_id_idx").on(table.companyId),
@@ -221,6 +223,34 @@ export const extractedFields = appSchema
         foreignColumns: [extractionSegments.runId, extractionSegments.documentId, extractionSegments.segmentId],
       }),
       tenantPolicy("extracted_fields"),
+    ],
+  )
+  .enableRLS();
+
+// Corrections made during review (#8, DR2/DR6). Append-only like the audit trail: the current value
+// of a field is its latest correction, else the extracted value. Old/new values are also written to
+// `audit_events` in the same transaction.
+export const fieldCorrections = appSchema
+  .table(
+    "field_corrections",
+    {
+      id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+      companyId: uuid("company_id").notNull(),
+      requestId: uuid("request_id").notNull(),
+      fieldKey: text("field_key").notNull(),
+      oldValue: text("old_value"),
+      newValue: text("new_value"),
+      correctedBy: uuid("corrected_by").notNull(),
+      createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    },
+    (table) => [
+      index("field_corrections_request_idx").on(table.companyId, table.requestId, table.fieldKey, table.createdAt),
+      foreignKey({
+        name: "field_corrections_request_same_company_fk",
+        columns: [table.requestId, table.companyId],
+        foreignColumns: [requests.id, requests.companyId],
+      }).onDelete("cascade"),
+      tenantPolicy("field_corrections"),
     ],
   )
   .enableRLS();
