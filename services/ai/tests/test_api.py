@@ -443,6 +443,35 @@ def test_unexpected_error_outside_extract_is_500_with_request_id(replay: Replay)
     assert error["excType"] == "RuntimeError"
 
 
+def test_pdf_over_the_page_cap_is_422_without_a_model_call(
+    fixtures_dir: Path, replay: Replay
+) -> None:
+    with TestClient(build_app(replay, ai_max_pdf_pages=1)) as client:
+        response = upload(client, pdf_bytes(fixtures_dir))  # 2 pages
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "document_too_long"
+    assert replay.requests == []
+
+
+def test_max_pdf_pages_defaults_to_50() -> None:
+    assert make_settings().ai_max_pdf_pages == 50
+
+
+def test_layout_pipeline_without_model_refuses_to_start(
+    replay: Replay, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from requestflow_ai.parsing import pdf as pdf_module
+    from requestflow_ai.parsing.errors import PdfPipelineInitError
+
+    class MissingModel:
+        def initialize_pipeline(self, _: object) -> None:
+            raise FileNotFoundError("layout model not found")
+
+    monkeypatch.setattr(pdf_module, "_layout_converter", MissingModel)
+    with pytest.raises(PdfPipelineInitError):
+        build_app(replay, ai_pdf_pipeline="layout")
+
+
 def test_service_refuses_to_start_without_token(monkeypatch: pytest.MonkeyPatch) -> None:
     from pydantic import ValidationError
 
