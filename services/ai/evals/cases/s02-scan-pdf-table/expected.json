@@ -4,7 +4,7 @@
     "scanned",
     "table"
   ],
-  "description": "Image-only PDF with an item table. No text layer: until OCR (#23) the service returns no_text, no model call, all fields missing.",
+  "description": "Image-only PDF with an item table. No text layer: the replay runs with OCR off (AI_PDF_OCR=off, the default; CI has no OCR models), so the service returns no_text, no model call, all fields missing. Expectations with OCR are kept under after_ocr.",
   "document": "document.pdf",
   "declared_type": "application/pdf",
   "fields": {

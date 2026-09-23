@@ -19,6 +19,7 @@ header field regression fails the gate.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, cast
@@ -48,8 +49,9 @@ def resolve_threshold(cli_value: float | None, environ: Mapping[str, str]) -> fl
         threshold = float(environ[THRESHOLD_ENV])
     else:
         threshold = DEFAULT_THRESHOLD
-    if threshold < 0:
-        raise ValueError("the gate threshold must be >= 0 points")
+    # NaN or inf would make every comparison false and the gate pass silently (#24 review).
+    if not math.isfinite(threshold) or threshold < 0:
+        raise ValueError("the gate threshold must be a finite number >= 0 points")
     return threshold
 
 
@@ -87,8 +89,20 @@ def compare(
             continue
         current = metrics.get(key)
         for name in METRIC_NAMES:
-            before = base_field.get(name)
+            # Every metric must be in the baseline; an explicit null means "nothing to measure"
+            # (as --update-baseline writes it). A missing key or a non-finite number fails.
+            if name not in base_field:
+                failures.append(f"{key}.{name}: missing from the baseline")
+                continue
+            before = base_field[name]
             if before is None:
+                continue
+            if (
+                isinstance(before, bool)
+                or not isinstance(before, int | float)
+                or not math.isfinite(before)
+            ):
+                failures.append(f"{key}.{name}: baseline value is not a finite number")
                 continue
             now = current.metric(name) if current is not None else None
             if now is None:

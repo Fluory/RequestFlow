@@ -18,6 +18,8 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from pydantic import ValidationError
+
 from requestflow_ai.evals.cases import CaseError, EvalCase, load_cases
 from requestflow_ai.evals.gate import THRESHOLD_ENV, baseline_from, compare, resolve_threshold
 from requestflow_ai.evals.model import LiveModeRefusedError, live_model, live_settings, replay_model
@@ -76,14 +78,28 @@ def main(argv: Sequence[str] | None = None, environ: Mapping[str, str] | None = 
     if args.live:
         try:
             settings = live_settings(env)
+            # Fail closed before any case runs (AI rule): no client, no run - and no half-updated
+            # recordings next to the hand-written ones.
+            live_model(settings, cases[0].model_response)
         except (LiveModeRefusedError, ModelClientInitError) as exc:
             print(f"error: {exc}", file=sys.stderr)
+            return 2
+        except ValidationError as exc:
+            names = sorted({str(error["loc"][0]) for error in exc.errors() if error.get("loc")})
+            print(
+                f"error: invalid or missing Vertex configuration: {', '.join(names)}",
+                file=sys.stderr,
+            )
             return 2
 
         def factory(case: EvalCase) -> ModelClient:
             return live_model(settings, case.model_response)
 
-        run = run_cases(cases, factory, "live")
+        try:
+            run = run_cases(cases, factory, "live")
+        except ModelClientInitError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
     else:
         run = run_cases(cases, lambda case: replay_model(case.model_response), "replay")
 
