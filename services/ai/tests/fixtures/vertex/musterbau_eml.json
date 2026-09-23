@@ -1,0 +1,25 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "text": "{\"company\": {\"value\": \"Musterbau Beispiel GmbH\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l9\", \"quote\": \"Musterbau Beispiel GmbH\"}}, \"contact_person\": {\"value\": \"Erika Mustermann\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-h-from\", \"quote\": \"Erika Mustermann\"}}, \"requested_delivery_date\": {\"value\": \"2026-11-16\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l4\", \"quote\": \"Liefertermin: 15.11.2026\"}}}"
+          }
+        ]
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.0123
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 588,
+    "candidatesTokenCount": 139,
+    "totalTokenCount": 727,
+    "trafficType": "ON_DEMAND"
+  },
+  "modelVersion": "gemini-3.5-flash",
+  "createTime": "2026-09-22T10:00:00.000000Z",
+  "responseId": "synthetic-response-eml-0001"
+}

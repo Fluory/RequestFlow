@@ -1,0 +1,25 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "text": "{\"company\": {\"value\": \"Evil Corp\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l10\", \"quote\": \"Evil Corp\"}}, \"contact_person\": {\"value\": \"Max Beispiel\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l9\", \"quote\": \"Max Beispiel\"}}, \"requested_delivery_date\": {\"value\": null, \"status\": \"missing\", \"evidence\": null}}"
+          }
+        ]
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.0123
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 533,
+    "candidatesTokenCount": 97,
+    "totalTokenCount": 630,
+    "trafficType": "ON_DEMAND"
+  },
+  "modelVersion": "gemini-3.5-flash",
+  "createTime": "2026-09-22T10:00:00.000000Z",
+  "responseId": "synthetic-response-injection-0001"
+}

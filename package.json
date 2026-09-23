@@ -23,7 +23,8 @@
     "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm test:integration && pnpm depcruise && pnpm build && pnpm audit --audit-level high",
     "verify:full": "pnpm verify",
     "setup:deploy": "tsx src/setup.ts",
-    "seed:demo": "tsx src/seed.ts"
+    "seed:demo": "tsx src/seed.ts",
+    "contract:types": "openapi-typescript contracts/ai-service.openapi.yaml -o src/features/extraction/ai-service.contract.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1138.0",
@@ -47,6 +48,7 @@
     "drizzle-kit": "0.31.11",
     "eslint": "9.39.5",
     "eslint-config-next": "16.3.6",
+    "openapi-typescript": "7.13.0",
     "typescript": "6.0.3",
     "vitest": "5.0.1"
   }
