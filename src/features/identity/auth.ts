@@ -5,7 +5,7 @@ import { admin, organization } from "better-auth/plugins";
 import { and, asc, eq, gt, sql } from "drizzle-orm";
 import type { Database } from "@/db";
 import * as schema from "@/db/schema";
-import { organizationAc, organizationRoles, PLATFORM_ADMIN_ROLE, platformRoles } from "./access";
+import { DISABLED_AUTH_PATHS, organizationAc, organizationRoles, PLATFORM_ADMIN_ROLE, platformRoles } from "./access";
 import { isCompanyRole } from "./authorize";
 
 export interface AuthSettings {
@@ -57,6 +57,7 @@ export function createAuth(db: Database, settings: AuthSettings) {
     secret: settings.secret,
     baseURL: settings.baseURL,
     basePath: "/api/auth",
+    disabledPaths: DISABLED_AUTH_PATHS,
     database: drizzleAdapter(db, { provider: "pg", schema, transaction: true }),
     advanced: {
       database: { generateId: "uuid" },
