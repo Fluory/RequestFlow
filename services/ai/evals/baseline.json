@@ -1,0 +1,99 @@
+{
+  "note": "Committed eval baseline (replay mode). Update only with a reviewed `--update-baseline`; never in CI.",
+  "case_ids": [
+    "i01-injection-eml-header",
+    "i02-injection-pdf-items",
+    "m01-missing-eml-sparse",
+    "m02-missing-pdf-no-contact",
+    "m03-missing-eml-no-items",
+    "n01-eml-calendar-week",
+    "n02-pdf-standard",
+    "n03-eml-html-items",
+    "s01-scan-pdf-letter",
+    "s02-scan-pdf-table",
+    "s03-scan-pdf-fax",
+    "t01-table-pdf-flanges",
+    "t02-table-pdf-mixed-units",
+    "t03-table-eml-plaintext",
+    "t04-table-pdf-two-pages"
+  ],
+  "metrics": {
+    "company": {
+      "found_accuracy": 91.67,
+      "missing_precision": 100.0,
+      "missing_recall": 100.0,
+      "grounding_pass_rate": 100.0,
+      "false_found_rate": 8.33
+    },
+    "contact_person": {
+      "found_accuracy": 100.0,
+      "missing_precision": 100.0,
+      "missing_recall": 100.0,
+      "grounding_pass_rate": 100.0,
+      "false_found_rate": 0.0
+    },
+    "email": {
+      "found_accuracy": 90.91,
+      "missing_precision": 100.0,
+      "missing_recall": 75.0,
+      "grounding_pass_rate": 90.91,
+      "false_found_rate": 0.0
+    },
+    "phone": {
+      "found_accuracy": 100.0,
+      "missing_precision": 100.0,
+      "missing_recall": 85.71,
+      "grounding_pass_rate": 88.89,
+      "false_found_rate": 0.0
+    },
+    "requested_delivery_date": {
+      "found_accuracy": 70.0,
+      "missing_precision": 83.33,
+      "missing_recall": 100.0,
+      "grounding_pass_rate": 77.78,
+      "false_found_rate": 0.0
+    },
+    "additional_requirements": {
+      "found_accuracy": 100.0,
+      "missing_precision": 100.0,
+      "missing_recall": 87.5,
+      "grounding_pass_rate": 100.0,
+      "false_found_rate": 0.0
+    },
+    "line_items.description": {
+      "found_accuracy": 96.55,
+      "missing_precision": 0.0,
+      "missing_recall": null,
+      "grounding_pass_rate": 100.0,
+      "false_found_rate": 0.0
+    },
+    "line_items.quantity": {
+      "found_accuracy": 89.66,
+      "missing_precision": 0.0,
+      "missing_recall": null,
+      "grounding_pass_rate": 92.86,
+      "false_found_rate": 0.0
+    },
+    "line_items.unit": {
+      "found_accuracy": 86.21,
+      "missing_precision": 0.0,
+      "missing_recall": null,
+      "grounding_pass_rate": 89.29,
+      "false_found_rate": 0.0
+    },
+    "line_items.material": {
+      "found_accuracy": 89.29,
+      "missing_precision": 0.0,
+      "missing_recall": 0.0,
+      "grounding_pass_rate": 96.43,
+      "false_found_rate": 3.85
+    },
+    "line_items.dimensions": {
+      "found_accuracy": 92.86,
+      "missing_precision": 50.0,
+      "missing_recall": 100.0,
+      "grounding_pass_rate": 96.3,
+      "false_found_rate": 0.0
+    }
+  }
+}
