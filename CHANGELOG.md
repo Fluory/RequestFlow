@@ -6,6 +6,9 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
+- Duplicate handling: a possible duplicate shows a banner with the original; the clerk confirms it as a
+  separate request or rejects it as a duplicate (reason stored, audited). A possible duplicate cannot be
+  approved before that decision, and a rejected one can never be exported.
 - Request list (`/requests`): attempts, the last error with its stage (processing or export) and the next
   retry per request, filters for status and possible duplicates, and "Erneut verarbeiten" for failed requests.
 - Review of line items: positions appear as a table with a status per field; each field opens its source

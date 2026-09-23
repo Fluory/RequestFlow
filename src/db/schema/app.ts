@@ -51,6 +51,8 @@ export const requests = appSchema
       nextRetryAt: timestamp("next_retry_at", { withTimezone: true }),
       // Review decision (#8).
       rejectionReason: text("rejection_reason"),
+      // Clerk's decision on a possible duplicate (#27): null = undecided.
+      duplicateDecision: text("duplicate_decision", { enum: ["distinct", "duplicate"] }),
     },
     (table) => [
       index("requests_company_id_idx").on(table.companyId),
@@ -64,6 +66,7 @@ export const requests = appSchema
         foreignColumns: [table.id, table.companyId],
       }),
       check("requests_status_check", sql.raw(`status in (${REQUEST_STATUSES.map((s) => `'${s}'`).join(", ")})`)),
+      check("requests_duplicate_decision_check", sql`duplicate_decision is null or duplicate_decision in ('distinct', 'duplicate')`),
       tenantPolicy("requests"),
     ],
   )

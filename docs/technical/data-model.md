@@ -35,6 +35,7 @@ query sees zero rows and every write fails.
 | `possible_duplicate` / `duplicate_of_id` | boolean / uuid | exact duplicate within the company; composite FK `(duplicate_of_id, company_id)` | internal |
 | `error_stage`, `error_message` | text | `processing`/`export`; readable cause for staff – no stack traces, hosts or document content | internal |
 | `attempts`, `next_retry_at` | int, timestamptz | processing attempts; next retry while pg-boss retries | internal |
+| `duplicate_decision` | text | `distinct` · `duplicate` · null (undecided) – clerk's decision on a possible duplicate (#27); approval needs `distinct` | internal |
 | `rejection_reason` | text | free-text reason of a rejection, max 1000 chars (refused above, not cut – review module); also in the `request.rejected` audit event | confidential |
 
 Unique `(id, company_id)` so child tables can pin the company with composite foreign keys (FK checks

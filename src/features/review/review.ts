@@ -6,7 +6,7 @@ import { exportLimitViolations, getExportRecord, type ExportRecord } from "@/fea
 import { HEADER_FIELDS, ITEM_FIELDS, latestRun, listSegments } from "@/features/extraction";
 import { authorize, type Actor } from "@/features/identity";
 import { enqueueRequestExport, type JobSender } from "@/features/jobs";
-import { getRequest, lockRequest, transitionRequest, type RequestRow } from "@/features/requests";
+import { canTransition, getRequest, lockRequest, recordDuplicateDecision, transitionRequest, type RequestRow } from "@/features/requests";
 import { tenantOf, type Tenancy, type TenantTx } from "@/features/tenancy";
 import { buildSourceView, type SourceView, type StoredSegment } from "./source-view";
 
@@ -65,7 +65,14 @@ export interface ReviewView {
   exportRecord: ExportRecord | null;
 }
 
-export type ReviewRefusal = "not_in_review" | "unknown_field" | "reason_missing" | "reason_too_long" | "value_too_long";
+export type ReviewRefusal =
+  | "not_in_review"
+  | "unknown_field"
+  | "reason_missing"
+  | "reason_too_long"
+  | "value_too_long"
+  | "duplicate_undecided"
+  | "not_a_possible_duplicate";
 
 /** Refused action: request missing (or of another company – RLS), not in REVIEW, or invalid input. */
 export class ReviewRefused extends Error {
@@ -200,6 +207,9 @@ export async function approveRequest(deps: { tenancy: Tenancy; boss: JobSender }
   authorize(actor, "requests.process");
   await deps.tenancy.withTenant(actor.companyId, async (tx) => {
     const request = await lockForReview(tx, requestId);
+    // A possible duplicate is approved only after a clerk decided it is not one (#27) – nothing is
+    // exported twice by accident.
+    if (request.possibleDuplicate && request.duplicateDecision !== "distinct") throw new ReviewRefused("duplicate_undecided");
     if (exportLimitViolations(request.subject, await currentFieldValues(tx, requestId)).length > 0) throw new ReviewRefused("value_too_long");
     await transitionRequest(tx, request, "approve");
     await enqueueRequestExport(deps.boss, tx, requestId);
@@ -210,9 +220,7 @@ export async function approveRequest(deps: { tenancy: Tenancy; boss: JobSender }
 /** REVIEW → REJECTED with a mandatory reason, audited. */
 export async function rejectRequest(tenancy: Tenancy, actor: Actor, requestId: string, reason: string): Promise<void> {
   authorize(actor, "requests.process");
-  const text = reason.trim();
-  if (!text) throw new ReviewRefused("reason_missing");
-  if (text.length > REJECTION_REASON_MAX) throw new ReviewRefused("reason_too_long");
+  const text = reasonOf(reason);
   await tenancy.withTenant(actor.companyId, async (tx) => {
     const request = await lockForReview(tx, requestId);
     await transitionRequest(tx, request, "reject", { rejectionReason: text });
@@ -225,4 +233,67 @@ export async function correctionHistory(tenancy: Tenancy, actor: Actor, requestI
   return tenancy.withTenant(actor.companyId, (tx) =>
     tx.select().from(fieldCorrections).where(and(eq(fieldCorrections.requestId, requestId))).orderBy(asc(fieldCorrections.createdAt)),
   );
+}
+
+function reasonOf(reason: string): string {
+  const text = reason.trim();
+  if (!text) throw new ReviewRefused("reason_missing");
+  if (text.length > REJECTION_REASON_MAX) throw new ReviewRefused("reason_too_long");
+  return text;
+}
+
+/**
+ * Where a duplicate decision is possible (#27): NEW (a queued job then skips a rejected request),
+ * REVIEW and ERROR from processing – never while a worker holds it (PROCESSING) or after approval.
+ */
+export function duplicateDecidable(request: Pick<RequestRow, "status" | "errorStage">): boolean {
+  return request.status === "NEW" || request.status === "REVIEW" || (request.status === "ERROR" && request.errorStage === "processing");
+}
+
+/** Locks a possible duplicate that is still undecided; anything else is refused. */
+async function lockUndecidedDuplicate(tx: TenantTx, requestId: string): Promise<RequestRow> {
+  const request = await lockRequest(tx, requestId);
+  if (!request) throw new ReviewRefused();
+  if (!request.possibleDuplicate || request.duplicateDecision !== null) throw new ReviewRefused("not_a_possible_duplicate");
+  return request;
+}
+
+/** "Not a duplicate" (#27): the request continues normally; the decision is audited. */
+export async function confirmNotDuplicate(tenancy: Tenancy, actor: Actor, requestId: string): Promise<void> {
+  authorize(actor, "requests.process");
+  await tenancy.withTenant(actor.companyId, async (tx) => {
+    const request = await lockUndecidedDuplicate(tx, requestId);
+    // Same states the page offers (#27 review): before approval, not while a worker holds it.
+    if (!duplicateDecidable(request)) throw new ReviewRefused();
+    await recordDuplicateDecision(tx, request, "distinct");
+    await recordAudit(tx, { actorUserId: actor.userId, action: "request.duplicate_dismissed", entityType: "request", entityId: requestId, data: { duplicateOf: request.duplicateOfId } });
+  });
+}
+
+/**
+ * "Reject as duplicate" (#27): REJECTED with a reason, audited. Allowed before approval and never
+ * while a worker holds the request; a REJECTED request has no way to APPROVED, so it is never exported.
+ */
+export async function rejectAsDuplicate(tenancy: Tenancy, actor: Actor, requestId: string, reason: string): Promise<void> {
+  authorize(actor, "requests.process");
+  const text = reasonOf(reason);
+  await tenancy.withTenant(actor.companyId, async (tx) => {
+    const request = await lockUndecidedDuplicate(tx, requestId);
+    if (!duplicateDecidable(request) || !canTransition(request.status, "reject.duplicate")) throw new ReviewRefused();
+    // A rejected duplicate carries no stale error (#27 review) – it is decided, not failing.
+    await transitionRequest(tx, request, "reject.duplicate", {
+      rejectionReason: text,
+      duplicateDecision: "duplicate",
+      nextRetryAt: null,
+      errorStage: null,
+      errorMessage: null,
+    });
+    await recordAudit(tx, {
+      actorUserId: actor.userId,
+      action: "request.rejected",
+      entityType: "request",
+      entityId: requestId,
+      data: { reason: text, duplicate: true, duplicateOf: request.duplicateOfId },
+    });
+  });
 }

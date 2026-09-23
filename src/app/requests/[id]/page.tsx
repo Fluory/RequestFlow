@@ -2,10 +2,10 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { currentActor, getRuntime } from "@/app/_server/runtime";
-import { loadReview, REJECTION_REASON_MAX, type ReviewField, type ReviewStatus } from "@/features/review";
+import { duplicateDecidable, loadReview, REJECTION_REASON_MAX, type ReviewField, type ReviewStatus } from "@/features/review";
 import { requestStatusLabel } from "../status-labels";
 import { DONE_MESSAGES, ERROR_MESSAGES, messageFor } from "./messages";
-import { approveAction, correctFieldAction, rejectAction } from "./actions";
+import { approveAction, confirmNotDuplicateAction, correctFieldAction, rejectAction, rejectAsDuplicateAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -90,6 +90,8 @@ export default async function RequestPage({
       ? fields.find((field) => field.key === query.field)
       : lineItems.find((item) => item.itemIndex === selectedItem)?.fields.find((field) => field.key === query.field);
   const inReview = request.status === "REVIEW";
+  // Decidable before approval and not while a worker holds the request (status machine, #27).
+  const canDecideDuplicate = duplicateDecidable(request);
   const done = messageFor(DONE_MESSAGES, query.done);
   const error = messageFor(ERROR_MESSAGES, query.error);
 
@@ -117,9 +119,29 @@ export default async function RequestPage({
         </p>
       )}
       {request.possibleDuplicate && request.duplicateOfId && (
-        <p role="note">
-          Mögliches Duplikat von <Link href={`/requests/${request.duplicateOfId}`}>dieser Anfrage</Link>.
-        </p>
+        <section aria-labelledby="duplicate-heading" className="attention" data-testid="duplicate-banner">
+          <h2 id="duplicate-heading">Mögliches Duplikat</h2>
+          <p>
+            Gleiche E-Mail oder gleiche Dateien wie <Link href={`/requests/${request.duplicateOfId}`}>diese Anfrage</Link>.
+            {request.duplicateDecision === "distinct" && " Entscheidung: eigenständige Anfrage."}
+            {request.duplicateDecision === "duplicate" && " Entscheidung: als Duplikat abgelehnt."}
+          </p>
+          {request.duplicateDecision === null && canDecideDuplicate && (
+            <>
+              <form action={confirmNotDuplicateAction}>
+                <input type="hidden" name="requestId" value={request.id} />
+                <button type="submit">Kein Duplikat – weiter bearbeiten</button>
+              </form>
+              <form action={rejectAsDuplicateAction}>
+                <input type="hidden" name="requestId" value={request.id} />
+                <label>
+                  Grund <input name="reason" required maxLength={REJECTION_REASON_MAX} defaultValue="Duplikat einer bestehenden Anfrage" />
+                </label>{" "}
+                <button type="submit">Als Duplikat ablehnen</button>
+              </form>
+            </>
+          )}
+        </section>
       )}
 
       {fields.length > 0 && (

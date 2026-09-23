@@ -95,7 +95,15 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                   {/* The stage appears once: in the status for ERROR, as a prefix while retrying. */}
                   <td>{row.error ? `${request.status !== "ERROR" && row.stage ? `${STAGE_LABEL[row.stage]}: ` : ""}${row.error}` : "–"}</td>
                   <td>{row.nextRetryAt ? dateFormat.format(row.nextRetryAt) : "–"}</td>
-                  <td>{request.possibleDuplicate ? "Mögliches Duplikat" : ""}</td>
+                  <td>
+                    {request.possibleDuplicate
+                      ? request.duplicateDecision === "distinct"
+                        ? "Duplikat geprüft: eigenständig"
+                        : request.duplicateDecision === "duplicate"
+                          ? "Als Duplikat abgelehnt"
+                          : "Mögliches Duplikat – Entscheidung offen"
+                      : ""}
+                  </td>
                   <td>
                     {request.status === "ERROR" && (
                       <form action={reprocessAction}>

@@ -82,7 +82,13 @@ export async function lockRequest(tx: TenantTx, id: string): Promise<RequestRow 
   return row ?? null;
 }
 
-type StatePatch = Partial<Pick<RequestRow, "errorStage" | "errorMessage" | "attempts" | "nextRetryAt" | "rejectionReason">>;
+type StatePatch = Partial<Pick<RequestRow, "errorStage" | "errorMessage" | "attempts" | "nextRetryAt" | "rejectionReason" | "duplicateDecision">>;
+
+/** Records the clerk's "not a duplicate" decision (#27) on a locked row – no status change. */
+export async function recordDuplicateDecision(tx: TenantTx, row: RequestRow, decision: "distinct"): Promise<void> {
+  tenantOf(tx);
+  await tx.update(requests).set({ duplicateDecision: decision }).where(eq(requests.id, row.id));
+}
 
 /** Applies a status-machine event to a locked row; illegal transitions throw before any write. */
 export async function transitionRequest(tx: TenantTx, row: RequestRow, event: RequestEvent, patch: StatePatch = {}): Promise<RequestRow> {

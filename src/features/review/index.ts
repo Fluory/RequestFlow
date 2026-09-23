@@ -1,6 +1,9 @@
 // Public API of the `review` module: review view, corrections, approve/reject, source view.
 export {
   approveRequest,
+  confirmNotDuplicate,
+  duplicateDecidable,
+  rejectAsDuplicate,
   correctField,
   correctionHistory,
   currentFieldValues,
