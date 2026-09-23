@@ -11,8 +11,8 @@ from requestflow_ai.api.app import API_VERSION, build_api
 _PARAGRAPHS = (
     "Stateless AI service of RequestFlow (ADR-0001 D8). The TS worker sends one document (PDF or "
     "RFC 5322 e-mail) plus opaque IDs; the service parses it into segments with stable locators, "
-    "extracts header fields with Gemini on Vertex AI (`eu`) and verifies every quote "
-    "deterministically. The model never has the final say on `found`.",
+    "extracts header fields and line items with Gemini on Vertex AI (`eu`) and verifies every "
+    "quote deterministically. The model never has the final say on `found`.",
     "The service has no database, no storage and no tenant logic. Authentication: bearer token "
     "(`AI_SERVICE_TOKEN`) on `/v1/extract`; `/healthz` is open.",
 )

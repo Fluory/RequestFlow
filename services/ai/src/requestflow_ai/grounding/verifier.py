@@ -1,19 +1,21 @@
 """Grounding verifier (ADR-0001 D8 step 3, test-first).
 
-Rules, applied in order:
+Rules, applied in order, identically to header fields and to every field of every line item:
 
 * ``missing``: the value must be null, otherwise ``unverified`` (``missing_with_value``). Stray
   evidence is dropped.
 * ``found``: needs a value and evidence. The cited segment must exist, the normalised quote must
   occur in the normalised segment text, and the value must be consistent with the quote (text,
-  number or date semantics per field). Any failure -> ``unverified`` with a reason. Text must
-  match on word boundaries; a verified value is returned normalised (trimmed text, dates as ISO
-  ``YYYY-MM-DD``). A date quote with more than one distinct date proves nothing about which one
-  is meant: ``found`` is downgraded to ``uncertain`` (reason ``ambiguous_quote``).
+  number, date, unit, e-mail or phone semantics per field). Any failure -> ``unverified`` with a
+  reason. Text must match on word boundaries; a verified value is returned normalised (see
+  ``grounding.values``). A date quote with more than one distinct date proves nothing about which
+  one is meant: ``found`` is downgraded to ``uncertain`` (reason ``ambiguous_quote``). A date
+  field that only has a calendar week is at most ``uncertain`` (reason ``calendar_week_only``).
 * ``uncertain``: evidence, when given, is checked the same way (failure -> ``unverified``).
   Without evidence it stays ``uncertain``. It is never promoted to ``found``.
 
 The model never has the final say on ``found``; the verifier only ever keeps or downgrades.
+Line item indexes are assigned here from the order of the model's list, never taken from it.
 """
 
 from __future__ import annotations
@@ -24,7 +26,9 @@ from typing import Literal
 
 from requestflow_ai.extraction.schema import (
     FIELD_KEYS,
+    LINE_ITEM_KEYS,
     FieldKey,
+    LineItemKey,
     ModelEvidence,
     ModelExtraction,
     ModelField,
@@ -46,12 +50,25 @@ UnverifiedReason = Literal[
     # Not unverified: a ``found`` date whose quote holds several dates is downgraded to
     # ``uncertain`` with this reason.
     "ambiguous_quote",
+    # Not unverified: a date field that only has a calendar week (no date) is ``uncertain``.
+    "calendar_week_only",
 ]
 
 FIELD_KINDS: dict[FieldKey, ValueKind] = {
     "company": "text",
     "contact_person": "text",
+    "email": "email",
+    "phone": "phone",
     "requested_delivery_date": "date",
+    "additional_requirements": "text",
+}
+
+LINE_ITEM_KINDS: dict[LineItemKey, ValueKind] = {
+    "description": "text",
+    "quantity": "number",
+    "unit": "unit",
+    "material": "text",
+    "dimensions": "text",
 }
 
 
@@ -62,6 +79,12 @@ class VerifiedField:
     evidence: ModelEvidence | None
     model_status: ModelStatus
     reason: UnverifiedReason | None = None
+
+
+@dataclass(frozen=True)
+class VerifiedLineItem:
+    index: int
+    fields: dict[LineItemKey, VerifiedField]
 
 
 def _check_evidence(
@@ -109,8 +132,12 @@ def verify_field(
     check = _check_evidence(field.value, field.evidence, kind, segments)
     if not isinstance(check, ValueCheck):
         return unverified(check)
-    # A verified value is returned normalised (trimmed text, ISO date), never the raw model text.
+    # A verified value is returned normalised, never the raw model text.
     value = check.normalized if check.normalized is not None else field.value
+    if check.calendar_week:
+        return VerifiedField(
+            value, "uncertain", field.evidence, model_status, "calendar_week_only"
+        )
     if check.ambiguous and model_status == "found":
         return VerifiedField(value, "uncertain", field.evidence, model_status, "ambiguous_quote")
     return VerifiedField(value, model_status, field.evidence, model_status)
@@ -123,3 +150,19 @@ def verify_extraction(
     return {
         key: verify_field(getattr(extraction, key), FIELD_KINDS[key], by_id) for key in FIELD_KEYS
     }
+
+
+def verify_line_items(
+    extraction: ModelExtraction, segments: Sequence[Segment]
+) -> list[VerifiedLineItem]:
+    by_id = {segment.id: segment for segment in segments}
+    return [
+        VerifiedLineItem(
+            index=index,
+            fields={
+                key: verify_field(getattr(item, key), LINE_ITEM_KINDS[key], by_id)
+                for key in LINE_ITEM_KEYS
+            },
+        )
+        for index, item in enumerate(extraction.line_items)
+    ]

@@ -39,9 +39,24 @@ def test_pdf_all_fields_found_and_verified(fixtures_dir: Path) -> None:
     assert {key: f.status for key, f in run.fields.items()} == {
         "company": "found",
         "contact_person": "found",
+        # Schema v2 (#22): the PDF has no e-mail or phone; the tolerance is on page 2.
+        "email": "missing",
+        "phone": "missing",
         "requested_delivery_date": "found",
+        "additional_requirements": "found",
     }
     assert run.fields["requested_delivery_date"].value == "2026-11-15"
+    (item,) = run.line_items
+    assert item.index == 0
+    assert {key: f.status for key, f in item.fields.items()} == {
+        "description": "found",
+        "quantity": "found",
+        "unit": "found",
+        "material": "uncertain",
+        "dimensions": "found",
+    }
+    assert item.fields["quantity"].value == "1250"
+    assert item.fields["unit"].value == "pcs"
     assert "[p1-l1] Musterbau Beispiel GmbH" in sent_document(replay)
     assert run.usage.input_tokens == 612
     assert run.model_latency_ms is not None

@@ -116,7 +116,25 @@ def test_extract_pdf_returns_segments_fields_and_run_metadata(
     assert first["locator"]["coordOrigin"] == "TOPLEFT"
     assert set(first["locator"]["bbox"]) == {"l", "t", "r", "b"}
 
-    assert set(body["fields"]) == {"company", "contact_person", "requested_delivery_date"}
+    assert set(body["fields"]) == {
+        "company",
+        "contact_person",
+        "email",
+        "phone",
+        "requested_delivery_date",
+        "additional_requirements",
+    }
+    (item,) = body["lineItems"]
+    assert set(item) == {"index", "description", "quantity", "unit", "material", "dimensions"}
+    assert item["index"] == 0
+    assert item["quantity"] == {
+        "value": "1250",
+        "status": "found",
+        "modelStatus": "found",
+        "reason": None,
+        "evidence": {"segmentId": "p1-l5", "quote": "1.250 Stueck"},
+    }
+    assert item["unit"]["value"] == "pcs"
     company = body["fields"]["company"]
     assert company == {
         "value": "Musterbau Beispiel GmbH",
@@ -129,8 +147,8 @@ def test_extract_pdf_returns_segments_fields_and_run_metadata(
     run = body["run"]
     assert run["modelId"] == "gemini-3.5-flash"
     assert run["modelVersion"] == "gemini-3.5-flash"
-    assert run["promptVersion"] == "extract_header_v1"
-    assert run["schemaVersion"] == "header-v1"
+    assert run["promptVersion"] == "extract_v2"
+    assert run["schemaVersion"] == "2"
     assert run["pdfPipeline"] == "textlines"
     assert run["tokens"] == {"inputTokens": 612, "outputTokens": 141, "totalTokens": 753}
     assert isinstance(run["latencyMs"], int)

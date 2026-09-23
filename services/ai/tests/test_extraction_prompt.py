@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from importlib import resources
+
 from conftest import body_segment, pdf_segment
 
 from requestflow_ai.extraction.prompt import (
@@ -10,10 +12,22 @@ from requestflow_ai.extraction.prompt import (
 
 
 def test_prompt_is_a_versioned_file() -> None:
-    assert PROMPT_VERSION == "extract_header_v1"
+    assert PROMPT_VERSION == "extract_v2"
     text = system_instruction()
     assert "<document>" in text
     assert "DATA" in text
+
+
+def test_v2_prompt_covers_line_items_and_never_computes_dates_from_calendar_weeks() -> None:
+    text = system_instruction()
+    assert "line_items" in text
+    assert "Never compute a date from a calendar week" in text
+
+
+def test_previous_prompt_version_stays_available_for_traceability() -> None:
+    prompts = resources.files("requestflow_ai.extraction") / "prompts"
+    assert (prompts / "extract_header_v1.md").is_file()
+    assert (prompts / f"{PROMPT_VERSION}.md").is_file()
 
 
 def test_document_is_placed_inside_delimiters_with_segment_ids() -> None:
