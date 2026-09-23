@@ -12,7 +12,9 @@ const schema = z.object({
   BETTER_AUTH_URL: z.url(),
   AUTH_IP_HEADERS: z.string().default("x-forwarded-for"),
   AUTH_TRUSTED_PROXIES: z.string().default(""),
-  NODE_ENV: z.string().default("development"),
+  // Deployment environment – set explicitly everywhere (compose, CI, .env). Only `local` may use the
+  // committed local-default secret.
+  APP_ENV: z.enum(["local", "showcase", "production"]),
 });
 
 const LOCAL_PLACEHOLDER_SECRETS = new Set(["local-dev-only-secret-change-me-0123456789"]);
@@ -45,7 +47,7 @@ export function loadConfig(source: Record<string, string | undefined> = process.
   }
   const env = parsed.data;
   // The committed local default must never sign sessions of a real deployment.
-  if (env.NODE_ENV === "production" && LOCAL_PLACEHOLDER_SECRETS.has(env.BETTER_AUTH_SECRET)) {
+  if (env.APP_ENV !== "local" && LOCAL_PLACEHOLDER_SECRETS.has(env.BETTER_AUTH_SECRET)) {
     throw new Error("Invalid or missing configuration: BETTER_AUTH_SECRET");
   }
   return {
