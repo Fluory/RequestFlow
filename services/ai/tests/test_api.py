@@ -337,9 +337,7 @@ def test_unauthenticated_request_is_rejected_before_the_body_is_read(
 def test_guard_also_applies_behind_a_proxy_root_path(replay: Replay) -> None:
     # uvicorn --root-path /ai: scope["path"] includes the prefix.
     headers = {**MULTIPART, "content-length": str(10**12)}
-    status, _, body = call_asgi(
-        build_app(replay), headers, path="/ai/v1/extract", root_path="/ai"
-    )
+    status, _, body = call_asgi(build_app(replay), headers, path="/ai/v1/extract", root_path="/ai")
     assert status == 401
     assert body["error"]["code"] == "unauthorized"
 
