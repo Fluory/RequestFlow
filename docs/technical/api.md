@@ -7,7 +7,7 @@
 
 | Status | Body |
 |---|---|
-| 200 | `{"status":"ok","checks":{"database":"ok","storage":"ok"}}` |
+| 200 | `{"status":"ok","checks":{"database":"ok","storage":"ok"},"dependencies":{"aiService":"ok"},"backlog":{"request-process":0,"request-export":0}}` |
 | 503 | `{"status":"degraded","checks":{"<name>":"failed", …}}` – names only, never hosts, users or error text |
 | 503 | `{"status":"degraded","checks":{"config":"failed"}}` – invalid configuration (the server log names the variables) |
 
@@ -15,8 +15,8 @@
 - Cost per call: one `select 1` and one S3 `HeadBucket`. No rate limit in the pilot (local runtime,
   no public exposure); before any public deployment a rate limit or a short cache goes in front of it
   (showcase epic #19).
-- Checks are added additively (queue backlog and AI service follow with #28); clients must ignore
-  unknown check names.
+- `dependencies` (AI service reachable: `ok`/`failed`) and `backlog` (waiting jobs per queue; `null` when
+  unknown) are informational (#28) – they never change the HTTP status. Clients must ignore unknown keys.
 
 ## `POST /api/requests` (session required)
 

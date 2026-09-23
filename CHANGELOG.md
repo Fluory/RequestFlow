@@ -6,6 +6,9 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
+- Observability: structured JSON logs (pino) with IDs and codes only, correlated by the request id from web
+  through worker to the AI service; `/api/health` also shows whether the AI service is reachable and how
+  many jobs are waiting.
 - Duplicate handling: a possible duplicate shows a banner with the original; the clerk confirms it as a
   separate request or rejects it as a duplicate (reason stored, audited). A possible duplicate cannot be
   approved before that decision, and a rejected one can never be exported.
