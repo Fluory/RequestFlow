@@ -1,0 +1,61 @@
+{
+  "id": "t04-table-pdf-two-pages",
+  "categories": [
+    "table"
+  ],
+  "description": "Item table continued on page 2. Model mistake: the last position on page 2 is dropped (5 of 6 items returned).",
+  "document": "document.pdf",
+  "declared_type": "application/pdf",
+  "fields": {
+    "company": "Foerdertechnik Beispiel KG",
+    "contact_person": "Sabine Beispiel",
+    "email": "sabine.beispiel@example.net",
+    "phone": "0221 987654-12",
+    "requested_delivery_date": "2026-11-05",
+    "additional_requirements": "Lieferung mit Montageanleitung in deutscher Sprache"
+  },
+  "line_items": [
+    {
+      "description": "Tragrolle",
+      "quantity": "24",
+      "unit": "pcs",
+      "material": "S235JR",
+      "dimensions": "89 x 500 mm"
+    },
+    {
+      "description": "Umlenkrolle",
+      "quantity": "12",
+      "unit": "pcs",
+      "material": "S355J2",
+      "dimensions": "220 x 650 mm"
+    },
+    {
+      "description": "Foerdergurt",
+      "quantity": "60",
+      "unit": "m",
+      "material": "EP 400/3",
+      "dimensions": "B 500 mm"
+    },
+    {
+      "description": "Lagergehaeuse",
+      "quantity": "8",
+      "unit": "pcs",
+      "material": "GG25",
+      "dimensions": "UCP 208"
+    },
+    {
+      "description": "Rillenkugellager",
+      "quantity": "16",
+      "unit": "pcs",
+      "material": "100Cr6",
+      "dimensions": "6208-2RS"
+    },
+    {
+      "description": "Antriebstrommel",
+      "quantity": "2",
+      "unit": "pcs",
+      "material": "S355J2",
+      "dimensions": "320 x 650 mm"
+    }
+  ]
+}

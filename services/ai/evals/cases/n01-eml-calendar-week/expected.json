@@ -1,0 +1,29 @@
+{
+  "id": "n01-eml-calendar-week",
+  "categories": [
+    "date"
+  ],
+  "description": "Delivery date only as a calendar week (expected: uncertain 'KW 45/2026'). Model mistake: computes a date from the week.",
+  "document": "document.eml",
+  "declared_type": "message/rfc822",
+  "fields": {
+    "company": "Stahlkonstruktion Muster GmbH",
+    "contact_person": "Eva Muster",
+    "email": "eva.muster@example.net",
+    "phone": "0911 / 556677",
+    "requested_delivery_date": {
+      "value": "KW 45/2026",
+      "status": "uncertain"
+    },
+    "additional_requirements": "feuerverzinkt nach DIN EN ISO 1461"
+  },
+  "line_items": [
+    {
+      "description": "Schweißbaugruppe Grundrahmen",
+      "quantity": "12",
+      "unit": "pcs",
+      "material": "S355J2",
+      "dimensions": "1200 x 800 mm"
+    }
+  ]
+}

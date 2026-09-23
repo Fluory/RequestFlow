@@ -1,0 +1,33 @@
+{
+  "id": "n02-pdf-standard",
+  "categories": [
+    "standard"
+  ],
+  "description": "Plain PDF letter with two positions in running text; the model gets everything right (control case).",
+  "document": "document.pdf",
+  "declared_type": "application/pdf",
+  "fields": {
+    "company": "Hydraulik Beispiel GmbH",
+    "contact_person": "Martin Beispiel",
+    "email": "martin.beispiel@example.com",
+    "phone": "089 4455 667",
+    "requested_delivery_date": "2026-12-14",
+    "additional_requirements": "Toleranz ISO 286 H8 fuer alle Rohre"
+  },
+  "line_items": [
+    {
+      "description": "Zylinderrohr H8",
+      "quantity": "18",
+      "unit": "pcs",
+      "material": "E355",
+      "dimensions": "80 x 95 mm"
+    },
+    {
+      "description": "Kolbenstange",
+      "quantity": "6",
+      "unit": "m",
+      "material": "CK45 verchromt",
+      "dimensions": "D 40 mm"
+    }
+  ]
+}

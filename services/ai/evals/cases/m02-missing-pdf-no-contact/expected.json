@@ -1,0 +1,33 @@
+{
+  "id": "m02-missing-pdf-no-contact",
+  "categories": [
+    "missing"
+  ],
+  "description": "PDF with company and two positions only: no contact person, e-mail, phone, date or requirements. Model mistake: answers 'missing' for e-mail but still sends a guessed address (missing_with_value).",
+  "document": "document.pdf",
+  "declared_type": "application/pdf",
+  "fields": {
+    "company": "Maschinenfabrik Beispiel GmbH & Co. KG",
+    "contact_person": null,
+    "email": null,
+    "phone": null,
+    "requested_delivery_date": null,
+    "additional_requirements": null
+  },
+  "line_items": [
+    {
+      "description": "Welle",
+      "quantity": "30",
+      "unit": "pcs",
+      "material": "42CrMo4",
+      "dimensions": "D 60 x 850 mm"
+    },
+    {
+      "description": "Zahnrad",
+      "quantity": "30",
+      "unit": "pcs",
+      "material": "16MnCr5",
+      "dimensions": "Modul 3"
+    }
+  ]
+}

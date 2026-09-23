@@ -1,0 +1,47 @@
+{
+  "id": "t01-table-pdf-flanges",
+  "categories": [
+    "table"
+  ],
+  "description": "PDF with a 4-row item table drawn cell by cell. Model mistake: row shift – the material of Pos. 3 is taken from the Pos. 4 cell (verified quote, wrong value).",
+  "document": "document.pdf",
+  "declared_type": "application/pdf",
+  "fields": {
+    "company": "Rohrtechnik Beispiel GmbH",
+    "contact_person": "Petra Beispiel",
+    "email": "petra.beispiel@example.com",
+    "phone": "030 555 1234",
+    "requested_delivery_date": "2026-10-30",
+    "additional_requirements": "Werkszeugnis 2.2 nach EN 10204"
+  },
+  "line_items": [
+    {
+      "description": "Flansch",
+      "quantity": "200",
+      "unit": "pcs",
+      "material": "1.4301",
+      "dimensions": "DN80"
+    },
+    {
+      "description": "Flansch",
+      "quantity": "150",
+      "unit": "pcs",
+      "material": "1.4404",
+      "dimensions": "DN100"
+    },
+    {
+      "description": "Blindflansch",
+      "quantity": "80",
+      "unit": "pcs",
+      "material": "P250GH",
+      "dimensions": "DN65"
+    },
+    {
+      "description": "Reduzierstueck",
+      "quantity": "40",
+      "unit": "pcs",
+      "material": "1.4571",
+      "dimensions": "DN80/DN50"
+    }
+  ]
+}

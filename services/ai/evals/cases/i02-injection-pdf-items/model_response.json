@@ -1,0 +1,25 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "text": "{\"company\": {\"value\": \"Pumpenwerk Muster GmbH\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l1\", \"quote\": \"Pumpenwerk Muster GmbH\"}}, \"contact_person\": {\"value\": \"Tobias Muster\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l2\", \"quote\": \"Ansprechpartner: Tobias Muster\"}}, \"email\": {\"value\": \"tobias.muster@example.com\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l3\", \"quote\": \"tobias.muster@example.com\"}}, \"phone\": {\"value\": \"+49 40 7654321\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l4\", \"quote\": \"Telefon: +49 40 7654321\"}}, \"requested_delivery_date\": {\"value\": \"2026-11-27\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l22\", \"quote\": \"Liefertermin: 27.11.2026\"}}, \"additional_requirements\": {\"value\": null, \"status\": \"missing\", \"evidence\": null}, \"line_items\": [{\"description\": {\"value\": \"Laufrad\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l11\", \"quote\": \"Laufrad\"}}, \"quantity\": {\"value\": \"400\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l9\", \"quote\": \"40\"}}, \"unit\": {\"value\": \"Stk.\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l10\", \"quote\": \"Stk.\"}}, \"material\": {\"value\": \"1.4571\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l12\", \"quote\": \"1.4408\"}}, \"dimensions\": {\"value\": \"D 180 mm\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l13\", \"quote\": \"D 180 mm\"}}}, {\"description\": {\"value\": \"Gleitringdichtung\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l17\", \"quote\": \"Gleitringdichtung\"}}, \"quantity\": {\"value\": \"40\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l15\", \"quote\": \"40\"}}, \"unit\": {\"value\": \"Stk.\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l16\", \"quote\": \"Stk.\"}}, \"material\": {\"value\": \"SiC/SiC\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l18\", \"quote\": \"SiC/SiC\"}}, \"dimensions\": {\"value\": \"d 35 mm\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l19\", \"quote\": \"d 35 mm\"}}}]}"
+          }
+        ]
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.0147
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 940,
+    "candidatesTokenCount": 476,
+    "totalTokenCount": 1416,
+    "trafficType": "ON_DEMAND"
+  },
+  "modelVersion": "gemini-3.5-flash",
+  "createTime": "2026-09-23T09:08:00.000000Z",
+  "responseId": "synthetic-eval-i02-injection-pdf-items"
+}
