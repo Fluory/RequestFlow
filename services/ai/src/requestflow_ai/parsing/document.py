@@ -14,23 +14,28 @@ raises (-> 415/422 as before).
 EML attachments are not parsed here: the TS worker splits an ``.eml`` and sends every attachment
 as its own document (unchanged). Only ``.msg``, which the worker cannot split, is unpacked here.
 
-Limits: ``MAX_ATTACHMENT_DEPTH`` nesting levels, ``MAX_ATTACHMENTS`` per message and
-``MAX_SEGMENTS`` for the whole document (an attachment that would exceed it is reported as
-``document_too_long``). Logs carry error codes and exception types only, never names or content.
+Limits: ``MAX_ATTACHMENT_DEPTH`` nesting levels, ``MAX_ATTACHMENTS`` per message (attachments
+beyond it are never decoded), ``MAX_SEGMENTS`` for the whole document (an attachment that would
+exceed it is reported as ``document_too_long``) and one ``ParseBudget`` per uploaded document
+(attachments, unzipped bytes, PDF pages, OCR pages; an attachment that would overdraw it is
+reported as ``budget_exceeded``, see ``parsing.budget``). Logs carry error codes and exception
+types only, never names or content.
 """
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Literal
 
 from oxmsg import Message
 
+from requestflow_ai.parsing.budget import ParseBudget
 from requestflow_ai.parsing.detect import DocumentKind, detect_kind
 from requestflow_ai.parsing.docx import parse_docx
 from requestflow_ai.parsing.eml import parse_eml
 from requestflow_ai.parsing.errors import (
+    BudgetExceededError,
     DocumentParseError,
     DocumentTooLongError,
     UnsupportedMediaTypeError,
@@ -59,6 +64,7 @@ AttachmentError = Literal[
     "nesting_too_deep",
     "too_many_attachments",
     "not_attached_by_value",
+    "budget_exceeded",
 ]
 
 
@@ -67,6 +73,8 @@ class ParseOptions:
     pdf_pipeline: PdfPipeline = "textlines"
     max_pdf_pages: int = DEFAULT_MAX_PAGES
     pdf_ocr: PdfOcr = "off"
+    # One per uploaded document, created by the top-level ``parse_document`` (mutable, shared).
+    budget: ParseBudget | None = field(default=None, compare=False)
 
 
 @dataclass(frozen=True)
@@ -91,18 +99,29 @@ class ParsedDocument:
 def parse_document(
     data: bytes, declared_type: str | None, options: ParseOptions, depth: int = 0
 ) -> ParsedDocument:
+    budget = options.budget
+    if budget is None:
+        budget = ParseBudget.for_document(options.max_pdf_pages)
+        options = replace(options, budget=budget)
     kind = detect_kind(data, declared_type)
     if kind == "pdf":
         pdf = parse_pdf_document(
-            data, options.pdf_pipeline, options.max_pdf_pages, options.pdf_ocr
+            data,
+            options.pdf_pipeline,
+            options.max_pdf_pages,
+            options.pdf_ocr,
+            max_ocr_pages=budget.ocr_pages,
+            page_budget=budget.pdf_pages,
         )
+        budget.take_pdf_pages(pdf.page_count)
+        budget.take_ocr_pages(pdf.ocr_pages)
         return ParsedDocument(
             kind, pdf.segments, pdf_parsed=True, ocr_pages_skipped=pdf.ocr_pages_skipped
         )
     if kind == "xlsx":
-        return ParsedDocument(kind, parse_xlsx(data))
+        return ParsedDocument(kind, parse_xlsx(data, budget))
     if kind == "docx":
-        return ParsedDocument(kind, parse_docx(data))
+        return ParsedDocument(kind, parse_docx(data, budget))
     if kind == "msg":
         return _parse_message(load_message(data), options, depth)
     return ParsedDocument(kind, parse_eml(data))
@@ -111,6 +130,8 @@ def parse_document(
 def _error_code(exc: Exception) -> AttachmentError:
     if isinstance(exc, UnsupportedMediaTypeError):
         return "unsupported_media_type"
+    if isinstance(exc, BudgetExceededError):
+        return "budget_exceeded"
     if isinstance(exc, DocumentTooLongError):
         return "document_too_long"
     return "document_unparseable"
@@ -135,6 +156,8 @@ def _parse_attachment(
     if raw.not_by_value:
         return "not_attached_by_value"
     try:
+        if options.budget is not None:
+            options.budget.take_attachment()
         if raw.embedded is not None:
             return _parse_message(raw.embedded, options, depth)
         if raw.data is None:
@@ -142,6 +165,8 @@ def _parse_attachment(
         return parse_document(raw.data, raw.mime_type, options, depth)
     except UnsupportedMediaTypeError:
         return "unsupported_media_type"
+    except BudgetExceededError:
+        return "budget_exceeded"
     except DocumentTooLongError:
         return "document_too_long"
     except DocumentParseError:

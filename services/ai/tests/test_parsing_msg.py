@@ -4,14 +4,19 @@ from __future__ import annotations
 
 import struct
 import time
+import zipfile
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
 import pytest
 from builders import DocxTable, MsgAttachment, MsgSpec, build_docx, build_msg, build_xlsx
 from oxmsg.attachment import Attachment
+from test_parsing_pdf import _OcrConverter
 
+from requestflow_ai.parsing import budget as budget_module
 from requestflow_ai.parsing import document as document_module
+from requestflow_ai.parsing import pdf as pdf_module
 from requestflow_ai.parsing.detect import detect_kind
 from requestflow_ai.parsing.document import ParseOptions, parse_document
 from requestflow_ai.parsing.errors import DocumentParseError
@@ -285,3 +290,71 @@ def test_attachments_beyond_the_cap_are_never_read(monkeypatch: pytest.MonkeyPat
         ("failed", "too_many_attachments"),
     ]
     assert len(read) == 1
+
+
+# --- One budget per extracted document, shared by all attachments (security review of #40) -----
+
+
+def test_attachment_budget_is_shared_across_nesting_levels(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(budget_module, "MAX_TOTAL_ATTACHMENTS", 2)
+    xlsx = build_xlsx({"S": [["x"]]})
+    inner = MsgSpec(subject="Weitergeleitet", attachments=[MsgAttachment("c.xlsx", xlsx)])
+    spec = _spec(
+        [
+            MsgAttachment("a.xlsx", xlsx),
+            MsgAttachment("fwd.msg", embedded=inner),
+            MsgAttachment("b.xlsx", xlsx),
+        ]
+    )
+    parsed = parse_document(build_msg(spec), None, OPTIONS)
+    assert [(a.path, a.status, a.error) for a in parsed.attachments] == [
+        ((0,), "parsed", None),
+        ((1,), "parsed", None),
+        ((1, 0), "failed", "budget_exceeded"),
+        ((2,), "failed", "budget_exceeded"),
+    ]
+    assert "msg-l3" in {s.id for s in parsed.segments}  # the body is still returned
+
+
+def test_unzipped_bytes_budget_is_shared(monkeypatch: pytest.MonkeyPatch) -> None:
+    xlsx = build_xlsx({"S": [["x"]]})
+    with zipfile.ZipFile(BytesIO(xlsx)) as archive:
+        unzipped = sum(entry.file_size for entry in archive.infolist())
+    monkeypatch.setattr(budget_module, "MAX_TOTAL_UNZIPPED_BYTES", unzipped + unzipped // 2)
+    spec = _spec([MsgAttachment("a.xlsx", xlsx), MsgAttachment("b.xlsx", xlsx)])
+    parsed = parse_document(build_msg(spec), None, OPTIONS)
+    assert [(a.status, a.error) for a in parsed.attachments] == [
+        ("parsed", None),
+        ("failed", "budget_exceeded"),
+    ]
+
+
+def test_pdf_page_budget_is_shared(fixtures_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(budget_module, "MAX_TOTAL_PDF_PAGES", 3)
+    pdf = (fixtures_dir / "anfrage_musterbau.pdf").read_bytes()  # 2 pages
+    spec = _spec([MsgAttachment("a.pdf", pdf), MsgAttachment("b.pdf", pdf)])
+    options = ParseOptions(pdf_pipeline="textlines", max_pdf_pages=2)
+    parsed = parse_document(build_msg(spec), None, options)
+    assert [(a.status, a.error) for a in parsed.attachments] == [
+        ("parsed", None),
+        ("failed", "budget_exceeded"),
+    ]
+
+
+def test_ocr_pages_are_shared_by_all_attachments(
+    fixtures_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(pdf_module, "MAX_OCR_PAGES", 1)
+    converter = _OcrConverter(["Liefertermin: 15.11.2026"])
+    monkeypatch.setattr(pdf_module, "_ocr_converter", lambda: converter)
+    scan = (fixtures_dir / "anfrage_scan.pdf").read_bytes()  # 1 page without text
+    spec = _spec([MsgAttachment("a.pdf", scan), MsgAttachment("b.pdf", scan)])
+    options = ParseOptions(pdf_pipeline="textlines", pdf_ocr="auto")
+    parsed = parse_document(build_msg(spec), None, options)
+
+    assert len(converter.page_ranges) == 1
+    assert [(a.status, a.segment_count) for a in parsed.attachments] == [
+        ("parsed", 1),
+        ("parsed", 0),
+    ]
+    assert parsed.ocr_pages_skipped == 1

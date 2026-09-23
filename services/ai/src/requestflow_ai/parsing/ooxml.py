@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import zipfile
 from io import BytesIO
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from requestflow_ai.parsing.errors import (
     DocumentParseError,
@@ -35,11 +35,15 @@ MAX_PART_BYTES = 16 * 1024 * 1024
 MAX_RATIO = 100
 RATIO_CHECK_MIN_BYTES = 1024 * 1024
 
+if TYPE_CHECKING:
+    from requestflow_ai.parsing.budget import ParseBudget
+
 OoxmlKind = Literal["xlsx", "docx"]
 _MAIN_PARTS: dict[str, OoxmlKind] = {"xl/workbook.xml": "xlsx", "word/document.xml": "docx"}
 
 
-def open_package(data: bytes) -> zipfile.ZipFile:
+def open_package(data: bytes, budget: ParseBudget | None = None) -> zipfile.ZipFile:
+    """Open the package after the zip limits; charge its unzipped size to ``budget`` if given."""
     try:
         package = zipfile.ZipFile(BytesIO(data))
         entries = package.infolist()
@@ -58,6 +62,8 @@ def open_package(data: bytes) -> zipfile.ZipFile:
             raise DocumentParseError("package entry is compressed suspiciously well")
     if total > MAX_UNCOMPRESSED_BYTES:
         raise DocumentParseError("package is too large when uncompressed")
+    if budget is not None:
+        budget.take_unzipped_bytes(total)
     return package
 
 

@@ -31,6 +31,7 @@ from docx.oxml.ns import qn
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 
+from requestflow_ai.parsing.budget import ParseBudget
 from requestflow_ai.parsing.errors import DocumentParseError, DocumentTooLongError
 from requestflow_ai.parsing.ooxml import open_package
 from requestflow_ai.parsing.segments import DocxLocator, Segment
@@ -46,8 +47,8 @@ def _one_line(text: str) -> str:
     return " ".join(text.split())
 
 
-def parse_docx(data: bytes) -> list[Segment]:
-    open_package(data).close()
+def parse_docx(data: bytes, budget: ParseBudget | None = None) -> list[Segment]:
+    open_package(data, budget).close()
     try:
         document: Any = Document(BytesIO(data))
     except Exception as exc:
