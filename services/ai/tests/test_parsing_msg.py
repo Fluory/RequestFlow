@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
+import struct
+import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 from builders import DocxTable, MsgAttachment, MsgSpec, build_docx, build_msg, build_xlsx
 
+from oxmsg.attachment import Attachment
+
 from requestflow_ai.parsing import document as document_module
+from requestflow_ai.parsing.detect import detect_kind
 from requestflow_ai.parsing.document import ParseOptions, parse_document
 from requestflow_ai.parsing.errors import DocumentParseError
+from requestflow_ai.parsing.msg import load_message
 from requestflow_ai.parsing.segments import (
     AttachmentRef,
     DocxLocator,
@@ -204,3 +211,78 @@ def test_ole_file_that_is_not_a_message_is_a_parse_error() -> None:
 
     with pytest.raises(DocumentParseError):
         parse_document(build_cfb({"__properties_version1.0": b"\x00" * 4}), None, OPTIONS)
+
+
+# --- OLE stream bombs (security review of #40) ------------------------------------------------
+
+_FREE, _END, _FATSECT = 0xFFFFFFFF, 0xFFFFFFFE, 0xFFFFFFFD
+
+
+def _dirent(name: str, kind: int, child: int, start: int, size: int) -> bytes:
+    encoded = (name + "\0").encode("utf-16-le")
+    entry = encoded.ljust(64, b"\0") + struct.pack("<HBB", len(encoded), kind, 1)
+    entry += struct.pack("<III", _FREE, _FREE, child) + b"\0" * 36
+    entry += struct.pack("<III", start, size, 0)
+    assert len(entry) == 128
+    return entry
+
+
+def _looped_ole(stream_size: int, root_size: int = 0) -> bytes:
+    """A 2 KiB compound file whose one stream declares ``stream_size`` bytes on a FAT loop.
+
+    Sector 0 is the FAT, 1 the directory, 2 the stream's data; ``fat[2] = 2`` points the stream at
+    itself, so a reader that trusts the declared size reads sector 2 over and over.
+    """
+    header = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\0" * 16
+    header += struct.pack("<HHHHH", 0x3E, 3, 0xFFFE, 9, 6) + b"\0" * 6
+    # directory sectors, FAT sectors, first directory sector, transaction, mini cutoff,
+    # first mini FAT sector, mini FAT sectors, first DIFAT sector, DIFAT sectors
+    header += struct.pack("<IIIIIIIII", 0, 1, 1, 0, 4096, _END, 0, _END, 0)
+    header += struct.pack("<I", 0) + struct.pack("<I", _FREE) * 108
+    fat = struct.pack("<III", _FATSECT, _END, 2) + struct.pack("<I", _FREE) * 125
+    directory = _dirent("Root Entry", 5, 1, 2 if root_size else _END, root_size)
+    directory += _dirent("__properties_version1.0", 2, _FREE, 2, stream_size)
+    return header + fat + directory.ljust(512, b"\0") + b"A" * 512
+
+
+@pytest.mark.parametrize(
+    ("stream_size", "root_size"),
+    [
+        (64 * 1024 * 1024, 0),  # declared stream far beyond the container, looped FAT
+        (5_000, 0),  # small, but still larger than the whole 2 KiB file
+        (100, 64 * 1024 * 1024),  # mini stream (root entry) declared far beyond the container
+    ],
+)
+def test_ole_stream_larger_than_the_container_is_rejected_fast(
+    stream_size: int, root_size: int
+) -> None:
+    data = _looped_ole(stream_size, root_size)
+    assert len(data) == 2048
+    started = time.perf_counter()
+    with pytest.raises(DocumentParseError):
+        detect_kind(data, None)
+    with pytest.raises(DocumentParseError):
+        load_message(data)
+    with pytest.raises(DocumentParseError):
+        parse_document(data, None, OPTIONS)
+    assert time.perf_counter() - started < 2
+
+
+def test_attachments_beyond_the_cap_are_never_read(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(document_module, "MAX_ATTACHMENTS", 1)
+    xlsx = build_xlsx({"S": [["x"]]})
+    spec = _spec([MsgAttachment("a.xlsx", xlsx), MsgAttachment("b.xlsx", xlsx)])
+    read: list[int] = []
+    original: Any = Attachment.__dict__["file_bytes"]  # oxmsg's lazyproperty
+
+    def spy(self: Attachment) -> bytes | None:
+        read.append(1)
+        return original.__get__(self, Attachment)
+
+    monkeypatch.setattr(Attachment, "file_bytes", property(spy))
+    parsed = parse_document(build_msg(spec), None, OPTIONS)
+    assert [(a.status, a.error) for a in parsed.attachments] == [
+        ("parsed", None),
+        ("failed", "too_many_attachments"),
+    ]
+    assert len(read) == 1

@@ -123,7 +123,7 @@ def _parse_attachment(
     raw: RawAttachment, options: ParseOptions, depth: int
 ) -> ParsedDocument | AttachmentError:
     """Parse one attachment at nesting level ``depth``; an error code instead of raising."""
-    if raw.index >= MAX_ATTACHMENTS:
+    if raw.over_cap or raw.index >= MAX_ATTACHMENTS:
         return "too_many_attachments"
     if depth > MAX_ATTACHMENT_DEPTH:
         return "nesting_too_deep"
@@ -151,7 +151,7 @@ def _parse_message(message: Message, options: ParseOptions, depth: int) -> Parse
     reports: list[AttachmentReport] = []
     pdf_parsed = False
 
-    for raw in message_attachments(message):
+    for raw in message_attachments(message, MAX_ATTACHMENTS):
         path = (raw.index,)
         child = _parse_attachment(raw, options, depth + 1)
         if not isinstance(child, str) and len(segments) + len(child.segments) > MAX_SEGMENTS:

@@ -14,8 +14,15 @@ EML. A message with only an RTF body (``PidTagRtfCompressed``) yields no body se
 an attached Outlook item (``ATTACH_EMBEDDED_MSG``, a sub-storage) -> an embedded message;
 anything else (by reference, OLE objects) is reported as ``not_attached_by_value``.
 
-All streams are read into memory by olefile; the upload limit (``AI_MAX_DOCUMENT_BYTES``) bounds
-that. Errors never carry document content.
+Stream bombs: python-oxmsg reads *every* stream into memory at load time, and olefile trusts a
+stream's declared size (by default it only logs "stream too large"), so a 2 KiB file whose
+stream declares gigabytes on a looped FAT chain (``fat[n] = n``) would be read sector by sector
+until the declared size. ``check_ole_container`` therefore runs before any stream is read: it
+opens the directory with ``raise_defects=DEFECT_INCORRECT`` and rejects the file when a stream,
+the mini stream (root entry) or all streams together declare more bytes than the container has.
+A stream's sectors lie inside the file, so no legitimate stream is larger than the file; with that
+bound a looped chain costs at most ``len(data)`` bytes per stream. (olefile has no cheap FAT loop
+detector; the size bound makes one unnecessary.) Errors never carry document content.
 """
 
 from __future__ import annotations
@@ -24,6 +31,8 @@ from dataclasses import dataclass
 from io import BytesIO
 from typing import Any
 
+import olefile
+from olefile.olefile import STGTY_STREAM
 from oxmsg import Message
 from oxmsg.domain import model as oxmsg_model
 from oxmsg.properties import Properties
@@ -59,9 +68,38 @@ class RawAttachment:
     data: bytes | None = None
     embedded: Message | None = None
     not_by_value: bool = False
+    over_cap: bool = False
+
+
+def check_ole_container(data: bytes) -> olefile.OleFileIO:
+    """Open ``data`` as a compound file with every declared stream size bounded (see module doc).
+
+    Returns the open container (the caller closes it); raises ``DocumentParseError``.
+    """
+    try:
+        # Always a stream: olefile treats ``bytes`` shorter than 1536 as a *file name*.
+        ole = olefile.OleFileIO(BytesIO(data), raise_defects=olefile.DEFECT_INCORRECT)
+    except Exception as exc:  # olefile raises OSError and others for damaged containers
+        raise DocumentParseError("could not read OLE container") from exc
+    try:
+        limit = len(data)
+        total = 0
+        for entry in ole.direntries:
+            if entry is None or entry.entry_type != STGTY_STREAM:
+                continue
+            if entry.size > limit:
+                raise DocumentParseError("OLE stream larger than its container")
+            total += entry.size
+        if total > limit or ole.root.size > limit:
+            raise DocumentParseError("OLE streams larger than their container")
+    except BaseException:
+        ole.close()
+        raise
+    return ole
 
 
 def load_message(data: bytes) -> Message:
+    check_ole_container(data).close()
     try:
         message = Message.load(BytesIO(data))  # a stream: olefile reads short bytes as a path
         _ = message.attachment_count  # validates the root properties header
@@ -113,20 +151,27 @@ def message_segments(message: Message) -> list[Segment]:
 
 
 def _embedded(attachment: Any) -> Message | None:
-    storage: oxmsg_model.StorageT = attachment._storage  # oxmsg has no public accessor
+    # Private attribute of python-oxmsg (pinned ==0.0.2 in pyproject.toml): oxmsg has no public
+    # accessor for an attachment's storage. Re-check on every oxmsg upgrade.
+    storage: oxmsg_model.StorageT = attachment._storage
     for child in getattr(storage, "storages", ()):
         if child.name == _EMBEDDED_STORAGE:
             return _EmbeddedMessage(child)
     return None
 
 
-def message_attachments(message: Message) -> list[RawAttachment]:
+def message_attachments(message: Message, max_attachments: int) -> list[RawAttachment]:
+    """The message's attachments; those from index ``max_attachments`` on are only marked
+    ``over_cap`` (their properties and bytes are never decoded)."""
     try:
         attachments = message.attachments
     except Exception as exc:
         raise DocumentParseError("could not read Outlook attachments") from exc
     result: list[RawAttachment] = []
     for index, attachment in enumerate(attachments):
+        if index >= max_attachments:
+            result.append(RawAttachment(index, None, None, over_cap=True))
+            continue
         try:
             props = attachment.properties
             name = (
