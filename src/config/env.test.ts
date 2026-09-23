@@ -52,4 +52,18 @@ describe("loadConfig", () => {
   it("reads S3_FORCE_PATH_STYLE=false as false", () => {
     expect(loadConfig({ ...valid, S3_FORCE_PATH_STYLE: "false" }).storage.forcePathStyle).toBe(false);
   });
+
+  it("refuses the committed local auth secret in production", () => {
+    const local = { ...valid, BETTER_AUTH_SECRET: "local-dev-only-secret-change-me-0123456789" };
+
+    expect(() => loadConfig({ ...local, NODE_ENV: "production" })).toThrow(/BETTER_AUTH_SECRET/);
+    expect(() => loadConfig(local)).not.toThrow();
+  });
+
+  it("reads the client-IP headers and trusted proxies for the auth rate limit as lists", () => {
+    const config = loadConfig({ ...valid, AUTH_IP_HEADERS: "x-real-ip, x-forwarded-for", AUTH_TRUSTED_PROXIES: "10.0.0.2" });
+
+    expect(config.auth.ipAddressHeaders).toEqual(["x-real-ip", "x-forwarded-for"]);
+    expect(config.auth.trustedProxies).toEqual(["10.0.0.2"]);
+  });
 });

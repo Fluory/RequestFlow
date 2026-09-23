@@ -52,8 +52,8 @@ export async function call(
   return { status: response.status, body: text ? JSON.parse(text) : null, cookie };
 }
 
-export async function signUp(auth: Auth, email: string) {
-  return call(auth, "/sign-up/email", { body: { email, password: PASSWORD, name: "Synthetic User" } });
+export async function signUp(auth: Auth, email: string, invitationId?: string) {
+  return call(auth, "/sign-up/email", { body: { email, password: PASSWORD, name: "Synthetic User", invitationId } });
 }
 
 export async function signIn(auth: Auth, email: string, ip?: string) {
@@ -63,14 +63,24 @@ export async function signIn(auth: Auth, email: string, ip?: string) {
 /** A company with a signed-in first admin. */
 export async function companyWithAdmin(stack: Stack) {
   const adminEmail = syntheticEmail("admin");
-  const { company } = await bootstrapCompany(stack.database.db, {
+  const { company, invitationId } = await bootstrapCompany(stack.database.db, {
     name: `Beispiel Maschinenbau ${unique("co")}`,
     slug: unique("beispiel"),
     adminEmail,
   });
-  const signUpResult = await signUp(stack.auth, adminEmail);
-  if (signUpResult.status !== 200) throw new Error(`sign-up failed: ${signUpResult.status}`);
+  await signUp(stack.auth, adminEmail, invitationId);
   const login = await signIn(stack.auth, adminEmail);
   if (login.status !== 200) throw new Error(`sign-in failed: ${login.status}`);
   return { company, adminEmail, cookie: login.cookie };
+}
+
+/** Invite a user into the actor's company and sign them in; returns the new user's cookie. */
+export async function invitedUser(stack: Stack, admin: import("@/features/identity").Actor, role: "admin" | "clerk") {
+  const { inviteUser } = await import("@/features/identity");
+  const email = syntheticEmail(role);
+  const { invitationId } = await inviteUser(stack.database.db, admin, { email, role });
+  await signUp(stack.auth, email, invitationId);
+  const login = await signIn(stack.auth, email);
+  if (login.status !== 200) throw new Error(`sign-in failed: ${login.status}`);
+  return { email, cookie: login.cookie };
 }

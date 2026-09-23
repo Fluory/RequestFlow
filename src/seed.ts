@@ -18,7 +18,8 @@ async function main(): Promise<void> {
   const config = loadConfig();
   const database = createDatabase(config.databaseUrl, { max: 2 });
   const auth = createAuth(database.db, config.auth);
-  const signUp = (email: string, name: string) => auth.api.signUpEmail({ body: { email, password, name } });
+  const signUp = (email: string, name: string, invitationId: string) =>
+    auth.api.signUpEmail({ body: { email, password, name, invitationId } as { email: string; password: string; name: string } });
   try {
     for (const company of COMPANIES) {
       const [existing] = await database.db.select().from(schema.organization).where(eq(schema.organization.slug, company.slug));
@@ -26,15 +27,15 @@ async function main(): Promise<void> {
         console.log(`skip ${company.slug}: exists`);
         continue;
       }
-      await bootstrapCompany(database.db, { name: company.name, slug: company.slug, adminEmail: company.admin });
-      await signUp(company.admin, "Demo Admin");
+      const { invitationId } = await bootstrapCompany(database.db, { name: company.name, slug: company.slug, adminEmail: company.admin });
+      await signUp(company.admin, "Demo Admin", invitationId);
       if (company.clerk) {
         const login = await auth.api.signInEmail({ body: { email: company.admin, password }, returnHeaders: true });
         const cookie = login.headers.getSetCookie().map((line) => line.split(";")[0]).join("; ");
         const admin = await getActor(auth, database.db, new Headers({ cookie }));
         if (!admin) throw new Error("seeded admin has no company");
-        await inviteUser(database.db, admin, { email: company.clerk, role: "clerk" });
-        await signUp(company.clerk, "Demo Sachbearbeitung");
+        const invitation = await inviteUser(database.db, admin, { email: company.clerk, role: "clerk" });
+        await signUp(company.clerk, "Demo Sachbearbeitung", invitation.invitationId);
       }
       console.log(`seeded ${company.slug}`);
     }
