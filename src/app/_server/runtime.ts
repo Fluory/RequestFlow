@@ -1,6 +1,6 @@
 import { loadConfig, type AppConfig } from "@/config/env";
 import { createDatabase, type DatabaseHandle } from "@/db";
-import { createJobQueue } from "@/db/job-queue";
+import { createJobQueue } from "@/db/job-queue-client";
 import { createAuth, getActor, type Actor, type Auth } from "@/features/identity";
 import { S3BlobStore } from "@/features/storage";
 import { createTenancy, type Tenancy } from "@/features/tenancy";

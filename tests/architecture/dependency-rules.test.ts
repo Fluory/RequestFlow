@@ -46,6 +46,13 @@ describe("module boundary rules", () => {
     expect(output).toContain("no-db-connection-in-features");
   });
 
+  it("rejects a feature module opening its own pg-boss pool", () => {
+    const { status, output } = cruise("src/features/eta");
+
+    expect(status).not.toBe(0);
+    expect(output).toContain("no-db-connection-in-features");
+  });
+
   it("accepts an import through the other module's index.ts", () => {
     const { status, output } = cruise("src/features/gamma");
 
