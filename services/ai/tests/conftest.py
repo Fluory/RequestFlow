@@ -31,7 +31,7 @@ def fixtures_dir() -> Path:
 
 @dataclass
 class Replay:
-    """Replays a recorded Vertex response at the HTTP boundary and captures the requests."""
+    """Replays a hand-written Vertex response at the HTTP boundary and captures the requests."""
 
     status: int = 200
     body: dict[str, Any] | str = field(default_factory=dict[str, Any])
