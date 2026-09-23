@@ -75,6 +75,15 @@ describe("ERP mock – idempotent receiver (ADR-0001 D9)", () => {
     expect(mock.created()).toBe(1);
   });
 
+  it("stays bounded in memory: new keys are refused once the store is full, known keys still replay", async () => {
+    const mock = createErpMock({ token: TOKEN, store: new MemoryMockStore(), maxRecords: 1 });
+    const [a, b] = [randomUUID(), randomUUID()];
+    await mock.handle(post(body(a), keyed(a)));
+
+    expect((await mock.handle(post(body(b), keyed(b)))).status).toBe(503);
+    expect((await mock.handle(post(body(a), keyed(a)))).status).toBe(200);
+  });
+
   it("parses the fault list from configuration and rejects unknown entries", () => {
     expect(parseFaults("")).toEqual([]);
     expect(parseFaults("503, lost,timeout")).toEqual(["503", "lost", "timeout"]);

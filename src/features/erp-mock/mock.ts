@@ -50,6 +50,8 @@ export interface ErpMockOptions {
   faults?: MockFault[];
   /** How long a `timeout` fault hangs unless the caller aborts first. */
   hangMs?: number;
+  /** Memory bound: new keys are refused (503) once the store holds this many records. */
+  maxRecords?: number;
 }
 
 export interface ErpMock {
@@ -66,6 +68,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function createErpMock(options: ErpMockOptions): ErpMock {
   const faults = [...(options.faults ?? [])];
   const hangMs = options.hangMs ?? 60_000;
+  const maxRecords = options.maxRecords ?? 10_000;
   const { store } = options;
 
   return {
@@ -91,6 +94,7 @@ export function createErpMock(options: ErpMockOptions): ErpMock {
         if (existing.bodyHash !== bodyHash) return failure(409, "idempotency_conflict", "key was used with a different body");
         return fault === "lost" ? failure(503, "unavailable", "injected lost response") : json(200, existing.receipt);
       }
+      if (store.size() >= maxRecords) return failure(503, "unavailable", "mock store is full");
       const receipt: QuoteRequestReceipt = {
         erpReference: `QR-${randomBytes(5).toString("hex").toUpperCase()}`,
         requestId: parsed.data.requestId,

@@ -79,4 +79,20 @@ describe("loadConfig", () => {
     expect(loadConfig({ ...valid, AI_SERVICE_TOKEN: "x".repeat(24) }).aiService.token).toHaveLength(24);
     expect(() => loadConfig({ ...valid, AI_SERVICE_TOKEN: "short" })).toThrow(/AI_SERVICE_TOKEN/);
   });
+
+  it("reads the ERP port settings; the mock is off unless ERP_MOCK_ENABLED=true", () => {
+    const config = loadConfig({ ...valid, ERP_TOKEN: "t".repeat(24), ERP_TIMEOUT_MS: "5000" });
+
+    expect(config.erp).toEqual({ baseUrl: "http://127.0.0.1:3000/api/erp-mock", token: "t".repeat(24), timeoutMs: 5000, mock: { enabled: false, faults: "" } });
+    expect(loadConfig({ ...valid, ERP_MOCK_ENABLED: "true" }).erp.mock.enabled).toBe(true);
+    expect(() => loadConfig({ ...valid, ERP_MOCK_ENABLED: "yes" })).toThrow(/ERP_MOCK_ENABLED/);
+    expect(() => loadConfig({ ...valid, ERP_TOKEN: "short" })).toThrow(/ERP_TOKEN/);
+  });
+
+  it("refuses the committed local ERP token outside APP_ENV=local", () => {
+    const placeholder = "local-dev-only-erp-token-0123456789";
+
+    expect(loadConfig({ ...valid, ERP_TOKEN: placeholder }).erp.token).toBe(placeholder);
+    expect(() => loadConfig({ ...valid, APP_ENV: "showcase", BETTER_AUTH_SECRET: "s".repeat(40), ERP_TOKEN: placeholder })).toThrow(/ERP_TOKEN/);
+  });
 });
