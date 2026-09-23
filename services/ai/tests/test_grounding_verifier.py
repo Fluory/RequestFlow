@@ -14,7 +14,13 @@ from requestflow_ai.extraction.schema import (
     ModelLineItem,
 )
 from requestflow_ai.grounding.verifier import verify_extraction, verify_field, verify_line_items
-from requestflow_ai.parsing.segments import Segment
+from requestflow_ai.parsing.segments import (
+    AttachmentRef,
+    BoundingBox,
+    MsgLocator,
+    PdfLocator,
+    Segment,
+)
 
 SEGMENTS: dict[str, Segment] = {
     s.id: s
@@ -454,3 +460,89 @@ def test_line_item_quantity_is_never_promoted_from_uncertain() -> None:
 
 def test_no_line_items_is_an_empty_list() -> None:
     assert verify_line_items(extraction_with_items(), list(V2_SEGMENTS.values())) == []
+
+
+# --- OCR cap (#23): evidence from OCR text is at most ``uncertain`` ---------------------------
+
+OCR_SEGMENTS: dict[str, Segment] = {
+    s.id: s
+    for s in [
+        Segment(
+            id="p1-o1",
+            text="Musterbau Beispiel GmbH",
+            locator=PdfLocator(page=1, bbox=BoundingBox(l=72, t=50, r=300, b=62), ocr=True),
+        ),
+        Segment(
+            id="p1-o2",
+            text="Liefertermin: 15.11.2026",
+            locator=PdfLocator(page=1, bbox=BoundingBox(l=72, t=80, r=300, b=92), ocr=True),
+        ),
+        Segment(
+            id="msg-a0-p1-o1",
+            text="1.250 Stueck",
+            locator=MsgLocator(
+                part="attachment",
+                attachment=AttachmentRef(index=0, name="scan.pdf"),
+                inner=PdfLocator(page=1, bbox=BoundingBox(l=72, t=50, r=300, b=62), ocr=True),
+            ),
+        ),
+        pdf_segment("p2-l1", "Musterbau Beispiel GmbH", page=2),
+    ]
+}
+
+
+def test_found_with_ocr_only_evidence_is_capped_at_uncertain() -> None:
+    result = verify_field(
+        field("Musterbau Beispiel GmbH", "found", "p1-o1", "Musterbau Beispiel GmbH"),
+        "text",
+        OCR_SEGMENTS,
+    )
+    assert result.status == "uncertain"
+    assert result.reason == "ocr_only"
+    assert result.value == "Musterbau Beispiel GmbH"
+    assert result.model_status == "found"
+
+
+def test_ocr_cap_applies_to_dates_and_inside_attachments() -> None:
+    date = verify_field(
+        field("2026-11-15", "found", "p1-o2", "Liefertermin: 15.11.2026"), "date", OCR_SEGMENTS
+    )
+    assert (date.status, date.reason, date.value) == ("uncertain", "ocr_only", "2026-11-15")
+    quantity = verify_field(
+        field("1250", "found", "msg-a0-p1-o1", "1.250 Stueck"), "number", OCR_SEGMENTS
+    )
+    assert (quantity.status, quantity.reason) == ("uncertain", "ocr_only")
+
+
+def test_ocr_evidence_that_fails_the_quote_check_is_still_unverified() -> None:
+    result = verify_field(field("Evil Corp", "found", "p1-o1", "Evil Corp"), "text", OCR_SEGMENTS)
+    assert (result.status, result.reason) == ("unverified", "quote_not_in_segment")
+
+
+def test_uncertain_with_ocr_evidence_stays_uncertain_and_is_never_promoted() -> None:
+    result = verify_field(
+        field("Musterbau Beispiel GmbH", "uncertain", "p1-o1", "Musterbau Beispiel GmbH"),
+        "text",
+        OCR_SEGMENTS,
+    )
+    assert result.status == "uncertain"
+
+
+def test_text_layer_evidence_is_not_capped() -> None:
+    result = verify_field(
+        field("Musterbau Beispiel GmbH", "found", "p2-l1", "Musterbau Beispiel GmbH"),
+        "text",
+        OCR_SEGMENTS,
+    )
+    assert (result.status, result.reason) == ("found", None)
+
+
+def test_ocr_cap_applies_to_line_items() -> None:
+    extraction = extraction_with_items(
+        item(quantity=field("1250", "found", "msg-a0-p1-o1", "1.250 Stueck")),
+    )
+    (result,) = verify_line_items(extraction, list(OCR_SEGMENTS.values()))
+    assert (result.fields["quantity"].status, result.fields["quantity"].reason) == (
+        "uncertain",
+        "ocr_only",
+    )

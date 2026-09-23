@@ -1,8 +1,8 @@
 """FastAPI app. Run: ``uvicorn requestflow_ai.api.app:create_app --factory``.
 
 Startup is fail-closed: missing ``AI_SERVICE_TOKEN`` (settings validation), a model client that
-cannot be built or (with ``AI_PDF_PIPELINE=layout``) a missing layout model raises before the
-server accepts requests.
+cannot be built or (with ``AI_PDF_PIPELINE=layout`` or ``AI_PDF_OCR=auto``) a missing layout or
+OCR model raises before the server accepts requests.
 
 ``/v1/extract`` is guarded by a pure ASGI middleware (``ExtractGuard``) that checks the bearer token
 and the declared ``Content-Length`` before a single body byte is read or spooled.
@@ -29,6 +29,7 @@ from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from requestflow_ai.api.schemas import (
+    AttachmentResult,
     ErrorCode,
     ErrorDetail,
     ErrorResponse,
@@ -55,6 +56,7 @@ from requestflow_ai.parsing.errors import (
     UnsupportedMediaTypeError,
 )
 from requestflow_ai.parsing.pdf import prepare_pdf_pipeline
+from requestflow_ai.parsing.segments import is_ocr
 from requestflow_ai.pipeline import run_extraction
 
 _log = logging.getLogger("requestflow_ai.api")
@@ -242,10 +244,15 @@ def build_api() -> FastAPI:
                 "Document larger than AI_MAX_DOCUMENT_BYTES (declared Content-Length checked "
                 "before the body is read, the file size after)."
             ),
-            415: _error_doc("Not a PDF or RFC 5322 e-mail (.msg is not supported yet)."),
+            415: _error_doc(
+                "Not a PDF, RFC 5322 e-mail, Outlook .msg, DOCX or XLSX (e.g. legacy .doc/.xls, "
+                "password-protected Office files, images)."
+            ),
             422: _error_doc(
-                "The document could not be parsed (`document_unparseable`) or has more pages "
-                "than AI_MAX_PDF_PAGES (`document_too_long`)."
+                "The document could not be parsed (`document_unparseable`) or is too long "
+                "(`document_too_long`: more pages than AI_MAX_PDF_PAGES, too many rows, text "
+                "blocks or pages without text to OCR). A failing attachment of a .msg does not "
+                "cause this; it is reported in `attachments`."
             ),
             429: _error_doc("All extraction slots busy; retry later."),
             500: _error_doc("Unexpected error."),
@@ -254,7 +261,13 @@ def build_api() -> FastAPI:
     )
     def extract(
         request: Request,
-        file: Annotated[UploadFile, File(description="The document bytes (PDF or .eml).")],
+        file: Annotated[
+            UploadFile,
+            File(
+                description="The document bytes: PDF, .eml, Outlook .msg, .docx/.docm or "
+                ".xlsx/.xlsm. The kind is detected from the bytes, not from the file name."
+            ),
+        ],
         document_id: Annotated[
             str,
             Form(
@@ -268,7 +281,8 @@ def build_api() -> FastAPI:
             Form(
                 alias="mediaType",
                 max_length=100,
-                description="Declared media type, e.g. message/rfc822. PDF is detected from bytes.",
+                description="Declared media type, e.g. message/rfc822. Only helps to recognise "
+                "an .eml; every kind is detected from the bytes.",
             ),
         ] = None,
         x_request_id: Annotated[
@@ -294,7 +308,12 @@ def build_api() -> FastAPI:
         try:
             data = _read_limited(file, settings.ai_max_document_bytes)
             run = run_extraction(
-                data, media_type, model, settings.ai_pdf_pipeline, settings.ai_max_pdf_pages
+                data,
+                media_type,
+                model,
+                settings.ai_pdf_pipeline,
+                settings.ai_max_pdf_pages,
+                settings.ai_pdf_ocr,
             )
         except (
             UnsupportedMediaTypeError,
@@ -329,6 +348,10 @@ def build_api() -> FastAPI:
                 "latencyMs": latency_ms,
                 "fieldStatus": {key: field.status for key, field in run.fields.items()},
                 "lineItemCount": len(run.line_items),
+                # Counts only: attachment names are document content.
+                "attachmentCount": len(run.attachments),
+                "attachmentFailedCount": sum(a.status == "failed" for a in run.attachments),
+                "ocrSegmentCount": sum(is_ocr(s.locator) for s in run.segments),
             },
         )
         return ExtractResponse(
@@ -343,7 +366,7 @@ def build_api() -> FastAPI:
                 model_version=run.model_version,
                 prompt_version=PROMPT_VERSION,
                 schema_version=SCHEMA_VERSION,
-                pdf_pipeline=settings.ai_pdf_pipeline if run.document_kind == "pdf" else None,
+                pdf_pipeline=settings.ai_pdf_pipeline if run.pdf_parsed else None,
                 tokens=TokenUsage(
                     input_tokens=run.usage.input_tokens,
                     output_tokens=run.usage.output_tokens,
@@ -353,6 +376,7 @@ def build_api() -> FastAPI:
                 model_latency_ms=run.model_latency_ms,
             ),
             warnings=run.warnings,
+            attachments=[AttachmentResult.from_report(report) for report in run.attachments],
         )
 
     return app
@@ -364,7 +388,7 @@ def _map_error(exc: Exception) -> ApiError:
     if isinstance(exc, UnsupportedMediaTypeError):
         return ApiError(415, "unsupported_media_type", "unsupported document type")
     if isinstance(exc, DocumentTooLongError):
-        return ApiError(422, "document_too_long", "the document has too many pages")
+        return ApiError(422, "document_too_long", "the document is too long")
     if isinstance(exc, DocumentParseError):
         return ApiError(422, "document_unparseable", "the document could not be parsed")
     if isinstance(exc, ModelOutputError):
@@ -379,7 +403,7 @@ def create_app(
     configure_logging(settings.ai_log_level)
     if model_client is None:
         model_client = build_model_client(settings)
-    prepare_pdf_pipeline(settings.ai_pdf_pipeline)
+    prepare_pdf_pipeline(settings.ai_pdf_pipeline, settings.ai_pdf_ocr)
     app = build_api()
     app.state.settings = settings
     app.state.model_client = model_client

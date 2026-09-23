@@ -1,0 +1,25 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "text": "{\"company\": {\"value\": \"Armaturen Beispiel GmbH\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l16\", \"quote\": \"Armaturen Beispiel GmbH\"}}, \"contact_person\": {\"value\": \"Clara Beispiel\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l15\", \"quote\": \"Clara Beispiel\"}}, \"email\": {\"value\": \"c.beispiel@example.net\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-h-from\", \"quote\": \"<c.beispiel@example.net>\"}}, \"phone\": {\"value\": \"+49 621 3344 55\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l17\", \"quote\": \"Tel. +49 621 3344 55\"}}, \"requested_delivery_date\": {\"value\": \"2026-10-16\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l11\", \"quote\": \"Liefertermin: 16.10.2026\"}}, \"additional_requirements\": {\"value\": \"Druckprüfung nach EN 12266-1 mit Prüfprotokoll\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l12\", \"quote\": \"Druckprüfung nach EN 12266-1 mit Prüfprotokoll.\"}}, \"line_items\": [{\"description\": {\"value\": \"Kugelhahn\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l7\", \"quote\": \"Kugelhahn\"}}, \"quantity\": {\"value\": \"60\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l7\", \"quote\": \"| 60    | Stk.\"}}, \"unit\": {\"value\": \"Stk.\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l7\", \"quote\": \"60    | Stk.\"}}, \"material\": {\"value\": \"1.4408\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l7\", \"quote\": \"1.4408\"}}, \"dimensions\": {\"value\": \"DN 80\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l7\", \"quote\": \"DN80\"}}}, {\"description\": {\"value\": \"Rückschlagventil\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l8\", \"quote\": \"Rückschlagventil\"}}, \"quantity\": {\"value\": \"25\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l8\", \"quote\": \"| 25    | Stk.\"}}, \"unit\": {\"value\": \"Stk.\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l8\", \"quote\": \"25    | Stk.\"}}, \"material\": {\"value\": \"1.0619\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l8\", \"quote\": \"1.0619\"}}, \"dimensions\": {\"value\": \"DN50\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l8\", \"quote\": \"DN50\"}}}, {\"description\": {\"value\": \"Flachdichtung\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l9\", \"quote\": \"Flachdichtung\"}}, \"quantity\": {\"value\": \"120\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l9\", \"quote\": \"| 120   | Stk.\"}}, \"unit\": {\"value\": \"Stk.\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l9\", \"quote\": \"120   | Stk.\"}}, \"material\": {\"value\": \"PTFE\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l9\", \"quote\": \"PTFE\"}}, \"dimensions\": {\"value\": \"DN80\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l9\", \"quote\": \"DN80\"}}}]}"
+          }
+        ]
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.0147
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 842,
+    "candidatesTokenCount": 653,
+    "totalTokenCount": 1495,
+    "trafficType": "ON_DEMAND"
+  },
+  "modelVersion": "gemini-3.5-flash",
+  "createTime": "2026-09-23T09:02:00.000000Z",
+  "responseId": "synthetic-eval-t03-table-eml-plaintext"
+}

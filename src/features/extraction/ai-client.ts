@@ -41,7 +41,7 @@ const fieldResult = z.object({
 });
 const responseSchema = z.object({
   documentId: z.string(),
-  documentKind: z.enum(["pdf", "eml"]),
+  documentKind: z.enum(["pdf", "eml", "xlsx", "docx", "msg"]),
   segments: z.array(z.object({ id: z.string(), text: z.string(), locator: z.record(z.string(), z.unknown()) })),
   fields: z.object({
     company: fieldResult,

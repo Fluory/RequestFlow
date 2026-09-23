@@ -1,0 +1,25 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "text": "{\"company\": {\"value\": \"Foerdertechnik Beispiel KG\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l1\", \"quote\": \"Foerdertechnik Beispiel KG\"}}, \"contact_person\": {\"value\": \"Sabine Beispiel\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l2\", \"quote\": \"Kontakt: Sabine Beispiel\"}}, \"email\": {\"value\": \"sabine.beispiel@example.net\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l3\", \"quote\": \"sabine.beispiel@example.net\"}}, \"phone\": {\"value\": \"0221 987654-12\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l2\", \"quote\": \"Tel. 0221 987654-12\"}}, \"requested_delivery_date\": {\"value\": \"2026-11-05\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p2-l23\", \"quote\": \"Liefertermin: 05.11.2026\"}}, \"additional_requirements\": {\"value\": \"Lieferung mit Montageanleitung in deutscher Sprache\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p2-l24\", \"quote\": \"Lieferung mit Montageanleitung in deutscher Sprache.\"}}, \"line_items\": [{\"description\": {\"value\": \"Tragrolle\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l11\", \"quote\": \"Tragrolle\"}}, \"quantity\": {\"value\": \"24\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l9\", \"quote\": \"24\"}}, \"unit\": {\"value\": \"Stk.\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l10\", \"quote\": \"Stk.\"}}, \"material\": {\"value\": \"S235JR\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l12\", \"quote\": \"S235JR\"}}, \"dimensions\": {\"value\": \"89 x 500 mm\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l13\", \"quote\": \"89 x 500 mm\"}}}, {\"description\": {\"value\": \"Umlenkrolle\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l17\", \"quote\": \"Umlenkrolle\"}}, \"quantity\": {\"value\": \"12\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l15\", \"quote\": \"12\"}}, \"unit\": {\"value\": \"Stk.\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l16\", \"quote\": \"Stk.\"}}, \"material\": {\"value\": \"S355J2\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l18\", \"quote\": \"S355J2\"}}, \"dimensions\": {\"value\": \"220 x 650 mm\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l19\", \"quote\": \"220 x 650 mm\"}}}, {\"description\": {\"value\": \"Foerdergurt\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l23\", \"quote\": \"Foerdergurt\"}}, \"quantity\": {\"value\": \"60\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l21\", \"quote\": \"60\"}}, \"unit\": {\"value\": \"m\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l22\", \"quote\": \"m\"}}, \"material\": {\"value\": \"EP 400/3\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l24\", \"quote\": \"EP 400/3\"}}, \"dimensions\": {\"value\": \"B 500 mm\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p1-l25\", \"quote\": \"B 500 mm\"}}}, {\"description\": {\"value\": \"Lagergehaeuse\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p2-l8\", \"quote\": \"Lagergehaeuse\"}}, \"quantity\": {\"value\": \"8\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p2-l6\", \"quote\": \"8\"}}, \"unit\": {\"value\": \"Stk.\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p2-l7\", \"quote\": \"Stk.\"}}, \"material\": {\"value\": \"GG25\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p2-l9\", \"quote\": \"GG25\"}}, \"dimensions\": {\"value\": \"UCP 208\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p2-l10\", \"quote\": \"UCP 208\"}}}, {\"description\": {\"value\": \"Rillenkugellager\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p2-l14\", \"quote\": \"Rillenkugellager\"}}, \"quantity\": {\"value\": \"16\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p2-l12\", \"quote\": \"16\"}}, \"unit\": {\"value\": \"Stk.\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p2-l13\", \"quote\": \"Stk.\"}}, \"material\": {\"value\": \"100Cr6\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p2-l15\", \"quote\": \"100Cr6\"}}, \"dimensions\": {\"value\": \"6208-2RS\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"p2-l16\", \"quote\": \"6208-2RS\"}}}]}"
+          }
+        ]
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.0147
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 1790,
+    "candidatesTokenCount": 924,
+    "totalTokenCount": 2714,
+    "trafficType": "ON_DEMAND"
+  },
+  "modelVersion": "gemini-3.5-flash",
+  "createTime": "2026-09-23T09:03:00.000000Z",
+  "responseId": "synthetic-eval-t04-table-pdf-two-pages"
+}

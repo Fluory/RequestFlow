@@ -11,6 +11,8 @@ Rules, applied in order, identically to header fields and to every field of ever
   ``grounding.values``). A date quote with more than one distinct date proves nothing about which
   one is meant: ``found`` is downgraded to ``uncertain`` (reason ``ambiguous_quote``). A date
   field that only has a calendar week is at most ``uncertain`` (reason ``calendar_week_only``).
+  Evidence from an OCR segment (``locator.ocr``, also inside an attachment) proves only what the
+  OCR read, not what the page says: ``found`` is downgraded to ``uncertain`` (reason ``ocr_only``).
 * ``uncertain``: evidence, when given, is checked the same way (failure -> ``unverified``).
   Without evidence it stays ``uncertain``. It is never promoted to ``found``.
 
@@ -36,7 +38,7 @@ from requestflow_ai.extraction.schema import (
 )
 from requestflow_ai.grounding.normalize import normalize_text
 from requestflow_ai.grounding.values import ValueCheck, ValueKind, check_value
-from requestflow_ai.parsing.segments import Segment
+from requestflow_ai.parsing.segments import Segment, is_ocr
 
 FieldStatus = Literal["found", "uncertain", "missing", "unverified"]
 UnverifiedReason = Literal[
@@ -52,6 +54,8 @@ UnverifiedReason = Literal[
     "ambiguous_quote",
     # Not unverified: a date field that only has a calendar week (no date) is ``uncertain``.
     "calendar_week_only",
+    # Not unverified: a ``found`` field whose evidence is OCR text is downgraded to ``uncertain``.
+    "ocr_only",
 ]
 
 FIELD_KINDS: dict[FieldKey, ValueKind] = {
@@ -138,6 +142,9 @@ def verify_field(
         return VerifiedField(value, "uncertain", field.evidence, model_status, "calendar_week_only")
     if check.ambiguous and model_status == "found":
         return VerifiedField(value, "uncertain", field.evidence, model_status, "ambiguous_quote")
+    if model_status == "found" and is_ocr(segments[field.evidence.segment_id].locator):
+        # The quote matched OCR text; OCR can misread, so a human confirms (issue #23).
+        return VerifiedField(value, "uncertain", field.evidence, model_status, "ocr_only")
     return VerifiedField(value, model_status, field.evidence, model_status)
 
 

@@ -11,6 +11,15 @@ This file records what changes **in the product** – process and session state 
   approved before that decision, and a rejected one can never be exported.
 - Request list (`/requests`): attempts, the last error with its stage (processing or export) and the next
   retry per request, filters for status and possible duplicates, and "Erneut verarbeiten" for failed requests.
+- Review of line items: positions appear as a table with a status per field; each field opens its source
+  (mail line, PDF page – marked when it comes from text recognition –, Excel cell, Word paragraph or table
+  cell) and can be corrected, audited like header fields.
+- AI eval set and gate: 15 synthetic cases (tables, scans, missing values, prompt injection) measure
+  extraction quality per field; every change to the AI service is checked against a committed
+  baseline and fails when a field gets worse by more than 5 points or an injected value is accepted.
+- More document formats: Outlook `.msg` (with attachments, parsed recursively), Excel `.xlsx` and Word
+  `.docx` are extracted with exact source positions; scanned PDFs can be read with OCR – such values are
+  at most "uncertain". A broken attachment no longer fails the whole request.
 - Extraction schema v2: e-mail, phone and additional requirements as header fields, plus line items
   (description, quantity, unit, material, dimensions), each with its own status and source quote; German
   number formats, units and dates are normalised, a bare calendar week ("KW 42") stays at most uncertain.
