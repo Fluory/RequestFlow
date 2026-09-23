@@ -6,14 +6,14 @@ an extra item the pipeline returned is expected to be all ``missing``.
 
 Per key field, in percent (``None`` when the denominator is 0):
 
-* ``found_accuracy`` – of the observations whose value is in the document, the share returned
+* ``found_accuracy`` - of the observations whose value is in the document, the share returned
   with the expected status (``found``, or ``uncertain`` for a calendar week) and the expected
   value. "Accuracy of found values"; it drops when a value is lost, wrong or unverified.
-* ``missing_precision`` – of the observations returned as ``missing``, the share really missing.
-* ``missing_recall`` – of the observations really missing, the share returned as ``missing``.
-* ``grounding_pass_rate`` – of the observations where the model claimed a value with evidence
+* ``missing_precision`` - of the observations returned as ``missing``, the share really missing.
+* ``missing_recall`` - of the observations really missing, the share returned as ``missing``.
+* ``grounding_pass_rate`` - of the observations where the model claimed a value with evidence
   (model status ``found`` or ``uncertain``), the share the verifier did not mark ``unverified``.
-* ``false_found_rate`` – of the observations returned as ``found``, the share whose value is not
+* ``false_found_rate`` - of the observations returned as ``found``, the share whose value is not
   the expected one (the hallucination indicator: a wrong value a reviewer would see as proven).
   Lower is better.
 

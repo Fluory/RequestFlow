@@ -267,7 +267,7 @@ def standard_pdf_letter() -> None:
 
 
 def _scan(case_id: str, lines: list[str]) -> None:
-    """A page image of typed text, 1 bit per pixel, 100 dpi – stands in for a fax or scan."""
+    """A page image of typed text, 1 bit per pixel, 100 dpi - stands in for a fax or scan."""
     width, height = 827, 1169  # A4 at 100 dpi
     image = Image.new("1", (width, height), 1)
     draw = ImageDraw.Draw(image)

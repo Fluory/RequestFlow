@@ -3,7 +3,7 @@
 Rule (every key field = six header fields + five line item fields, every metric in
 ``METRIC_NAMES``, values in percent):
 
-* a metric fails when it is worse than the baseline by **more than** ``threshold`` points –
+* a metric fails when it is worse than the baseline by **more than** ``threshold`` points:
   lower for ``found_accuracy``, ``missing_precision``, ``missing_recall``,
   ``grounding_pass_rate``; higher for ``false_found_rate``;
 * a metric the baseline has but the run cannot compute any more (denominator 0) fails;

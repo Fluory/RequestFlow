@@ -1,4 +1,4 @@
-"""CLI: ``uv run python -m requestflow_ai.evals (--replay | --live) [options]`` from ``services/ai``.
+"""CLI, run from ``services/ai``: ``uv run python -m requestflow_ai.evals (--replay | --live)``.
 
 Exit codes: 0 gate passed (or no gate), 1 gate failed, 2 usage or setup error.
 """

@@ -96,10 +96,10 @@ def load_case(directory: Path) -> EvalCase:
         raise CaseError(f"{directory.name}: {EXPECTED_FILE} is not an object")
     data = cast(dict[str, Any], raw)
     case_id = data.get("id")
-    if case_id != directory.name:
+    if not isinstance(case_id, str) or case_id != directory.name:
         raise CaseError(f"{directory.name}: id {case_id!r} does not match the directory")
 
-    categories = tuple(data.get("categories") or ())
+    categories = tuple(str(c) for c in cast(list[Any], data.get("categories") or []))
     if not categories or any(c not in CATEGORIES for c in categories):
         raise CaseError(f"{case_id}: categories must be a non-empty subset of {CATEGORIES}")
 
@@ -110,7 +110,9 @@ def load_case(directory: Path) -> EvalCase:
     raw_fields = cast(dict[str, Any], data.get("fields") or {})
     if set(raw_fields) != set(FIELD_KEYS):
         raise CaseError(f"{case_id}: fields must list exactly {FIELD_KEYS}")
-    fields = {key: _expected(raw_fields[key], f"{case_id}.{key}") for key in FIELD_KEYS}
+    fields: dict[FieldKey, Expected] = {
+        key: _expected(raw_fields[key], f"{case_id}.{key}") for key in FIELD_KEYS
+    }
 
     items: list[dict[LineItemKey, Expected]] = []
     for index, raw_item in enumerate(cast(list[Any], data.get("line_items") or [])):
