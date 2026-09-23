@@ -6,6 +6,8 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
+- Request list (`/requests`): attempts, the last error with its stage (processing or export) and the next
+  retry per request, filters for status and possible duplicates, and "Erneut verarbeiten" for failed requests.
 - Review of line items: positions appear as a table with a status per field; each field opens its source
   (mail line, PDF page – marked when it comes from text recognition –, Excel cell, Word paragraph or table
   cell) and can be corrected, audited like header fields.

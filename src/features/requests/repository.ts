@@ -17,9 +17,20 @@ export interface NewRequest {
 
 // Repository of the request aggregate. Every function needs a tenant transaction; the company id is
 // taken from it, never from the caller – RLS enforces the same rule in the database.
-export async function listRequests(tx: TenantTx): Promise<RequestRow[]> {
+export interface RequestFilter {
+  status?: RequestStatus;
+  /** true: only possible duplicates; false: only non-duplicates; undefined: all. */
+  possibleDuplicate?: boolean;
+}
+
+/** The company's requests, newest first, optionally filtered (#26). */
+export async function listRequests(tx: TenantTx, filter: RequestFilter = {}): Promise<RequestRow[]> {
   tenantOf(tx);
-  return tx.select().from(requests).orderBy(desc(requests.createdAt));
+  const conditions = [
+    filter.status ? eq(requests.status, filter.status) : undefined,
+    filter.possibleDuplicate === undefined ? undefined : eq(requests.possibleDuplicate, filter.possibleDuplicate),
+  ].filter((condition) => condition !== undefined);
+  return tx.select().from(requests).where(and(...conditions)).orderBy(desc(requests.createdAt));
 }
 
 export async function getRequest(tx: TenantTx, id: string): Promise<RequestRow | null> {
@@ -83,6 +94,12 @@ export async function transitionRequest(tx: TenantTx, row: RequestRow, event: Re
 }
 
 /** Keeps the last failure visible while a retry is pending (status unchanged). */
+/** Next export attempt of an APPROVED request (#26 list); a request that moved on is left alone. */
+export async function recordExportRetry(tx: TenantTx, id: string, nextRetryAt: Date | null): Promise<void> {
+  tenantOf(tx);
+  await tx.update(requests).set({ nextRetryAt }).where(and(eq(requests.id, id), eq(requests.status, "APPROVED")));
+}
+
 export async function recordProcessingFailure(tx: TenantTx, id: string, failure: { message: string; nextRetryAt: Date | null }): Promise<void> {
   tenantOf(tx);
   // Only while processing: a late failure of a redelivered attempt must not stamp a request that

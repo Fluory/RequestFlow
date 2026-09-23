@@ -16,7 +16,10 @@
 
 - `worker` drains the `request-process` queue in a loop (30 s budget, 2 s idle poll) and supervises
   pg-boss (expiry → retry, retention). Retries: 5 with exponential backoff (30 s … 30 min); then the
-  dead-letter queue moves the request to `ERROR` with a readable cause. Staff reprocess from there.
+  dead-letter queue moves the request to `ERROR` with a readable cause. Staff see status, attempts, the
+  last cause with its stage (processing/export) and the next retry on `/requests` (filter: status,
+  possible duplicate) and reprocess an `ERROR` request there – status change, new job and audit event
+  in one transaction.
 - The AI service runs only with the compose profile `ai` (`docker compose --profile ai up`) and needs
   Vertex AI credentials (`VERTEX_PROJECT`, ADC file via `GOOGLE_ADC_FILE`). Without it, requests stay
   in retries and end in `ERROR` ("Der KI-Dienst ist nicht erreichbar.") – by design, nothing is lost.
