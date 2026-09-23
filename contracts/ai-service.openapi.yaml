@@ -182,6 +182,7 @@ components:
             - nesting_too_deep
             - too_many_attachments
             - not_attached_by_value
+            - budget_exceeded
           - type: 'null'
           title: Error
           description: Why the attachment was not parsed; null when parsed. The message and its other
@@ -427,11 +428,14 @@ components:
             enum:
             - no_text
             - attachment_failed
+            - ocr_pages_skipped
           type: array
           title: Warnings
           description: '`no_text`: the document has no text (e.g. a scan without OCR); no model call made.
             `attachment_failed`: at least one attachment of a `.msg` could not be parsed (see `attachments`);
-            the rest was processed.'
+            the rest was processed. `ocr_pages_skipped`: more PDF pages without text than the OCR page
+            cap (10 per document, `.msg` attachments together); the first ones were OCR''d, the rest stayed
+            empty.'
         attachments:
           items:
             $ref: '#/components/schemas/AttachmentResult'

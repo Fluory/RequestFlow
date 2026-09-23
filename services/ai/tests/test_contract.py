@@ -105,7 +105,12 @@ def test_contract_formats_grow_additively() -> None:
     schemas = committed()["components"]["schemas"]
     response = schemas["ExtractResponse"]
     assert response["properties"]["documentKind"]["enum"] == ["pdf", "eml", "xlsx", "docx", "msg"]
-    assert response["properties"]["warnings"]["items"]["enum"] == ["no_text", "attachment_failed"]
+    # `ocr_pages_skipped` appended after the security review of PR #40 (additive).
+    assert response["properties"]["warnings"]["items"]["enum"] == [
+        "no_text",
+        "attachment_failed",
+        "ocr_pages_skipped",
+    ]
     # New response field is optional so older clients stay valid.
     assert "attachments" in response["properties"]
     assert "attachments" not in response["required"]
@@ -140,4 +145,5 @@ def test_contract_formats_grow_additively() -> None:
         "nesting_too_deep",
         "too_many_attachments",
         "not_attached_by_value",
+        "budget_exceeded",  # appended after the security review of PR #40 (additive)
     ]
