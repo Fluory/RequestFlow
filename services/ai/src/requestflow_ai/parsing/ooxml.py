@@ -22,8 +22,9 @@ from typing import Literal
 from requestflow_ai.parsing.errors import DocumentParseError, UnsupportedMediaTypeError
 
 MAX_ENTRIES = 2_000
-MAX_UNCOMPRESSED_BYTES = 256 * 1024 * 1024
-MAX_RATIO = 200
+# Parsed XML trees cost several times the XML size in memory, per concurrent extraction slot.
+MAX_UNCOMPRESSED_BYTES = 64 * 1024 * 1024
+MAX_RATIO = 100
 RATIO_CHECK_MIN_BYTES = 1024 * 1024
 
 OoxmlKind = Literal["xlsx", "docx"]

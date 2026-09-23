@@ -281,7 +281,8 @@ def build_api() -> FastAPI:
             Form(
                 alias="mediaType",
                 max_length=100,
-                description="Declared media type, e.g. message/rfc822. PDF is detected from bytes.",
+                description="Declared media type, e.g. message/rfc822. Only helps to recognise "
+                "an .eml; every kind is detected from the bytes.",
             ),
         ] = None,
         x_request_id: Annotated[
@@ -387,7 +388,7 @@ def _map_error(exc: Exception) -> ApiError:
     if isinstance(exc, UnsupportedMediaTypeError):
         return ApiError(415, "unsupported_media_type", "unsupported document type")
     if isinstance(exc, DocumentTooLongError):
-        return ApiError(422, "document_too_long", "the document has too many pages")
+        return ApiError(422, "document_too_long", "the document is too long")
     if isinstance(exc, DocumentParseError):
         return ApiError(422, "document_unparseable", "the document could not be parsed")
     if isinstance(exc, ModelOutputError):

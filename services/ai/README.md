@@ -139,8 +139,8 @@ python-oxmsg, which docling already depends on.
 Every upload is untrusted. Beyond `AI_MAX_DOCUMENT_BYTES` and `AI_MAX_PDF_PAGES`:
 
 - **OOXML (XLSX/DOCX) zip limits** before any XML is parsed (`parsing/ooxml.py`): at most 2,000
-  entries, 256 MiB declared uncompressed in total, and no entry above 1 MiB compressed more than
-  200:1 (zip bomb) → 422. `zipfile` stops at an entry's declared size (CRC-checked), so the
+  entries, 64 MiB declared uncompressed in total (an lxml tree costs several times its XML size,
+  per extraction slot), and no entry above 1 MiB compressed more than 100:1 (zip bomb) → 422. `zipfile` stops at an entry's declared size (CRC-checked), so the
   declared sizes are binding.
 - **XML**: openpyxl parses through defusedxml (installed); python-docx uses lxml with
   `resolve_entities=False`. No external entities, no entity expansion.

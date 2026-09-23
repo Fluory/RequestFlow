@@ -1,4 +1,8 @@
-"""PDF parsing through docling's own PDF parser (docling-parse), model-free."""
+"""PDF parsing through docling (docling-parse text lines, layout, OCR of text-less pages).
+
+Model-free except the tests marked ``docling``, which need cached models and
+``AI_TEST_DOCLING_MODELS=1``.
+"""
 
 from __future__ import annotations
 
