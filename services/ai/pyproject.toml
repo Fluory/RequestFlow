@@ -65,7 +65,7 @@ ignore = []
 "scripts/**" = ["S101"]
 
 [tool.pyright]
-include = ["src", "tests", "scripts"]
+include = ["src", "tests", "scripts", "evals"]
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
 venvPath = "."

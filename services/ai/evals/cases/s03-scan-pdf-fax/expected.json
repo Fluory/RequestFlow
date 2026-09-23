@@ -1,0 +1,40 @@
+{
+  "id": "s03-scan-pdf-fax",
+  "categories": [
+    "scanned"
+  ],
+  "description": "Image-only PDF (fax). No text layer: the replay runs with OCR off (AI_PDF_OCR=off, the default; CI has no OCR models), so the service returns no_text, no model call, all fields missing. Expectations with OCR are kept under after_ocr.",
+  "document": "document.pdf",
+  "declared_type": "application/pdf",
+  "fields": {
+    "company": null,
+    "contact_person": null,
+    "email": null,
+    "phone": null,
+    "requested_delivery_date": null,
+    "additional_requirements": null
+  },
+  "line_items": [],
+  "after_ocr": {
+    "fields": {
+      "company": "Werkzeugbau Beispiel e.K.",
+      "contact_person": "Jan Beispiel",
+      "email": null,
+      "phone": null,
+      "requested_delivery_date": {
+        "value": "KW 47/2026",
+        "status": "uncertain"
+      },
+      "additional_requirements": null
+    },
+    "line_items": [
+      {
+        "description": "Stanzstempel",
+        "quantity": "10",
+        "unit": "pcs",
+        "material": "1.2379",
+        "dimensions": "D 12 x 80 mm"
+      }
+    ]
+  }
+}
