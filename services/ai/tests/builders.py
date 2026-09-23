@@ -117,7 +117,9 @@ def _link_children(entries: list[_Entry]) -> None:
         return ids[middle]
 
     for entry in entries:
-        ordered = sorted(entry.children, key=lambda i: (len(entries[i].name), entries[i].name.upper()))
+        ordered = sorted(
+            entry.children, key=lambda i: (len(entries[i].name), entries[i].name.upper())
+        )
         entry.child = build(ordered)
 
 

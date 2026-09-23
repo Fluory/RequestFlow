@@ -41,9 +41,8 @@ def open_package(data: bytes) -> zipfile.ZipFile:
     total = 0
     for entry in entries:
         total += entry.file_size
-        if (
-            entry.file_size > RATIO_CHECK_MIN_BYTES
-            and entry.file_size > MAX_RATIO * max(entry.compress_size, 1)
+        if entry.file_size > RATIO_CHECK_MIN_BYTES and entry.file_size > MAX_RATIO * max(
+            entry.compress_size, 1
         ):
             raise DocumentParseError("package entry is compressed suspiciously well")
     if total > MAX_UNCOMPRESSED_BYTES:

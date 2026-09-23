@@ -29,11 +29,11 @@ from starlette.datastructures import Headers
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from requestflow_ai.api.schemas import (
+    AttachmentResult,
     ErrorCode,
     ErrorDetail,
     ErrorResponse,
     ExtractedFields,
-    AttachmentResult,
     ExtractResponse,
     HealthResponse,
     LineItem,

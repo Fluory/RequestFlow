@@ -77,7 +77,10 @@ def _single_line(value: str | None, limit: int | None = None) -> str:
 
 def message_segments(message: Message) -> list[Segment]:
     try:
-        headers = (("From", "msg-h-from", message.sender), ("Subject", "msg-h-subject", message.subject))
+        headers = (
+            ("From", "msg-h-from", message.sender),
+            ("Subject", "msg-h-subject", message.subject),
+        )
         body = message.body
         if not body:
             html = message.html_body
@@ -102,7 +105,9 @@ def message_segments(message: Message) -> list[Segment]:
         text = line.strip()
         if text:
             segments.append(
-                Segment(id=f"msg-l{number}", text=text, locator=MsgLocator(part="body", line=number))
+                Segment(
+                    id=f"msg-l{number}", text=text, locator=MsgLocator(part="body", line=number)
+                )
             )
     return segments
 

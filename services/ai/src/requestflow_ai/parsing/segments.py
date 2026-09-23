@@ -2,9 +2,9 @@
 
 A segment is one line of document text with a stable locator. Segment ids are deterministic for
 the same input bytes (``p{page}-l{line}`` for PDF, ``eml-l{line}`` for an e-mail body,
-``s{sheet}-r{row}`` for a spreadsheet row, ``d-p{n}`` / ``d-t{t}-r{r}-c{c}`` for Word, ``msg-l{line}``
-and ``msg-a{i}-<inner id>`` for Outlook), so a stored evidence reference still resolves when the
-document is parsed again.
+``s{sheet}-r{row}`` for a spreadsheet row, ``d-p{n}`` / ``d-t{t}-r{r}-c{c}`` for Word,
+``msg-l{line}`` and ``msg-a{i}-<inner id>`` for Outlook), so a stored evidence reference still
+resolves when the document is parsed again.
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ class BoundingBox(_ApiModel):
     b: float
 
 
-def _not_required(*names: str) -> Any:
+def optional_in_schema(*names: str) -> Any:
     """``json_schema_extra`` hook: keep fields optional in the contract (additive growth)."""
 
     def hook(schema: dict[str, Any]) -> None:
@@ -44,7 +44,7 @@ def _not_required(*names: str) -> Any:
 
 
 class PdfLocator(_ApiModel):
-    model_config = ConfigDict(json_schema_extra=_not_required("ocr"))
+    model_config = ConfigDict(json_schema_extra=optional_in_schema("ocr"))
 
     kind: Literal["pdf"] = "pdf"
     page: int = Field(ge=1, description="1-based page number.")
@@ -108,7 +108,7 @@ class AttachmentRef(_ApiModel):
 
 
 class MsgLocator(_ApiModel):
-    """Outlook ``.msg``: header and body lines like ``email``; attachments wrap their own locator."""
+    """Outlook ``.msg``: headers and body lines like ``email``; attachments wrap their locator."""
 
     kind: Literal["msg"] = "msg"
     part: Literal["header", "body", "attachment"]

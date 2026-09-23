@@ -9,14 +9,11 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from docling_core.types.doc import BoundingBox as DocBox
-from docling_core.types.doc import (
-    CoordOrigin,
-    DocItemLabel,
-    DoclingDocument,
-    ProvenanceItem,
-    Size,
-)
+from docling_core.types.doc.base import BoundingBox as DocBox
+from docling_core.types.doc.base import CoordOrigin, Size
+from docling_core.types.doc.common.reference import ProvenanceItem
+from docling_core.types.doc.document import DoclingDocument
+from docling_core.types.doc.labels import DocItemLabel
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
@@ -169,7 +166,9 @@ class _OcrConverter:
         self.page_ranges: list[tuple[int, int]] = []
         self.initialized: list[object] = []
 
-    def convert(self, _stream: object, *, raises_on_error: bool, page_range: tuple[int, int]) -> Any:
+    def convert(
+        self, _stream: object, *, raises_on_error: bool, page_range: tuple[int, int]
+    ) -> Any:
         from docling.datamodel.base_models import ConversionStatus
 
         assert raises_on_error is False

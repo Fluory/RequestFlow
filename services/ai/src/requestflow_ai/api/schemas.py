@@ -17,7 +17,7 @@ from requestflow_ai.grounding.verifier import (
 )
 from requestflow_ai.parsing.detect import DocumentKind
 from requestflow_ai.parsing.document import AttachmentError, AttachmentReport
-from requestflow_ai.parsing.segments import Segment
+from requestflow_ai.parsing.segments import Segment, optional_in_schema
 
 ErrorCode = Literal[
     "invalid_request",
@@ -185,15 +185,9 @@ class AttachmentResult(_Camel):
         )
 
 
-def _attachments_optional(schema: dict[str, object]) -> None:
-    required = schema.get("required")
-    if isinstance(required, list):
-        schema["required"] = [name for name in required if name != "attachments"]
-
-
 class ExtractResponse(_Camel):
     # `attachments` was added in #23: optional in the contract so older clients stay valid.
-    model_config = ConfigDict(json_schema_extra=_attachments_optional)
+    model_config = ConfigDict(json_schema_extra=optional_in_schema("attachments"))
 
     request_id: str
     document_id: str

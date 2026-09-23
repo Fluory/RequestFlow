@@ -153,16 +153,15 @@ def _layout_converter() -> DocumentConverter:
 @functools.cache
 def _ocr_converter() -> DocumentConverter:
     from docling.datamodel.base_models import InputFormat
-    from docling.datamodel.pipeline_options import PdfPipelineOptions, RapidOcrOptions
+    from docling.datamodel.pipeline_options import OcrMode, PdfPipelineOptions, RapidOcrOptions
     from docling.document_converter import DocumentConverter, PdfFormatOption
 
     options = PdfPipelineOptions(
         do_ocr=True,
         do_table_structure=False,
         # torch is installed for docling anyway; the default onnxruntime backend is not.
-        ocr_options=RapidOcrOptions(
-            backend="torch", lang=[OCR_LANGUAGE], force_full_page_ocr=True
-        ),
+        # Full-page OCR: only pages without a text layer ever reach this converter.
+        ocr_options=RapidOcrOptions(backend="torch", lang=[OCR_LANGUAGE], mode=OcrMode.FULL_PAGE),
     )
     return DocumentConverter(
         allowed_formats=[InputFormat.PDF],
