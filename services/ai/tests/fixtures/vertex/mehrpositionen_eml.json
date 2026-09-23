@@ -1,0 +1,25 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "text": "{\"company\": {\"value\": \"Stahlbau Beispiel KG\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l14\", \"quote\": \"Stahlbau Beispiel KG\"}}, \"contact_person\": {\"value\": \"Jonas Beispiel\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l13\", \"quote\": \"Jonas Beispiel\"}}, \"email\": {\"value\": \"Jonas.Beispiel@example.com\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-h-from\", \"quote\": \"<Jonas.Beispiel@example.com>\"}}, \"phone\": {\"value\": \"+49 30 1234567\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l15\", \"quote\": \"Tel. +49 30 1234567\"}}, \"requested_delivery_date\": {\"value\": \"KW 42/2026\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l8\", \"quote\": \"Liefertermin: KW 42/2026\"}}, \"additional_requirements\": {\"value\": \"Abnahmeprüfzeugnis 3.1 nach EN 10204\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l9\", \"quote\": \"Abnahmeprüfzeugnis 3.1 nach EN 10204\"}}, \"line_items\": [{\"description\": {\"value\": \"Flansch\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l4\", \"quote\": \"Stk. Flansch DN50\"}}, \"quantity\": {\"value\": \"1.250\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l4\", \"quote\": \"1.250 Stk.\"}}, \"unit\": {\"value\": \"Stk.\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l4\", \"quote\": \"1.250 Stk.\"}}, \"material\": {\"value\": \"1.4301\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l4\", \"quote\": \"Werkstoff 1.4301\"}}, \"dimensions\": {\"value\": \"DN50\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l4\", \"quote\": \"Flansch DN50\"}}}, {\"description\": {\"value\": \"Rohr\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l5\", \"quote\": \"12,5 m Rohr\"}}, \"quantity\": {\"value\": \"12,5\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l5\", \"quote\": \"12,5 m\"}}, \"unit\": {\"value\": \"m\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l5\", \"quote\": \"12,5 m Rohr\"}}, \"material\": {\"value\": \"S235JR\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l5\", \"quote\": \"Werkstoff S235JR\"}}, \"dimensions\": {\"value\": \"60,3 x 2,9 mm\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l5\", \"quote\": \"Rohr 60,3 x 2,9 mm\"}}}, {\"description\": {\"value\": \"Blech\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l6\", \"quote\": \"2,5 t Blech\"}}, \"quantity\": {\"value\": \"2,5\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l6\", \"quote\": \"2,5 t\"}}, \"unit\": {\"value\": \"t\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l6\", \"quote\": \"2,5 t Blech\"}}, \"material\": {\"value\": \"S355J2\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l6\", \"quote\": \"Werkstoff S355J2\"}}, \"dimensions\": {\"value\": \"2000 x 1000 x 5 mm\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l6\", \"quote\": \"Blech 2000 x 1000 x 5 mm\"}}}]}"
+          }
+        ]
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.0101
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 1184,
+    "candidatesTokenCount": 902,
+    "totalTokenCount": 2086,
+    "trafficType": "ON_DEMAND"
+  },
+  "modelVersion": "gemini-3.5-flash",
+  "createTime": "2026-09-23T08:31:00.000000Z",
+  "responseId": "synthetic-response-multi-item-0001"
+}

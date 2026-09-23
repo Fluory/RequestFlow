@@ -522,3 +522,57 @@ def test_settings_have_no_database_or_storage_credentials() -> None:
     names = " ".join(Settings.model_fields).lower()
     for forbidden in ("database", "postgres", "db_", "s3", "storage", "bucket"):
         assert forbidden not in names
+
+
+def test_multi_item_eml_returns_line_items_and_logs_only_counts(fixtures_dir: Path) -> None:
+    # Build the app first: create_app configures logging and would drop a handler added earlier.
+    app = build_app(Replay(body=recorded("mehrpositionen_eml.json")))
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(JsonFormatter())
+    root = logging.getLogger()
+    root.addHandler(handler)
+    try:
+        with TestClient(app) as client:
+            response = upload(
+                client,
+                (fixtures_dir / "anfrage_mehrpositionen.eml").read_bytes(),
+                media_type="message/rfc822",
+            )
+    finally:
+        root.removeHandler(handler)
+    assert response.status_code == 200, response.text
+    body = response.json()
+
+    assert body["fields"]["email"]["value"] == "jonas.beispiel@example.com"
+    date_field = body["fields"]["requested_delivery_date"]
+    assert date_field["status"] == "uncertain"
+    assert date_field["reason"] == "calendar_week_only"
+    assert date_field["value"] == "KW 42/2026"
+
+    items = body["lineItems"]
+    assert [item["index"] for item in items] == [0, 1, 2]
+    assert [item["quantity"]["value"] for item in items] == ["1250", "12.5", "2.5"]
+    assert [item["unit"]["value"] for item in items] == ["pcs", "m", "t"]
+    assert items[1]["dimensions"]["evidence"] == {
+        "segmentId": "eml-l5",
+        "quote": "Rohr 60,3 x 2,9 mm",
+    }
+
+    records = [json.loads(line) for line in stream.getvalue().splitlines()]
+    completed = next(r for r in records if r["event"] == "extraction_completed")
+    assert completed["lineItemCount"] == 3
+    for content in ("Flansch", "S235JR", "1234567", "Stahlbau", "KW 42"):
+        assert content not in stream.getvalue()
+
+
+def test_document_without_text_returns_an_empty_line_item_list(
+    client: TestClient, fixtures_dir: Path
+) -> None:
+    response = upload(client, (fixtures_dir / "ohne_textebene.pdf").read_bytes())
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["warnings"] == ["no_text"]
+    assert body["lineItems"] == []
+    assert all(f["status"] == "missing" for f in body["fields"].values())
+    assert len(body["fields"]) == 6

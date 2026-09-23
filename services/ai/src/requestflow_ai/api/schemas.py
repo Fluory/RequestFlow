@@ -118,7 +118,7 @@ class LineItem(_Camel):
         description='Quantity as a plain decimal with a dot and no grouping ("1250", "2.5").'
     )
     unit: FieldResult = Field(
-        description="Unit: one of mm, cm, m, kg, t, pcs (Stk./Stück/St. -> pcs) when known; "
+        description="Unit: one of mm, cm, m, kg, t, pcs (Stk., St., Stueck -> pcs) when known; "
         "otherwise the unit as written, trimmed."
     )
     material: FieldResult = Field(description="Material or material number; trimmed text.")
