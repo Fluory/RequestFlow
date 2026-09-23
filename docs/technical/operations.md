@@ -28,6 +28,16 @@
   (integration test). Known gap: a request whose job vanished completely (e.g. deleted by hand) stays
   in `NEW`/`PROCESSING` – a cross-company sweep needs a privileged path and follows with #26/#28.
 
+## Evals
+
+- CI runs the AI eval gate in replay mode on every PR that changes `services/ai/` or `contracts/`
+  (step "AI eval gate (replay)"): `cd services/ai && uv run python -m requestflow_ai.evals --replay`.
+  No credentials, deterministic. It fails when a key field drops more than `EVAL_GATE_THRESHOLD`
+  points (default 5) against `services/ai/evals/baseline.json`, or on an injection violation.
+- After a prompt or model change, record real responses locally with `--live` (Vertex credentials,
+  never in CI), review the diff of `evals/cases/*/model_response.json`, then `--update-baseline` in
+  the same PR. Details: [`services/ai/README.md`](../../services/ai/README.md#evals).
+
 ## ERP export
 
 - The worker also drains `request-export` (approved requests). It posts to `ERP_BASE_URL` with
