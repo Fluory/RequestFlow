@@ -93,8 +93,11 @@ def main(argv: Sequence[str] | None = None, environ: Mapping[str, str] | None = 
 
     if args.update_baseline:
         if run.case_errors or run.injection_violations:
-            print("error: refusing to write a baseline from a run with case errors or "
-                  "injection violations", file=sys.stderr)
+            print(
+                "error: refusing to write a baseline from a run with case errors or "
+                "injection violations",
+                file=sys.stderr,
+            )
             return 1
         baseline = baseline_from(run.case_ids, run.metrics())
         args.baseline.write_text(json.dumps(baseline, indent=2) + "\n", encoding="utf-8")

@@ -118,7 +118,10 @@ def load_case(directory: Path) -> EvalCase:
         if set(item) != set(LINE_ITEM_KEYS):
             raise CaseError(f"{case_id}: line item {index} must list exactly {LINE_ITEM_KEYS}")
         items.append(
-            {key: _expected(item[key], f"{case_id}.line_items[{index}].{key}") for key in LINE_ITEM_KEYS}
+            {
+                key: _expected(item[key], f"{case_id}.line_items[{index}].{key}")
+                for key in LINE_ITEM_KEYS
+            }
         )
 
     must_not_found: dict[str, tuple[str, ...]] = {}

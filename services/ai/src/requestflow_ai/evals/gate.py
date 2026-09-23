@@ -77,9 +77,7 @@ def compare(
     failures += [f"injection: {violation}" for violation in injection_violations or []]
 
     if sorted(case_ids) != sorted(cast(list[str], baseline.get("case_ids", []))):
-        failures.append(
-            "case set differs from the baseline: review and run --update-baseline"
-        )
+        failures.append("case set differs from the baseline: review and run --update-baseline")
 
     base_metrics = cast(Mapping[str, Mapping[str, Any]], baseline.get("metrics", {}))
     for key in KEY_FIELDS:

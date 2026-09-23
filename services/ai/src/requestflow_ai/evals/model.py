@@ -103,9 +103,7 @@ class RecordingTransport(httpx.BaseTransport):
             for name, value in response.headers.multi_items()
             if name.lower() not in _HOP_HEADERS
         ]
-        return httpx.Response(
-            response.status_code, headers=headers, content=body, request=request
-        )
+        return httpx.Response(response.status_code, headers=headers, content=body, request=request)
 
     def close(self) -> None:
         self._inner.close()

@@ -125,7 +125,9 @@ def table_pdf_mixed_units() -> None:
         ],
         y - 12,
     )
-    _lines(pdf, ["Liefertermin: 12.01.2027", "Anlieferung auf Europaletten, max. 1 t je Palette."], y)
+    _lines(
+        pdf, ["Liefertermin: 12.01.2027", "Anlieferung auf Europaletten, max. 1 t je Palette."], y
+    )
     pdf.showPage()
     _save(pdf, buffer, "t02-table-pdf-mixed-units")
 
@@ -163,7 +165,9 @@ def table_pdf_two_pages() -> None:
         ],
         y - 12,
     )
-    _lines(pdf, ["Liefertermin: 05.11.2026", "Lieferung mit Montageanleitung in deutscher Sprache."], y)
+    _lines(
+        pdf, ["Liefertermin: 05.11.2026", "Lieferung mit Montageanleitung in deutscher Sprache."], y
+    )
     pdf.showPage()
     _save(pdf, buffer, "t04-table-pdf-two-pages")
 
