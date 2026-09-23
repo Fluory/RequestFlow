@@ -17,3 +17,23 @@
   (showcase epic #19).
 - Checks are added additively (queue backlog and AI service follow with #28); clients must ignore
   unknown check names.
+
+## `POST /api/requests` (session required)
+
+Multipart form, field `files` (1–`UPLOAD_MAX_FILES` files, each ≤ `UPLOAD_MAX_FILE_BYTES`). Allowed:
+`.eml .msg .pdf .xlsx .docx`, checked by extension **and** content signature.
+
+| Status | Body |
+|---|---|
+| 201 | `{"requestId": uuid, "possibleDuplicate": bool, "duplicateOfId": uuid \| null}` |
+| 401 / 403 | `{"error":{"title":"…"}}` – not signed in / role |
+| 413 | declared body larger than files × size limit |
+| 422 | `{"error":{"title":"Dateityp nicht erlaubt: …"}}` – user-facing reason |
+| 500 | generic message; details only as IDs in the log |
+
+Request (NEW), documents, audit event and the `request-process` job commit in one transaction.
+
+## `GET /api/documents/:id` (session required)
+
+Streams the original as `attachment` with `x-content-type-options: nosniff` and `cache-control: private,
+no-store`. A document of another company answers 404 like a missing one; no session → 401.

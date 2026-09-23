@@ -6,6 +6,9 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
+- Upload of a quote request (`/requests`): .eml, .msg, .pdf, .xlsx, .docx up to a configured size;
+  originals stored privately, download only for the own company. Request, documents, audit entry and
+  the processing job are created in one step; exact duplicates are flagged and linked.
 - Invite-only login (e-mail + password): admins invite staff into their own company and hand over
   an invitation link; sign-up without a valid invitation link creates no account. Roles `admin` and `clerk` per company.
 - Tenant isolation: every company-owned table has forced row-level security; data access runs
