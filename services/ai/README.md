@@ -169,8 +169,8 @@ Every upload is untrusted. Beyond `AI_MAX_DOCUMENT_BYTES` and `AI_MAX_PDF_PAGES`
   declare more bytes than the file has; a looped chain then costs at most the file size.
   `DEFECT_INCORRECT` is stricter than olefile's default and may reject real Outlook files with
   spec violations (unverified: no real `.msg` sample yet). olefile always gets a stream (it
-  treats `bytes` shorter than 1536 as a *file path*). Other OLE files (legacy `.doc`/`.xls`, password-protected
-  OOXML) → 415.
+  treats `bytes` shorter than 1536 as a *file path*). Other OLE files (legacy `.doc`/`.xls`,
+  password-protected OOXML) → 415.
 - **Parser errors never crash the service**: top-level errors map to 415/422, attachment errors
   to an `attachments` entry; any unexpected exception in an attachment parser is recorded as
   `document_unparseable` (log: exception type only).
