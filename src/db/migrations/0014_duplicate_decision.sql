@@ -1,2 +1,0 @@
-ALTER TABLE "app"."requests" ADD COLUMN "duplicate_decision" text;--> statement-breakpoint
-ALTER TABLE "app"."requests" ADD CONSTRAINT "requests_duplicate_decision_check" CHECK (duplicate_decision is null or duplicate_decision in ('distinct', 'duplicate'));
