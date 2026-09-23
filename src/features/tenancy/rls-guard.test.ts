@@ -4,6 +4,8 @@ import { tenantIsolationViolations, type TableSecurity } from "./rls-guard";
 const TENANT = "(company_id = (NULLIF(current_setting('app.company_id'::text, true), ''::text))::uuid)";
 const protectedTable = (overrides: Partial<TableSecurity> = {}): TableSecurity => ({
   table: "things",
+  kind: "r",
+  securityInvoker: false,
   rlsEnabled: true,
   rlsForced: true,
   companyIdNotNull: true,
@@ -23,17 +25,26 @@ describe("tenant isolation rules (#29)", () => {
   });
 
   it("reports a missing company policy and a policy for only some commands", () => {
-    expect(tenantIsolationViolations(protectedTable({ policies: [] }))).toEqual(["no company policy for ALL commands"]);
-    expect(tenantIsolationViolations(protectedTable({ policies: [{ name: "sel", permissive: true, command: "SELECT", using: TENANT, withCheck: null }] }))).toEqual([
-      "no company policy for ALL commands",
-    ]);
+    const missing = `no company policy for ALL commands (expected USING ${TENANT})`;
+    expect(tenantIsolationViolations(protectedTable({ policies: [] }))).toEqual([missing]);
+    expect(tenantIsolationViolations(protectedTable({ policies: [{ name: "sel", permissive: true, command: "SELECT", using: TENANT, withCheck: null }] }))).toEqual([missing]);
   });
 
   it("reports any extra policy with another expression – permissive policies are OR-ed and would widen access", () => {
     const wide = { name: "everyone", permissive: true, command: "SELECT", using: "true", withCheck: null };
     expect(tenantIsolationViolations(protectedTable({ policies: [...protectedTable().policies, wide] }))).toEqual(["policy everyone is not a company policy"]);
     const looseCheck = { name: "loose", permissive: true, command: "ALL", using: TENANT, withCheck: "true" };
-    expect(tenantIsolationViolations(protectedTable({ policies: [looseCheck] }))).toEqual(["no company policy for ALL commands", "policy loose is not a company policy"]);
+    expect(tenantIsolationViolations(protectedTable({ policies: [looseCheck] }))).toEqual([
+      `no company policy for ALL commands (expected USING ${TENANT})`,
+      "policy loose is not a company policy",
+    ]);
+  });
+
+  it("refuses materialized views and foreign tables, and views unless they run with the caller's rights", () => {
+    expect(tenantIsolationViolations(protectedTable({ kind: "m", policies: [] }))).toEqual(["materialized view cannot carry row-level security"]);
+    expect(tenantIsolationViolations(protectedTable({ kind: "f", policies: [] }))).toEqual(["foreign table cannot carry row-level security"]);
+    expect(tenantIsolationViolations(protectedTable({ kind: "v", policies: [] }))).toEqual(["view without security_invoker bypasses row-level security"]);
+    expect(tenantIsolationViolations(protectedTable({ kind: "v", securityInvoker: true, policies: [] }))).toEqual([]);
   });
 
   it("reports a table without a NOT NULL company_id", () => {
