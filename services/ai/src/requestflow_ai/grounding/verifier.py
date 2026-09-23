@@ -135,9 +135,7 @@ def verify_field(
     # A verified value is returned normalised, never the raw model text.
     value = check.normalized if check.normalized is not None else field.value
     if check.calendar_week:
-        return VerifiedField(
-            value, "uncertain", field.evidence, model_status, "calendar_week_only"
-        )
+        return VerifiedField(value, "uncertain", field.evidence, model_status, "calendar_week_only")
     if check.ambiguous and model_status == "found":
         return VerifiedField(value, "uncertain", field.evidence, model_status, "ambiguous_quote")
     return VerifiedField(value, model_status, field.evidence, model_status)
