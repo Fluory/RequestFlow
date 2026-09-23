@@ -12,7 +12,7 @@ database, no storage credentials and no tenant logic; the only credentials it ho
 - Contract: [`contracts/ai-service.openapi.yaml`](../../contracts/ai-service.openapi.yaml)
   (OpenAPI 3.1, generated from the app, guarded by `tests/test_contract.py`).
 - Packages (`src/requestflow_ai/`): `parsing` (detect, `document` dispatcher, PDF incl. OCR, EML,
-  XLSX, DOCX, MSG, OOXML zip limits, segments), `extraction` (model-facing
+  XLSX, DOCX, MSG, OOXML zip limits, shared `budget` per document, segments), `extraction` (model-facing
   schema, versioned prompt, `ModelClient`), `grounding` (normalisation, value parsing, verifier),
   `api` (FastAPI app, response schemas, OpenAPI export), `evals` (eval runner and gate, see
   [Evals](#evals)), `pipeline.py`, `config.py`, `jsonlog.py`. Eval data lives in `evals/`.
@@ -49,7 +49,7 @@ Proof (the same commands as CI):
 | `AI_ALLOW_GEMINI_API_DEV` | `false` | **Local development with synthetic data only.** Uses the Gemini API (free tier) instead of Vertex. Needs this flag **and** `GEMINI_API_KEY`, and `VERTEX_PROJECT` must be unset (both set → the service refuses to start). It is never used as a fallback, and a key alone changes nothing. |
 | `GEMINI_API_KEY` | – | Only read when the dev flag is `true`. |
 | `AI_PDF_PIPELINE` | `textlines` | `textlines` (model-free) or `layout` (docling layout model, see below). |
-| `AI_PDF_OCR` | `off` | `auto`: OCR (docling + RapidOCR on torch, German/Latin) for PDF pages **without a text layer**, also inside `.msg` attachments; OCR segments carry `locator.ocr: true` and OCR-only evidence is at most `uncertain`. Needs the layout + RapidOCR models (fail-closed at startup; image: `PREFETCH_OCR_MODELS=true`). At most 10 such pages per document (`MAX_OCR_PAGES`) → otherwise 422 `document_too_long`. `off`: scans yield `no_text`. |
+| `AI_PDF_OCR` | `off` | `auto`: OCR (docling + RapidOCR on torch, German/Latin) for PDF pages **without a text layer**, also inside `.msg` attachments; OCR segments carry `locator.ocr: true` and OCR-only evidence is at most `uncertain`. Needs the layout + RapidOCR models (fail-closed at startup; image: `PREFETCH_OCR_MODELS=true`). At most 10 such pages per extracted document (`MAX_OCR_PAGES`, all `.msg` attachments together): the first ones are OCR'd, the rest stay empty and the response carries the warning `ocr_pages_skipped`. `off`: scans yield `no_text`. |
 | `AI_MAX_DOCUMENT_BYTES` | `20971520` | Upload limit → 413. Checked twice: the declared `Content-Length` before the body is read (limit + 16 KiB multipart allowance, `MULTIPART_OVERHEAD_BYTES`), then the exact file size. |
 | `AI_MAX_PDF_PAGES` | `50` | Page cap for PDFs → 422 `document_too_long`. Counted model-free (docling-parse) before any page is parsed and before the layout model runs. |
 | `AI_MAX_CONCURRENT_EXTRACTIONS` | `4` | Concurrent extractions per process → 429 when busy. |
@@ -93,8 +93,9 @@ gains `ocr_only`; `warnings` gains `attachment_failed`; `ExtractResponse.attachm
 always sent, empty unless `.msg`) lists every attachment (also nested) with `path`, `name`,
 `documentKind`, `status` (`parsed`/`failed`) and `error` (`unsupported_media_type`,
 `document_unparseable`, `document_too_long`, `nesting_too_deep`, `too_many_attachments`,
-`not_attached_by_value`). `run.pdfPipeline` is set whenever a PDF was parsed, also as an
-attachment. Nothing existing was removed or made required.
+`not_attached_by_value`, `budget_exceeded`). `run.pdfPipeline` is set whenever a PDF was parsed,
+also as an attachment. After the security review of PR #40: `warnings` gains `ocr_pages_skipped`,
+`attachments[].error` gains `budget_exceeded`. Nothing existing was removed or made required.
 
 **Partial failure.** A `.msg` attachment that cannot be parsed never fails the request: it is
 reported in `attachments` (and the warning `attachment_failed`), contributes no segments, and the
@@ -141,19 +142,39 @@ Every upload is untrusted. Beyond `AI_MAX_DOCUMENT_BYTES` and `AI_MAX_PDF_PAGES`
 
 - **OOXML (XLSX/DOCX) zip limits** before any XML is parsed (`parsing/ooxml.py`): at most 2,000
   entries, 64 MiB declared uncompressed in total (an lxml tree costs several times its XML size,
-  per extraction slot), and no entry above 1 MiB compressed more than 100:1 (zip bomb) → 422. `zipfile` stops at an entry's declared size (CRC-checked), so the
-  declared sizes are binding.
+  per extraction slot), no single entry above 16 MiB declared uncompressed (`MAX_PART_BYTES`;
+  any entry, since python-docx/openpyxl pick the XML parser by content type, not by name), and
+  no entry above 1 MiB compressed more than 100:1 (zip bomb) → 422. `zipfile` stops at an
+  entry's declared size (CRC-checked), so the declared sizes are binding.
 - **XML**: openpyxl parses through defusedxml (installed); python-docx uses lxml with
   `resolve_entities=False`. No external entities, no entity expansion.
 - **No macros, no formulas**: `vbaProject.bin` is never read; XLSX formulas contribute their
   cached value only (`data_only=True`), external links are ignored (`keep_links=False`).
 - **Size caps** → 422 `document_too_long`: XLSX 50 sheets, 10,000 non-empty rows, 500,000
   visited cells (the declared sheet dimension is discarded so a forged `A1:XFD1048576` cannot
-  force padding); DOCX 10,000 segments; a whole document 20,000 segments; OCR 10 pages.
-- **MSG**: nesting depth 3 (`MAX_ATTACHMENT_DEPTH`), 50 attachments per message, attachment
-  names single-lined and cut to 255 characters. olefile always gets a stream (it treats `bytes`
-  shorter than 1536 as a *file path*). Other OLE files (legacy `.doc`/`.xls`, password-protected
-  OOXML) → 415.
+  force padding); DOCX 10,000 segments and 100,000 visited paragraphs + table cells (empty ones
+  count too); a whole document 20,000 segments. OCR: at most 10 pages per extracted document;
+  further pages without text are skipped with the warning `ocr_pages_skipped` (not an error).
+- **One budget per extracted document** (`parsing/budget.py`), shared by all attachments of a
+  `.msg` at every nesting level: 100 attachments, 128 MiB unzipped OOXML, 100 PDF pages (at
+  least `AI_MAX_PDF_PAGES`), 10 OCR pages. An attachment that would overdraw it is not parsed and
+  is reported as `budget_exceeded`; the body and the attachments parsed so far are returned. A
+  single top-level document always fits the budget.
+- **MSG**: nesting depth 3 (`MAX_ATTACHMENT_DEPTH`), 50 attachments per message (further ones
+  are reported `too_many_attachments` without decoding their properties or bytes), attachment
+  names single-lined and cut to 255 characters. **OLE stream bombs:** python-oxmsg reads every
+  stream at load time and olefile trusts declared sizes by default (a 2 KiB file with a looped
+  FAT chain declaring gigabytes took 3.4 GB / 54 s). Before anything is read,
+  `msg.check_ole_container` opens the directory with `raise_defects=DEFECT_INCORRECT` and rejects
+  the file (422 `document_unparseable`) when any stream, the mini stream or all streams together
+  declare more bytes than the file has; a looped chain then costs at most the file size. Before
+  that, the header's sector counts (FAT, DIFAT, mini FAT, directory) must fit the file size:
+  olefile follows a declared FAT count along the DIFAT chain in its constructor, so a forged count
+  on a looped DIFAT chain would otherwise hang it.
+  `DEFECT_INCORRECT` is stricter than olefile's default and may reject real Outlook files with
+  spec violations (unverified: no real `.msg` sample yet). olefile always gets a stream (it
+  treats `bytes` shorter than 1536 as a *file path*). Other OLE files (legacy `.doc`/`.xls`,
+  password-protected OOXML) → 415.
 - **Parser errors never crash the service**: top-level errors map to 415/422, attachment errors
   to an `attachments` entry; any unexpected exception in an attachment parser is recorded as
   `document_unparseable` (log: exception type only).
@@ -161,7 +182,8 @@ Every upload is untrusted. Beyond `AI_MAX_DOCUMENT_BYTES` and `AI_MAX_PDF_PAGES`
   `attachmentFailedCount`, `ocrSegmentCount`); attachment names and text never appear (tested).
   The `RapidOCR` logger is raised to WARNING.
 - **Not bounded in-process**: wall-clock time. OCR costs ~8.5 s per page on 4 vCPU, so 10 OCR
-  pages take ~90 s; the worker's request timeout must allow for that.
+  pages (the per-document maximum) take ~90 s; the worker's request timeout must allow for that.
+  docling opens the whole PDF for every OCR conversion (consecutive pages share one).
 
 ## Verification (the model never has the final say on `found`)
 
@@ -448,7 +470,7 @@ counts only directly after a number; the verifier is unchanged here (open point)
 | openpyxl | 3.1.5 | MIT | XLSX rows with cell locators (#23; already a docling dependency, pinned directly) |
 | python-docx | 1.2.0 | MIT | DOCX paragraphs and table cells (#23; already a docling dependency) |
 | python-oxmsg | 0.0.2 | MIT | Outlook `.msg` properties and attachments (#23; already a docling dependency). Early version: one private attribute (`Attachment._storage`) is used for embedded messages, covered by tests |
-| olefile | 0.47 | BSD | OLE container check in detection (#23; already a python-oxmsg dependency) |
+| olefile | 0.47 | BSD | OLE container check in detection and stream-size bound before `.msg` loading (#23; already a python-oxmsg dependency) |
 | dev: ruff, pyright, pytest, httpx, pyyaml, reportlab | 0.16.8, 1.1.414, 9.1.1, 0.28.1, 6.0.3, 5.0.1 | MIT, MIT, MIT, BSD-3, MIT, BSD | Lint, types, tests, contract export, fixtures |
 
 Transitive packages include mail-parser (Apache-2.0), python-oxmsg (MIT), pypdfium2

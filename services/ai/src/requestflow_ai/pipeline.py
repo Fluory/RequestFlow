@@ -20,7 +20,7 @@ from requestflow_ai.parsing.document import AttachmentReport, ParseOptions, pars
 from requestflow_ai.parsing.pdf import DEFAULT_MAX_PAGES, PdfOcr, PdfPipeline
 from requestflow_ai.parsing.segments import Segment
 
-Warning = Literal["no_text", "attachment_failed"]
+Warning = Literal["no_text", "attachment_failed", "ocr_pages_skipped"]
 
 
 @dataclass(frozen=True)
@@ -57,6 +57,8 @@ def run_extraction(
         warnings.append("no_text")
     if any(report.status == "failed" for report in parsed.attachments):
         warnings.append("attachment_failed")
+    if parsed.ocr_pages_skipped:
+        warnings.append("ocr_pages_skipped")
 
     if not segments:
         # Nothing to cite, so nothing can be found; do not spend a model call on it.

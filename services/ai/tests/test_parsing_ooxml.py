@@ -9,7 +9,11 @@ import pytest
 from builders import build_docx, build_xlsx
 
 from requestflow_ai.parsing import ooxml
-from requestflow_ai.parsing.errors import DocumentParseError, UnsupportedMediaTypeError
+from requestflow_ai.parsing.errors import (
+    DocumentParseError,
+    DocumentTooLongError,
+    UnsupportedMediaTypeError,
+)
 from requestflow_ai.parsing.ooxml import open_package, package_kind
 
 
@@ -48,3 +52,18 @@ def test_entry_count_is_capped(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ooxml, "MAX_ENTRIES", 3)
     with pytest.raises(DocumentParseError):
         open_package(_zip({f"{i}.xml": b"x" for i in range(4)}))
+
+
+def test_single_part_over_the_part_cap_is_rejected_before_decompression(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Any part: python-docx/openpyxl choose the XML parser by content type, not by file name.
+    package = build_docx(["a"])
+    with zipfile.ZipFile(BytesIO(package)) as archive:
+        largest = max(entry.file_size for entry in archive.infolist())
+    monkeypatch.setattr(ooxml, "MAX_PART_BYTES", largest)
+    open_package(package).close()  # every part within the cap
+    with pytest.raises(DocumentTooLongError):
+        open_package(_zip({"word/document.xml": b"<w:p/>" * (largest // 6 + 1)}))
+    with pytest.raises(DocumentTooLongError):
+        open_package(_zip({"word/media/anything.bin": bytes(range(256)) * (largest // 256 + 1)}))

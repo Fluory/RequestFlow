@@ -256,6 +256,7 @@ class _OcrConverter:
 
     def __init__(self) -> None:
         self.initialized = 0
+        self.converted = 0
 
     def initialize_pipeline(self, _fmt: object) -> None:
         self.initialized += 1
@@ -265,6 +266,7 @@ class _OcrConverter:
     ) -> Any:
         from docling.datamodel.base_models import ConversionStatus
 
+        self.converted += 1
         page_no = page_range[0]
         document = DoclingDocument(name="document")
         document.add_page(page_no=page_no, size=Size(width=595, height=842))
@@ -325,6 +327,20 @@ def test_scanned_pdf_without_ocr_keeps_the_no_text_behaviour(
     assert response.status_code == 200
     assert response.json()["warnings"] == ["no_text"]
     assert replay.requests == []
+
+
+def test_pages_over_the_ocr_cap_are_skipped_with_a_warning(
+    fixtures_dir: Path, replay: Replay, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    converter = _OcrConverter()
+    monkeypatch.setattr(pdf_module, "_ocr_converter", lambda: converter)
+    monkeypatch.setattr(pdf_module, "MAX_OCR_PAGES", 0)
+    with TestClient(build_app(replay, ai_pdf_ocr="auto")) as client:
+        response = upload(client, (fixtures_dir / "anfrage_scan.pdf").read_bytes())
+    assert response.status_code == 200, response.text
+    assert response.json()["warnings"] == ["no_text", "ocr_pages_skipped"]
+    assert replay.requests == []
+    assert converter.converted == 0
 
 
 def test_ocr_setting_defaults_to_off() -> None:
