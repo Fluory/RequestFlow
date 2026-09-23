@@ -381,7 +381,8 @@ components:
             maxLength: 100
           - type: 'null'
           title: Mediatype
-          description: Declared media type, e.g. message/rfc822. PDF is detected from bytes.
+          description: Declared media type, e.g. message/rfc822. Only helps to recognise an .eml; every
+            kind is detected from the bytes.
       type: object
       required:
       - file
