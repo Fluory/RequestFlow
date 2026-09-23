@@ -258,6 +258,25 @@ def test_live_mode_is_refused_in_ci_and_on_the_gemini_free_tier(
     assert main(["--live", "--cases", str(CASES)], environ={"CI": "true"}) == 2
 
 
+def test_live_mode_aborts_before_any_case_without_configuration_or_credentials(
+    cases_copy: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """AI rule: a failed client init aborts - no case errors, no touched recordings (#24 review)."""
+    before = {path: path.read_bytes() for path in cases_copy.rglob(MODEL_RESPONSE_FILE)}
+    for name in ("VERTEX_PROJECT", "GOOGLE_APPLICATION_CREDENTIALS", "AI_ALLOW_GEMINI_API_DEV"):
+        monkeypatch.delenv(name, raising=False)
+
+    assert main(["--live", "--cases", str(cases_copy)], environ={}) == 2
+    assert "error:" in capsys.readouterr().err
+
+    monkeypatch.setenv("VERTEX_PROJECT", "beispiel-projekt")
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(cases_copy / "no-such-adc.json"))
+    assert main(["--live", "--cases", str(cases_copy)], environ={}) == 2
+    err = capsys.readouterr().err
+    assert "error:" in err and "case error" not in err
+    assert {path: path.read_bytes() for path in cases_copy.rglob(MODEL_RESPONSE_FILE)} == before
+
+
 def test_update_baseline_is_refused_in_ci_and_in_live_mode() -> None:
     with pytest.raises(SystemExit):
         main(["--replay", "--update-baseline"], environ={"CI": "true"})

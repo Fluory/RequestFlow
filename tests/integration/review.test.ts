@@ -159,7 +159,7 @@ describe("review: fields beside their source, corrections, approve or reject", (
 
     const corrected = (await loadReview(tenancy, clerk, requestId))!.lineItems[0]!.fields.find((field) => field.key === "quantity");
     expect(corrected).toMatchObject({ value: "1250", extractedValue: "99999", reviewStatus: "corrected", itemIndex: 0 });
-    // Header field with the same key space is untouched; the correction belongs to position 0 only.
+    // The correction belongs to position 0 only – position 1 keeps its (missing) value.
     expect((await loadReview(tenancy, clerk, requestId))!.lineItems[1]!.fields.find((field) => field.key === "quantity")?.value).toBeNull();
     expect((await auditOf(clerk, requestId)).find((event) => event.action === "field.corrected")?.data).toEqual({ field: "quantity", item: 0, oldValue: "99999", newValue: "1250" });
     await expect(correctField(tenancy, clerk, requestId, "quantity", "5", 7)).rejects.toMatchObject({ code: "unknown_field" });

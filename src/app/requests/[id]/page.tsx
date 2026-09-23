@@ -183,7 +183,11 @@ export default async function RequestPage({
                       data-testid={`item-${item.itemIndex}-${field.key}`}
                       className={field.reviewStatus === "unverified" || field.reviewStatus === "uncertain" ? "attention" : undefined}
                     >
-                      <Link href={`/requests/${request.id}?field=${field.key}&item=${item.itemIndex}`} aria-label={`Position ${item.itemIndex + 1}, ${field.label}: prüfen`}>
+                      {/* The accessible name contains the visible value (WCAG 2.5.3 label in name). */}
+                      <Link
+                        href={`/requests/${request.id}?field=${field.key}&item=${item.itemIndex}`}
+                        aria-label={`Position ${item.itemIndex + 1}, ${field.label}: ${field.value ?? "–"}`}
+                      >
                         {field.value ?? "–"}
                       </Link>{" "}
                       <StatusBadge status={field.reviewStatus} />
