@@ -17,6 +17,9 @@ const schema = z.object({
   APP_ENV: z.enum(["local", "showcase", "production"]),
   UPLOAD_MAX_FILE_BYTES: z.coerce.number().int().positive().default(20 * 1024 * 1024),
   UPLOAD_MAX_FILES: z.coerce.number().int().positive().max(50).default(10),
+  AI_SERVICE_URL: z.url().default("http://127.0.0.1:8000"),
+  AI_SERVICE_TOKEN: z.string().min(24).optional(),
+  AI_SERVICE_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
   UPLOAD_MAX_REQUEST_BYTES: z.coerce.number().int().positive().default(40 * 1024 * 1024),
 });
 
@@ -38,6 +41,11 @@ export interface AppConfig {
     baseURL: string;
     ipAddressHeaders: string[];
     trustedProxies: string[];
+  };
+  aiService: {
+    baseUrl: string;
+    token: string | undefined;
+    timeoutMs: number;
   };
   upload: {
     maxFileBytes: number;
@@ -74,6 +82,7 @@ export function loadConfig(source: Record<string, string | undefined> = process.
       ipAddressHeaders: list(env.AUTH_IP_HEADERS),
       trustedProxies: list(env.AUTH_TRUSTED_PROXIES),
     },
+    aiService: { baseUrl: env.AI_SERVICE_URL, token: env.AI_SERVICE_TOKEN, timeoutMs: env.AI_SERVICE_TIMEOUT_MS },
     upload: { maxFileBytes: env.UPLOAD_MAX_FILE_BYTES, maxFiles: env.UPLOAD_MAX_FILES, maxRequestBytes: env.UPLOAD_MAX_REQUEST_BYTES },
   };
 }

@@ -15,6 +15,8 @@ export async function createJobQueue(connectionString: string, options: { superv
     createSchema: false,
     supervise: options.supervise ?? false,
     schedule: false,
+    // Persisted queue statistics create daily partitions (DDL) – the runtime role has no DDL rights.
+    persistQueueStats: false,
   });
   boss.on("error", (error: Error) => console.error(JSON.stringify({ level: "error", module: "jobs", message: error.message })));
   await boss.start();
@@ -50,7 +52,8 @@ export async function installJobQueues(ownerConnectionString: string, definition
       `GRANT SELECT, INSERT, UPDATE, DELETE ON ${s}.job, ${s}.job_common, ${s}.job_dependency, ${s}.warning, ${s}.bam TO app_rw`,
       `GRANT SELECT, INSERT, UPDATE, DELETE ON ${s}.queue_stats TO app_rw`,
       `GRANT SELECT, UPDATE ON ${s}.queue TO app_rw`,
-      `GRANT SELECT ON ${s}.version, ${s}.schedule, ${s}.subscription TO app_rw`,
+      `GRANT SELECT, UPDATE ON ${s}.version TO app_rw`, // supervise() records its maintenance timestamps here
+      `GRANT SELECT ON ${s}.schedule, ${s}.subscription TO app_rw`,
       `GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA ${s} TO app_rw`,
       `GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA ${s} TO app_rw`,
       // Partitions of job/queue_stats created later by the owner inherit the table privileges.
