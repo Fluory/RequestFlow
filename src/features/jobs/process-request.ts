@@ -21,8 +21,9 @@ export class PermanentProcessingError extends Error {
   }
 }
 
-// Formats the AI service accepts today; others are kept as originals but skipped (#23 adds them).
-const AI_KINDS = new Set(["pdf", "eml"]);
+// Formats the AI service reads (#23: XLSX, DOCX and Outlook .msg joined PDF and e-mail). Anything else
+// is kept as an original but skipped with a visible note.
+const AI_KINDS = new Set(["pdf", "eml", "xlsx", "docx", "msg"]);
 
 /** Human-readable causes for staff (DR4): no stack traces, no hosts, no document content. */
 export function describeFailure(error: unknown): string {

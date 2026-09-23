@@ -12,7 +12,8 @@ class UnsupportedMediaTypeError(Exception):
 
 
 class DocumentTooLongError(Exception):
-    """The document has more pages than ``AI_MAX_PDF_PAGES``."""
+    """The document exceeds a size cap: PDF pages (``AI_MAX_PDF_PAGES``), pages to OCR, XLSX
+    sheets/rows/cells, DOCX blocks or segments of a whole message."""
 
 
 class PdfPipelineInitError(Exception):

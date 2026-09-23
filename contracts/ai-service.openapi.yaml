@@ -87,14 +87,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '415':
-          description: Not a PDF or RFC 5322 e-mail (.msg is not supported yet).
+          description: Not a PDF, RFC 5322 e-mail, Outlook .msg, DOCX or XLSX (e.g. legacy .doc/.xls,
+            password-protected Office files, images).
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '422':
-          description: The document could not be parsed (`document_unparseable`) or has more pages than
-            AI_MAX_PDF_PAGES (`document_too_long`).
+          description: 'The document could not be parsed (`document_unparseable`) or is too long (`document_too_long`:
+            more pages than AI_MAX_PDF_PAGES, too many rows, text blocks or pages without text to OCR).
+            A failing attachment of a .msg does not cause this; it is reported in `attachments`.'
           content:
             application/json:
               schema:
@@ -119,6 +121,86 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
+    AttachmentRef:
+      properties:
+        index:
+          type: integer
+          minimum: 0.0
+          title: Index
+          description: 0-based position among the message's attachments.
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Name
+          description: File name as stored in the message (untrusted text).
+      type: object
+      required:
+      - index
+      - name
+      title: AttachmentRef
+    AttachmentResult:
+      properties:
+        path:
+          items:
+            type: integer
+          type: array
+          title: Path
+          description: 0-based attachment index per nesting level, outermost first; the last one is `attachment.index`
+            in the locators of this attachment's segments.
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Name
+          description: File name as stored in the message (untrusted text).
+        documentKind:
+          anyOf:
+          - type: string
+            enum:
+            - pdf
+            - eml
+            - xlsx
+            - docx
+            - msg
+          - type: 'null'
+          title: Documentkind
+          description: Detected kind; null when failed.
+        status:
+          type: string
+          enum:
+          - parsed
+          - failed
+          title: Status
+        error:
+          anyOf:
+          - type: string
+            enum:
+            - unsupported_media_type
+            - document_unparseable
+            - document_too_long
+            - nesting_too_deep
+            - too_many_attachments
+            - not_attached_by_value
+          - type: 'null'
+          title: Error
+          description: Why the attachment was not parsed; null when parsed. The message and its other
+            attachments are still processed.
+        segmentCount:
+          type: integer
+          minimum: 0.0
+          title: Segmentcount
+          description: Segments this attachment contributed.
+      type: object
+      required:
+      - path
+      - name
+      - documentKind
+      - status
+      - error
+      - segmentCount
+      title: AttachmentResult
+      description: One attachment of an Outlook ``.msg`` (also nested ones), parsed or not.
     BoundingBox:
       properties:
         l:
@@ -141,6 +223,58 @@ components:
       - b
       title: BoundingBox
       description: Box in PDF points; origin top-left of the page (``t`` < ``b``).
+    DocxLocator:
+      properties:
+        kind:
+          type: string
+          const: docx
+          title: Kind
+          default: docx
+        part:
+          type: string
+          enum:
+          - paragraph
+          - table_cell
+          title: Part
+        paragraph:
+          anyOf:
+          - type: integer
+            minimum: 1.0
+          - type: 'null'
+          title: Paragraph
+          description: 1-based index of the paragraph among the body paragraphs (empty ones count); null
+            for a table cell.
+        table:
+          anyOf:
+          - type: integer
+            minimum: 1.0
+          - type: 'null'
+          title: Table
+          description: 1-based table index in the body.
+        row:
+          anyOf:
+          - type: integer
+            minimum: 1.0
+          - type: 'null'
+          title: Row
+          description: 1-based row in the table.
+        cell:
+          anyOf:
+          - type: integer
+            minimum: 1.0
+          - type: 'null'
+          title: Cell
+          description: 1-based grid column where the cell starts (a merged cell counts once).
+      type: object
+      required:
+      - kind
+      - part
+      - paragraph
+      - table
+      - row
+      - cell
+      title: DocxLocator
+      description: A body paragraph (``part=paragraph``) or one table cell (``part=table_cell``).
     EmailLocator:
       properties:
         kind:
@@ -234,7 +368,8 @@ components:
           type: string
           contentMediaType: application/octet-stream
           title: File
-          description: The document bytes (PDF or .eml).
+          description: 'The document bytes: PDF, .eml, Outlook .msg, .docx/.docm or .xlsx/.xlsm. The kind
+            is detected from the bytes, not from the file name.'
         documentId:
           type: string
           pattern: ^[A-Za-z0-9._:-]{1,128}$
@@ -246,7 +381,8 @@ components:
             maxLength: 100
           - type: 'null'
           title: Mediatype
-          description: Declared media type, e.g. message/rfc822. PDF is detected from bytes.
+          description: Declared media type, e.g. message/rfc822. Only helps to recognise an .eml; every
+            kind is detected from the bytes.
       type: object
       required:
       - file
@@ -265,7 +401,11 @@ components:
           enum:
           - pdf
           - eml
+          - xlsx
+          - docx
+          - msg
           title: Documentkind
+          description: 'Detected from the bytes: pdf, eml, xlsx, docx or msg (Outlook).'
         segments:
           items:
             $ref: '#/components/schemas/Segment'
@@ -284,10 +424,21 @@ components:
         warnings:
           items:
             type: string
-            const: no_text
+            enum:
+            - no_text
+            - attachment_failed
           type: array
           title: Warnings
-          description: '`no_text`: the document has no text layer (e.g. a scan); no model call made.'
+          description: '`no_text`: the document has no text (e.g. a scan without OCR); no model call made.
+            `attachment_failed`: at least one attachment of a `.msg` could not be parsed (see `attachments`);
+            the rest was processed.'
+        attachments:
+          items:
+            $ref: '#/components/schemas/AttachmentResult'
+          type: array
+          title: Attachments
+          description: Attachments of an Outlook `.msg`, flattened in document order (nested ones after
+            their parent); empty for other kinds.
       type: object
       required:
       - requestId
@@ -378,12 +529,14 @@ components:
             - value_not_in_quote
             - ambiguous_quote
             - calendar_week_only
+            - ocr_only
           - type: 'null'
           title: Reason
           description: 'Why the verifier set `unverified`; for `uncertain`: `ambiguous_quote` when it
-            downgraded `found` (the quote holds several dates) or `calendar_week_only` when a date field
-            only has a calendar week (value then `KW <week>` or `KW <week>/<year>`, never a computed date);
-            null otherwise.'
+            downgraded `found` (the quote holds several dates), `calendar_week_only` when a date field
+            only has a calendar week (value then `KW <week>` or `KW <week>/<year>`, never a computed date)
+            or `ocr_only` when the only evidence is OCR text (a segment with `locator.ocr`, also inside
+            an attachment); null otherwise.'
       type: object
       required:
       - value
@@ -435,6 +588,68 @@ components:
       - dimensions
       title: LineItem
       description: One requested position; every field is verified on its own (same rules as header fields).
+    MsgLocator:
+      properties:
+        kind:
+          type: string
+          const: msg
+          title: Kind
+          default: msg
+        part:
+          type: string
+          enum:
+          - header
+          - body
+          - attachment
+          title: Part
+        line:
+          anyOf:
+          - type: integer
+            minimum: 1.0
+          - type: 'null'
+          title: Line
+          description: 1-based line in the decoded text body (part=body), or 1-based position in the header
+            list (part=header); null for part=attachment.
+        header:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Header
+          description: Header name when part=header.
+        attachment:
+          anyOf:
+          - $ref: '#/components/schemas/AttachmentRef'
+          - type: 'null'
+          description: The attachment holding the segment when part=attachment.
+        inner:
+          anyOf:
+          - oneOf:
+            - $ref: '#/components/schemas/PdfLocator'
+            - $ref: '#/components/schemas/EmailLocator'
+            - $ref: '#/components/schemas/XlsxLocator'
+            - $ref: '#/components/schemas/DocxLocator'
+            - $ref: '#/components/schemas/MsgLocator'
+            discriminator:
+              propertyName: kind
+              mapping:
+                docx: '#/components/schemas/DocxLocator'
+                email: '#/components/schemas/EmailLocator'
+                msg: '#/components/schemas/MsgLocator'
+                pdf: '#/components/schemas/PdfLocator'
+                xlsx: '#/components/schemas/XlsxLocator'
+          - type: 'null'
+          title: Inner
+          description: Locator inside the attachment (pdf, xlsx, docx, email or a nested msg) when part=attachment.
+      type: object
+      required:
+      - kind
+      - part
+      - line
+      - header
+      - attachment
+      - inner
+      title: MsgLocator
+      description: 'Outlook ``.msg``: headers and body lines like ``email``; attachments wrap their locator.'
     PdfLocator:
       properties:
         kind:
@@ -454,6 +669,12 @@ components:
           const: TOPLEFT
           title: Coordorigin
           default: TOPLEFT
+        ocr:
+          type: boolean
+          title: Ocr
+          description: 'True when the text comes from OCR of a page without a text layer. A field whose
+            evidence is OCR text is at most `uncertain` (reason `ocr_only`). Optional: absent means false.'
+          default: false
       type: object
       required:
       - kind
@@ -486,7 +707,8 @@ components:
             - layout
           - type: 'null'
           title: Pdfpipeline
-          description: PDF pipeline used; null for e-mails.
+          description: PDF pipeline used; null when no PDF was parsed (neither the document nor one of
+            its attachments).
         tokens:
           $ref: '#/components/schemas/TokenUsage'
         latencyMs:
@@ -522,12 +744,18 @@ components:
           oneOf:
           - $ref: '#/components/schemas/PdfLocator'
           - $ref: '#/components/schemas/EmailLocator'
+          - $ref: '#/components/schemas/XlsxLocator'
+          - $ref: '#/components/schemas/DocxLocator'
+          - $ref: '#/components/schemas/MsgLocator'
           title: Locator
           discriminator:
             propertyName: kind
             mapping:
+              docx: '#/components/schemas/DocxLocator'
               email: '#/components/schemas/EmailLocator'
+              msg: '#/components/schemas/MsgLocator'
               pdf: '#/components/schemas/PdfLocator'
+              xlsx: '#/components/schemas/XlsxLocator'
       type: object
       required:
       - id
@@ -557,6 +785,34 @@ components:
       - outputTokens
       - totalTokens
       title: TokenUsage
+    XlsxLocator:
+      properties:
+        kind:
+          type: string
+          const: xlsx
+          title: Kind
+          default: xlsx
+        sheet:
+          type: string
+          title: Sheet
+          description: Sheet name as in the workbook.
+        row:
+          type: integer
+          minimum: 1.0
+          title: Row
+          description: 1-based row number.
+        cellRange:
+          type: string
+          title: Cellrange
+          description: Range of the non-empty cells of the row, e.g. "A7:D7" (or "B7" for one cell).
+      type: object
+      required:
+      - kind
+      - sheet
+      - row
+      - cellRange
+      title: XlsxLocator
+      description: 'One spreadsheet row: its non-empty cells are joined with `` | `` in the segment text.'
   securitySchemes:
     bearerAuth:
       type: http

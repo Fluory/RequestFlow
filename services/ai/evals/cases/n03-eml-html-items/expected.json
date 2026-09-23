@@ -1,0 +1,34 @@
+{
+  "id": "n03-eml-html-items",
+  "categories": [
+    "standard",
+    "missing"
+  ],
+  "description": "HTML-only mail with two positions; Pos. 1 has no material. Model mistake: proposes the hose type '2SN' as material (uncertain, verified quote).",
+  "document": "document.eml",
+  "declared_type": "message/rfc822",
+  "fields": {
+    "company": "Fluidtechnik Beispiel GmbH",
+    "contact_person": "Ben Beispiel",
+    "email": "ben.beispiel@example.com",
+    "phone": "0521 777 888",
+    "requested_delivery_date": "2026-11-02",
+    "additional_requirements": "Schläuche einzeln verpackt und etikettiert"
+  },
+  "line_items": [
+    {
+      "description": "Hydraulikschlauch 2SN",
+      "quantity": "40",
+      "unit": "pcs",
+      "material": null,
+      "dimensions": "DN12, 1000 mm"
+    },
+    {
+      "description": "Pressfitting",
+      "quantity": "40",
+      "unit": "pcs",
+      "material": "Stahl verzinkt",
+      "dimensions": "DN12"
+    }
+  ]
+}

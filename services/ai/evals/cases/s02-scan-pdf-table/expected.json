@@ -1,0 +1,45 @@
+{
+  "id": "s02-scan-pdf-table",
+  "categories": [
+    "scanned",
+    "table"
+  ],
+  "description": "Image-only PDF with an item table. No text layer: until OCR (#23) the service returns no_text, no model call, all fields missing.",
+  "document": "document.pdf",
+  "declared_type": "application/pdf",
+  "fields": {
+    "company": null,
+    "contact_person": null,
+    "email": null,
+    "phone": null,
+    "requested_delivery_date": null,
+    "additional_requirements": null
+  },
+  "line_items": [],
+  "after_ocr": {
+    "fields": {
+      "company": "Kranbau Muster AG",
+      "contact_person": null,
+      "email": "anna.muster@example.org",
+      "phone": null,
+      "requested_delivery_date": null,
+      "additional_requirements": null
+    },
+    "line_items": [
+      {
+        "description": "Seilrolle",
+        "quantity": "4",
+        "unit": "pcs",
+        "material": "GS-52",
+        "dimensions": "D 400 mm"
+      },
+      {
+        "description": "Drahtseil",
+        "quantity": "200",
+        "unit": "m",
+        "material": "1770 verz.",
+        "dimensions": "D 16 mm"
+      }
+    ]
+  }
+}

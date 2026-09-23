@@ -1,0 +1,40 @@
+{
+  "id": "t03-table-eml-plaintext",
+  "categories": [
+    "table"
+  ],
+  "description": "Plain-text e-mail with a pipe table (one segment per row). Model mistake: dimension 'DN 80' reformatted with a space (not in the quote).",
+  "document": "document.eml",
+  "declared_type": "message/rfc822",
+  "fields": {
+    "company": "Armaturen Beispiel GmbH",
+    "contact_person": "Clara Beispiel",
+    "email": "c.beispiel@example.net",
+    "phone": "+49 621 3344 55",
+    "requested_delivery_date": "2026-10-16",
+    "additional_requirements": "Druckprüfung nach EN 12266-1 mit Prüfprotokoll"
+  },
+  "line_items": [
+    {
+      "description": "Kugelhahn",
+      "quantity": "60",
+      "unit": "pcs",
+      "material": "1.4408",
+      "dimensions": "DN80"
+    },
+    {
+      "description": "Rückschlagventil",
+      "quantity": "25",
+      "unit": "pcs",
+      "material": "1.0619",
+      "dimensions": "DN50"
+    },
+    {
+      "description": "Flachdichtung",
+      "quantity": "120",
+      "unit": "pcs",
+      "material": "PTFE",
+      "dimensions": "DN80"
+    }
+  ]
+}
