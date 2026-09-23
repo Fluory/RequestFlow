@@ -5,7 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import { currentActor, getJobClient, getRuntime } from "@/app/_server/runtime";
 import { AuthorizationError } from "@/features/identity";
-import { approveRequest, correctField, rejectRequest, ReviewRefused } from "@/features/review";
+import { approveRequest, confirmNotDuplicate, correctField, rejectAsDuplicate, rejectRequest, ReviewRefused } from "@/features/review";
 
 // Server actions of the review screen. Every action resolves the actor from the session and the
 // review module authorizes it again next to the data (security rule: never only hidden UI).
@@ -28,7 +28,7 @@ function back(requestId: string, params: { done: string } | { error: string }): 
   redirect(`/requests/${requestId}?${new URLSearchParams(params).toString()}`);
 }
 
-async function guarded(requestId: string, action: () => Promise<void>, done: "corrected" | "approved" | "rejected"): Promise<never> {
+async function guarded(requestId: string, action: () => Promise<void>, done: "corrected" | "approved" | "rejected" | "not_duplicate"): Promise<never> {
   try {
     await action();
   } catch (error) {
@@ -59,4 +59,17 @@ export async function rejectAction(formData: FormData): Promise<void> {
   const requestId = requestIdOf(formData);
   const reason = String(formData.get("reason") ?? "");
   await guarded(requestId, () => rejectRequest(getRuntime().tenancy, actor, requestId, reason), "rejected");
+}
+
+export async function confirmNotDuplicateAction(formData: FormData): Promise<void> {
+  const actor = await actorOrLogin();
+  const requestId = requestIdOf(formData);
+  await guarded(requestId, () => confirmNotDuplicate(getRuntime().tenancy, actor, requestId), "not_duplicate");
+}
+
+export async function rejectAsDuplicateAction(formData: FormData): Promise<void> {
+  const actor = await actorOrLogin();
+  const requestId = requestIdOf(formData);
+  const reason = String(formData.get("reason") ?? "");
+  await guarded(requestId, () => rejectAsDuplicate(getRuntime().tenancy, actor, requestId, reason), "rejected");
 }

@@ -4,6 +4,7 @@ export const DONE_MESSAGES: Record<string, string> = {
   corrected: "Korrektur gespeichert.",
   approved: "Freigegeben – der Export ist eingeplant.",
   rejected: "Abgelehnt.",
+  not_duplicate: "Als eigenständige Anfrage bestätigt.",
 };
 
 export const ERROR_MESSAGES: Record<string, string> = {
@@ -12,6 +13,8 @@ export const ERROR_MESSAGES: Record<string, string> = {
   reason_missing: "Bitte einen Grund für die Ablehnung angeben.",
   reason_too_long: "Der Grund ist zu lang (höchstens 1000 Zeichen).",
   value_too_long: "Ein Wert ist zu lang für den ERP-Export (höchstens 500 Zeichen) – bitte zuerst korrigieren.",
+  duplicate_undecided: "Mögliches Duplikat – bitte zuerst entscheiden, ob es eine eigenständige Anfrage ist.",
+  not_a_possible_duplicate: "Für diese Anfrage steht keine Duplikat-Entscheidung an.",
   forbidden: "Keine Berechtigung.",
 };
 
