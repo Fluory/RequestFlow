@@ -21,10 +21,11 @@
     "db:migrate": "drizzle-kit migrate",
     "verify:changed": "bash scripts/verify-changed.sh",
     "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm test:integration && pnpm depcruise && pnpm build && pnpm audit --audit-level high",
-    "verify:full": "pnpm verify",
+    "verify:full": "pnpm verify && pnpm e2e",
     "setup:deploy": "tsx src/setup.ts",
     "seed:demo": "tsx src/seed.ts",
-    "contract:types": "openapi-typescript contracts/ai-service.openapi.yaml -o src/features/extraction/ai-service.contract.ts"
+    "contract:types": "openapi-typescript contracts/ai-service.openapi.yaml -o src/features/extraction/ai-service.contract.ts",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1138.0",
@@ -40,6 +41,7 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@types/node": "24.13.6",
     "@types/pg": "8.23.1",
     "@types/react": "19.3.0",

@@ -1,3 +1,17 @@
-// Public API of the `review` module: review UI, corrections, approve/reject.
-// Other modules import only from this file (dependency-cruiser, ADR-0001 D1). Planned – see docs/technical/architecture.md.
-export {};
+// Public API of the `review` module: review view, corrections, approve/reject, source view.
+export {
+  approveRequest,
+  correctField,
+  correctionHistory,
+  FIELD_LABELS,
+  loadReview,
+  REJECTION_REASON_MAX,
+  rejectRequest,
+  ReviewRefused,
+  type FieldStatus,
+  type ReviewRefusal,
+  type ReviewStatus,
+  type ReviewField,
+  type ReviewView,
+} from "./review";
+export { buildSourceView, type SourceLine, type SourceView } from "./source-view";

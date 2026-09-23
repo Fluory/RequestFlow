@@ -1,0 +1,62 @@
+"use server";
+
+import { headers } from "next/headers";
+import { notFound, redirect } from "next/navigation";
+import { z } from "zod";
+import { currentActor, getJobClient, getRuntime } from "@/app/_server/runtime";
+import { AuthorizationError } from "@/features/identity";
+import { approveRequest, correctField, rejectRequest, ReviewRefused } from "@/features/review";
+
+// Server actions of the review screen. Every action resolves the actor from the session and the
+// review module authorizes it again next to the data (security rule: never only hidden UI).
+const id = z.uuid();
+
+async function actorOrLogin() {
+  const actor = await currentActor(await headers());
+  if (!actor) redirect("/login");
+  return actor;
+}
+
+function requestIdOf(formData: FormData): string {
+  const parsed = id.safeParse(formData.get("requestId"));
+  if (!parsed.success) notFound();
+  return parsed.data;
+}
+
+// Only fixed codes go into the URL; the page maps them to texts (messages.ts).
+function back(requestId: string, params: { done: string } | { error: string }): never {
+  redirect(`/requests/${requestId}?${new URLSearchParams(params).toString()}`);
+}
+
+async function guarded(requestId: string, action: () => Promise<void>, done: "corrected" | "approved" | "rejected"): Promise<never> {
+  try {
+    await action();
+  } catch (error) {
+    if (error instanceof ReviewRefused) back(requestId, { error: error.code });
+    if (error instanceof AuthorizationError) back(requestId, { error: "forbidden" });
+    throw error;
+  }
+  back(requestId, { done });
+}
+
+export async function correctFieldAction(formData: FormData): Promise<void> {
+  const actor = await actorOrLogin();
+  const requestId = requestIdOf(formData);
+  const fieldKey = String(formData.get("field") ?? "");
+  const raw = String(formData.get("value") ?? "");
+  await guarded(requestId, () => correctField(getRuntime().tenancy, actor, requestId, fieldKey, raw === "" ? null : raw), "corrected");
+}
+
+export async function approveAction(formData: FormData): Promise<void> {
+  const actor = await actorOrLogin();
+  const requestId = requestIdOf(formData);
+  const boss = await getJobClient();
+  await guarded(requestId, () => approveRequest({ tenancy: getRuntime().tenancy, boss }, actor, requestId), "approved");
+}
+
+export async function rejectAction(formData: FormData): Promise<void> {
+  const actor = await actorOrLogin();
+  const requestId = requestIdOf(formData);
+  const reason = String(formData.get("reason") ?? "");
+  await guarded(requestId, () => rejectRequest(getRuntime().tenancy, actor, requestId, reason), "rejected");
+}

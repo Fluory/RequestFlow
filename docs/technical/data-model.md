@@ -19,7 +19,7 @@ query sees zero rows and every write fails.
 
 ## Tables
 
-### `app.requests` – request aggregate (#4, extended by #5/#7)
+### `app.requests` – request aggregate (#4, extended by #5/#7/#8)
 
 | Column | Type | Notes | Class |
 |---|---|---|---|
@@ -35,6 +35,7 @@ query sees zero rows and every write fails.
 | `possible_duplicate` / `duplicate_of_id` | boolean / uuid | exact duplicate within the company; composite FK `(duplicate_of_id, company_id)` | internal |
 | `error_stage`, `error_message` | text | `processing`/`export`; readable cause for staff – no stack traces, hosts or document content | internal |
 | `attempts`, `next_retry_at` | int, timestamptz | processing attempts; next retry while pg-boss retries | internal |
+| `rejection_reason` | text | free-text reason of a rejection, max 1000 chars (refused above, not cut – review module); also in the `request.rejected` audit event | confidential |
 
 Unique `(id, company_id)` so child tables can pin the company with composite foreign keys (FK checks
 bypass RLS). Purpose: one quote request per row. Retention: open question for the customer (ADR-0001 open points).
@@ -45,10 +46,25 @@ bypass RLS). Purpose: one quote request per row. Retention: open question for th
 |---|---|---|---|
 | `extraction_runs` | one row per processing job: model, prompt + schema version, tokens, latency, per-document metadata (or why a document was skipped) | internal | unique `job_id` → a redelivered job is a no-op |
 | `extraction_segments` | segment text + locator (page/bbox, mail line) per document | confidential + personal | source view of the review UI |
-| `extracted_fields` | one merged value per header field: value, status (`found` only with a verified quote – check constraint), model status, reason, document, segment, quote | confidential + personal | corrections come with #8 |
+| `extracted_fields` | one merged value per header field: value, status (`found` only with a verified quote – check constraint), model status, reason, document, segment, quote | confidential + personal | original extraction – never overwritten; corrections live in `field_corrections` |
 
 All three: `company_id`, forced RLS, composite FKs to the run and request of the same company;
 `extracted_fields` evidence `(run_id, document_id, segment_id)` must reference a stored segment.
+
+### `app.field_corrections` – manual corrections from the review (#8)
+
+| Column | Type | Notes | Class |
+|---|---|---|---|
+| `id`, `company_id`, `request_id` | uuid | composite FK `(request_id, company_id)` → `requests` | internal |
+| `field_key` | text | `company` · `contact_person` · `requested_delivery_date` | internal |
+| `old_value`, `new_value` | text | value before / after; the newest row is the current value | confidential + personal |
+| `corrected_by`, `created_at` | uuid, timestamptz | who and when; no FK to `auth.user` (like `audit_events.actor_user_id`) – the history must survive a user's removal | personal (staff) |
+
+Append-only: forced RLS, `app_rw` has INSERT/SELECT only (UPDATE/DELETE/TRUNCATE revoked) – the
+history is the correction audit. The page shows a corrected value as `korrigiert`, never as `found`
+(its proof is this history, not a quote). Purpose: traceable corrections before export. Retention: with the
+request. Corrected values and rejection reasons are also copied into the append-only `audit_events` – they
+cannot be deleted per request there; this joins the open retention question (ADR-0001 open points).
 
 ### `app.documents` – originals of a request (#5)
 
@@ -96,5 +112,7 @@ auth.organization 1─n auth.invitation
 auth.organization 1─n app.requests            (company_id)
 app.requests      1─n app.documents           (request_id, company_id)
 app.requests      0─1 app.requests            (duplicate_of_id, company_id)
+app.requests      1─n app.extraction_runs     (request_id, company_id) 1─n segments / fields
+app.requests      1─n app.field_corrections   (request_id, company_id)
 app.*             1─n app.audit_events        (entity_type, entity_id – no FK, append-only)
 ```

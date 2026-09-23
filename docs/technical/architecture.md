@@ -27,7 +27,7 @@ Every new file belongs to one of these modules – otherwise add the module here
 | `documents` | `src/features/documents/` | document records, storage references, hashes | internal | confidential | tenant context | built: records, SHA-256, storage keys |
 | `extraction` | `src/features/extraction/` | AI-service client, persists runs/fields/evidence | internal | confidential + personal | tenant context, contract validation | built: AI-service client (timeout, error classes), field merge, runs/segments/fields |
 | `requests` | `src/features/requests/` | request aggregate, status machine | internal | confidential | tenant context | built: repository, status machine, processing state |
-| `review` | `src/features/review/` | review UI, corrections, approve/reject | authenticated UI | confidential + personal | session, role check, audit | skeleton |
+| `review` | `src/features/review/` | review UI, corrections, approve/reject | authenticated UI | confidential + personal | session, role check, audit | built: review page (fields + status badges + source view), corrections with history, approve (→ export job) / reject with reason |
 | `export` | `src/features/export/` | ERP port + REST adapter, idempotency | outbound HTTP | confidential | idempotency key, unique export, timeout | skeleton |
 | `erp-mock` | `src/features/erp-mock/` | simulated ERP REST API | route behind flag | synthetic | disabled unless `ERP_MOCK_ENABLED` | skeleton |
 | `identity` | `src/features/identity/` | Better Auth, users, companies, roles | public login route | personal (staff) | rate limit, invite-only | partial: Better Auth (invite-only, organization + admin plugins), `authorize()`, invite, seed |

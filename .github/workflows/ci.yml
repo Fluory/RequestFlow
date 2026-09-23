@@ -101,6 +101,9 @@ jobs:
         id: profile
         if: steps.diff.outputs.code == 'true' && hashFiles('package.json') != ''
         run: echo "stage=$(sed -n 's/^[[:space:]]*stage:[[:space:]]*\([a-z]*\).*/\1/p' project-profile.yml | head -1)" >> "$GITHUB_OUTPUT"
+      - name: Install Playwright Chromium (E2E smoke)
+        if: steps.diff.outputs.code == 'true' && hashFiles('package.json') != '' && (steps.profile.outputs.stage == 'production' || contains(github.event.pull_request.labels.*.name, 'verify-full'))
+        run: pnpm exec playwright install --with-deps chromium
       - run: pnpm verify:full
         if: steps.diff.outputs.code == 'true' && hashFiles('package.json') != '' && (steps.profile.outputs.stage == 'production' || contains(github.event.pull_request.labels.*.name, 'verify-full'))
 
