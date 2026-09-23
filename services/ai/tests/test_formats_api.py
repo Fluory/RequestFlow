@@ -45,7 +45,11 @@ def missing() -> dict[str, Any]:
 
 
 def found(value: str, segment_id: str, quote: str) -> dict[str, Any]:
-    return {"value": value, "status": "found", "evidence": {"segment_id": segment_id, "quote": quote}}
+    return {
+        "value": value,
+        "status": "found",
+        "evidence": {"segment_id": segment_id, "quote": quote},
+    }
 
 
 def vertex_body(fields: dict[str, Any], line_items: list[dict[str, Any]] | None = None) -> dict:
@@ -58,7 +62,11 @@ def vertex_body(fields: dict[str, Any], line_items: list[dict[str, Any]] | None 
                 "finishReason": "STOP",
             }
         ],
-        "usageMetadata": {"promptTokenCount": 100, "candidatesTokenCount": 50, "totalTokenCount": 150},
+        "usageMetadata": {
+            "promptTokenCount": 100,
+            "candidatesTokenCount": 50,
+            "totalTokenCount": 150,
+        },
         "modelVersion": "gemini-3.5-flash",
         "responseId": "synthetic-formats",
     }
@@ -110,9 +118,10 @@ def test_xlsx_upload_returns_row_locators_and_verified_line_item() -> None:
     (line,) = body["lineItems"]
     assert (line["quantity"]["status"], line["quantity"]["value"]) == ("found", "1250")
     assert (line["unit"]["status"], line["unit"]["value"]) == ("found", "pcs")
-    assert "[s1-r3] 1 | Flansch DN50 | 1250 | Stk." in replay.request_json()["contents"][0][
-        "parts"
-    ][0]["text"]
+    assert (
+        "[s1-r3] 1 | Flansch DN50 | 1250 | Stk."
+        in replay.request_json()["contents"][0]["parts"][0]["text"]
+    )
 
 
 def test_docx_upload_returns_paragraph_and_cell_locators() -> None:
@@ -251,7 +260,9 @@ class _OcrConverter:
     def initialize_pipeline(self, _fmt: object) -> None:
         self.initialized += 1
 
-    def convert(self, _stream: object, *, raises_on_error: bool, page_range: tuple[int, int]) -> Any:
+    def convert(
+        self, _stream: object, *, raises_on_error: bool, page_range: tuple[int, int]
+    ) -> Any:
         from docling.datamodel.base_models import ConversionStatus
 
         page_no = page_range[0]
@@ -293,7 +304,10 @@ def test_scanned_pdf_is_ocrd_and_ocr_only_evidence_is_never_found(
     body = response.json()
     assert body["warnings"] == []
     assert [s["locator"]["ocr"] for s in body["segments"]] == [True, True]
-    for key, value in (("company", "Musterbau Beispiel GmbH"), ("requested_delivery_date", "2026-11-15")):
+    for key, value in (
+        ("company", "Musterbau Beispiel GmbH"),
+        ("requested_delivery_date", "2026-11-15"),
+    ):
         result = body["fields"][key]
         assert (result["status"], result["reason"], result["value"]) == (
             "uncertain",

@@ -1,7 +1,8 @@
 # RequestFlow AI service
 
 Stateless Python service (ADR-0001 D8): **parse → extract → verify**. The TS worker sends one
-document (PDF or `.eml`) plus opaque IDs. The service returns segments with stable locators, six
+document (PDF, `.eml`, Outlook `.msg`, `.docx` or `.xlsx`; detected from the bytes) plus opaque
+IDs. The service returns segments with stable locators, six
 header fields (`company`, `contact_person`, `email`, `phone`, `requested_delivery_date`,
 `additional_requirements`), `lineItems` (each with `index`, `description`, `quantity`, `unit`,
 `material`, `dimensions`, every one a verified `FieldResult`) and run metadata (`schemaVersion`
@@ -10,7 +11,8 @@ database, no storage credentials and no tenant logic; the only credentials it ho
 
 - Contract: [`contracts/ai-service.openapi.yaml`](../../contracts/ai-service.openapi.yaml)
   (OpenAPI 3.1, generated from the app, guarded by `tests/test_contract.py`).
-- Packages (`src/requestflow_ai/`): `parsing` (detect, PDF, EML, segments), `extraction` (model-facing
+- Packages (`src/requestflow_ai/`): `parsing` (detect, `document` dispatcher, PDF incl. OCR, EML,
+  XLSX, DOCX, MSG, OOXML zip limits, segments), `extraction` (model-facing
   schema, versioned prompt, `ModelClient`), `grounding` (normalisation, value parsing, verifier),
   `api` (FastAPI app, response schemas, OpenAPI export), `pipeline.py`, `config.py`, `jsonlog.py`.
 
@@ -27,9 +29,9 @@ uv run uvicorn requestflow_ai.api.app:create_app --factory --port 8080 --no-acce
 Startup is **fail-closed**. The service does not start if the token is missing or shorter than 24
 characters, if `VERTEX_PROJECT` is missing, if no Google credentials can be loaded
 (`google.auth.default()` runs at startup, not at the first request), if `AI_ALLOW_GEMINI_API_DEV=true`
-and `VERTEX_PROJECT` are both set (ambiguous), or, with `AI_PDF_PIPELINE=layout`, if the layout
-model cannot be loaded (the converter and its model are built in `create_app`, not at the first
-request).
+and `VERTEX_PROJECT` are both set (ambiguous), or, with `AI_PDF_PIPELINE=layout` or
+`AI_PDF_OCR=auto`, if the layout or OCR models cannot be loaded (the converters and their models
+are built in `create_app`, not at the first request).
 
 Proof (the same commands as CI):
 `uv sync --frozen && uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run pytest -q`
@@ -46,6 +48,7 @@ Proof (the same commands as CI):
 | `AI_ALLOW_GEMINI_API_DEV` | `false` | **Local development with synthetic data only.** Uses the Gemini API (free tier) instead of Vertex. Needs this flag **and** `GEMINI_API_KEY`, and `VERTEX_PROJECT` must be unset (both set → the service refuses to start). It is never used as a fallback, and a key alone changes nothing. |
 | `GEMINI_API_KEY` | – | Only read when the dev flag is `true`. |
 | `AI_PDF_PIPELINE` | `textlines` | `textlines` (model-free) or `layout` (docling layout model, see below). |
+| `AI_PDF_OCR` | `off` | `auto`: OCR (docling + RapidOCR on torch, German/Latin) for PDF pages **without a text layer**, also inside `.msg` attachments; OCR segments carry `locator.ocr: true` and OCR-only evidence is at most `uncertain`. Needs the layout + RapidOCR models (fail-closed at startup; image: `PREFETCH_OCR_MODELS=true`). At most 10 such pages per document (`MAX_OCR_PAGES`) → otherwise 422 `document_too_long`. `off`: scans yield `no_text`. |
 | `AI_MAX_DOCUMENT_BYTES` | `20971520` | Upload limit → 413. Checked twice: the declared `Content-Length` before the body is read (limit + 16 KiB multipart allowance, `MULTIPART_OVERHEAD_BYTES`), then the exact file size. |
 | `AI_MAX_PDF_PAGES` | `50` | Page cap for PDFs → 422 `document_too_long`. Counted model-free (docling-parse) before any page is parsed and before the layout model runs. |
 | `AI_MAX_CONCURRENT_EXTRACTIONS` | `4` | Concurrent extractions per process → 429 when busy. |
@@ -79,9 +82,24 @@ it is read.
 `requestId` and `X-Request-Id`.
 
 Component schemas (names for the generated TS types): `ExtractRequest`, `ExtractResponse`, `Segment`,
-`PdfLocator`, `EmailLocator` (discriminated by `kind`), `BoundingBox`, `ExtractedFields`,
-`LineItem`, `FieldResult`, `Evidence`, `RunMetadata`, `TokenUsage`, `ErrorResponse`, `ErrorDetail`,
-`HealthResponse`.
+`PdfLocator`, `EmailLocator`, `XlsxLocator`, `DocxLocator`, `MsgLocator` (discriminated by `kind`),
+`AttachmentRef`, `AttachmentResult`, `BoundingBox`, `ExtractedFields`, `LineItem`, `FieldResult`,
+`Evidence`, `RunMetadata`, `TokenUsage`, `ErrorResponse`, `ErrorDetail`, `HealthResponse`.
+
+**Contract growth in #23 (additive).** `documentKind` gains `xlsx`, `docx`, `msg`; the locator
+union gains `xlsx`, `docx`, `msg`; `PdfLocator.ocr` (optional, default `false`); `FieldResult.reason`
+gains `ocr_only`; `warnings` gains `attachment_failed`; `ExtractResponse.attachments` (optional,
+always sent, empty unless `.msg`) lists every attachment (also nested) with `path`, `name`,
+`documentKind`, `status` (`parsed`/`failed`) and `error` (`unsupported_media_type`,
+`document_unparseable`, `document_too_long`, `nesting_too_deep`, `too_many_attachments`,
+`not_attached_by_value`). `run.pdfPipeline` is set whenever a PDF was parsed, also as an
+attachment. Nothing existing was removed or made required.
+
+**Partial failure.** A `.msg` attachment that cannot be parsed never fails the request: it is
+reported in `attachments` (and the warning `attachment_failed`), contributes no segments, and the
+body and other attachments are extracted. Only a broken top-level document gives 415/422. `.eml`
+attachments are not parsed here: the TS worker splits an `.eml` and sends each attachment as its
+own document; a `.msg` cannot be split there, so the service unpacks it.
 
 Regenerate the contract after an API change with `uv run python scripts/export_openapi.py` and commit it.
 
@@ -93,9 +111,56 @@ Regenerate the contract after an API change with `uv run python scripts/export_o
 | PDF, `layout` | `p{page}-b{n}` (n-th layout block on the page) | same |
 | EML header | `eml-h-from`, `eml-h-subject` | `{kind: email, part: header, header, line: position}` |
 | EML body | `eml-l{line}` (1-based line of the decoded body; empty lines count, produce no segment) | `{kind: email, part: body, line}` |
+| PDF page OCR'd (`AI_PDF_OCR=auto`, page without text layer) | `p{page}-o{n}` (n-th OCR block on the page) | PDF locator with `ocr: true` |
+| XLSX | `s{sheet}-r{row}`: **one segment per non-empty row**, cells joined with ` \| ` | `{kind: xlsx, sheet, row, cellRange: "A7:D7"}` (`"B7"` for one cell) |
+| DOCX paragraph | `d-p{n}` (n-th body paragraph; empty ones count, produce no segment) | `{kind: docx, part: paragraph, paragraph}` |
+| DOCX table cell | `d-t{t}-r{r}-c{c}` (grid column; a merged cell once, at its first column) | `{kind: docx, part: table_cell, table, row, cell}` |
+| MSG header / body | `msg-h-from`, `msg-h-subject`, `msg-l{line}` (like EML) | `{kind: msg, part: header\|body, line, header}` |
+| MSG attachment | `msg-a{index}-<id inside the attachment>` (nested: `msg-a0-msg-a1-…`) | `{kind: msg, part: attachment, attachment: {index, name}, inner: <the attachment's own locator>}` |
 
 IDs are deterministic for the same bytes. For HTML-only mails the body is first reduced to text
 lines, so the line number refers to that text, not to the HTML source.
+
+Why rows for XLSX: a row keeps a position together (article, quantity, unit), which the model
+needs to read it as one line item; the quote of each field is still a substring of the row, and
+the locator still names the exact row and cell range. Formula cells contribute their cached value
+only (never the formula, nothing is computed). DOCX: headers/footers, text boxes, footnotes,
+comments, block-level content controls and tables nested in cells are not read (limitation).
+MSG: the plain-text body, else the HTML body; an RTF-only body yields no body segments
+(limitation); attachments by value are parsed with the same parsers, attached Outlook items
+(embedded messages) recursively; by-reference/OLE attachments are reported `not_attached_by_value`.
+
+Why not docling for XLSX/DOCX/MSG: its backends emit text without cell/paragraph/line provenance
+(and for mail only attachment names), so the service reads them with openpyxl, python-docx and
+python-oxmsg, which docling already depends on.
+
+## Untrusted documents: limits
+
+Every upload is untrusted. Beyond `AI_MAX_DOCUMENT_BYTES` and `AI_MAX_PDF_PAGES`:
+
+- **OOXML (XLSX/DOCX) zip limits** before any XML is parsed (`parsing/ooxml.py`): at most 2,000
+  entries, 256 MiB declared uncompressed in total, and no entry above 1 MiB compressed more than
+  200:1 (zip bomb) → 422. `zipfile` stops at an entry's declared size (CRC-checked), so the
+  declared sizes are binding.
+- **XML**: openpyxl parses through defusedxml (installed); python-docx uses lxml with
+  `resolve_entities=False`. No external entities, no entity expansion.
+- **No macros, no formulas**: `vbaProject.bin` is never read; XLSX formulas contribute their
+  cached value only (`data_only=True`), external links are ignored (`keep_links=False`).
+- **Size caps** → 422 `document_too_long`: XLSX 50 sheets, 10,000 non-empty rows, 500,000
+  visited cells (the declared sheet dimension is discarded so a forged `A1:XFD1048576` cannot
+  force padding); DOCX 10,000 segments; a whole document 20,000 segments; OCR 10 pages.
+- **MSG**: nesting depth 3 (`MAX_ATTACHMENT_DEPTH`), 50 attachments per message, attachment
+  names single-lined and cut to 255 characters. olefile always gets a stream (it treats `bytes`
+  shorter than 1536 as a *file path*). Other OLE files (legacy `.doc`/`.xls`, password-protected
+  OOXML) → 415.
+- **Parser errors never crash the service**: top-level errors map to 415/422, attachment errors
+  to an `attachments` entry; any unexpected exception in an attachment parser is recorded as
+  `document_unparseable` (log: exception type only).
+- **No content in logs**: `extraction_completed` logs counts only (`attachmentCount`,
+  `attachmentFailedCount`, `ocrSegmentCount`); attachment names and text never appear (tested).
+  The `RapidOCR` logger is raised to WARNING.
+- **Not bounded in-process**: wall-clock time. OCR costs ~8.5 s per page on 4 vCPU, so 10 OCR
+  pages take ~90 s; the worker's request timeout must allow for that.
 
 ## Verification (the model never has the final say on `found`)
 
@@ -133,6 +198,12 @@ downgrades a status and never upgrades one:
   prove which one is meant: `found` is downgraded to `uncertain` with reason `ambiguous_quote`.
   The same date written twice is not ambiguous. Partial dates without a year ("15.11.") are not
   counted.
+- **OCR cap (#23):** evidence from an OCR segment (`locator.ocr: true`, also as the `inner`
+  locator of a `.msg` attachment) proves only what the OCR read. A `found` field whose verified
+  evidence is OCR text is downgraded to `uncertain` with reason `ocr_only` (value still
+  normalised). A field has one evidence, so "only evidence is OCR" = "its evidence is OCR". A
+  failed quote check stays `unverified`. Text from a PDF's own text layer is never flagged, even
+  if a scanner produced it by OCR (nothing in the PDF says so).
 - A verified value (`found`, or `uncertain` with a verified quote) is returned **normalised**: text
   trimmed, dates as ISO `YYYY-MM-DD` (`15.10.26` → `2026-10-15`), quantities as a plain decimal
   with a dot (`1.250` → `1250`, `2,5` → `2.5`), units canonical (`Stk.` → `pcs`), e-mail
@@ -190,9 +261,15 @@ container's stderr as potentially sensitive: do not ship it unfiltered to shared
   (`tests/test_parsing_pdf.py`, `tests/test_api.py`); without a cached model the real check fails
   with `LocalEntryNotFoundError` → `PdfPipelineInitError` (observed 2026-09-23).
 - Fixtures are synthetic. `scripts/make_fixtures.py` generates the PDFs deterministically with
-  reportlab; the `.eml` files are hand-written text.
-- `tests/test_parsing_pdf.py::test_pdf_layout_pipeline_blocks_have_page_and_bbox` runs only with
-  `AI_TEST_DOCLING_MODELS=1` and a cached layout model (it was run locally, see below).
+  reportlab (`anfrage_scan.pdf`: text only as pixels, rendered with Pillow); the `.eml` files are
+  hand-written text. XLSX, DOCX and `.msg` documents are built in-test by `tests/builders.py`
+  (openpyxl, python-docx, and a minimal CFB writer for `.msg`, since no dependency can write one).
+- OCR is tested model-free with a fake docling converter that returns a real `DoclingDocument`
+  (page selection, `ocr` flag, ids, startup fail-closed, page cap, the `ocr_only` cap end to end
+  over HTTP in `tests/test_formats_api.py`).
+- `tests/test_parsing_pdf.py::test_pdf_layout_pipeline_blocks_have_page_and_bbox` and
+  `::test_real_ocr_reads_the_scanned_fixture` run only with `AI_TEST_DOCLING_MODELS=1` and the
+  cached layout (and RapidOCR) models; both were run locally on 2026-09-23 and passed.
 
 ## Verified facts (2026-09-22, in this environment)
 
@@ -202,7 +279,7 @@ container's stderr as potentially sensitive: do not ship it unfiltered to shared
   `.msg` python-oxmsg (MIT), which projects the message onto RFC 822. It emits the title, From/To/Date
   and body **paragraphs** as text items **without provenance** (no line numbers), and only the
   names of attachments. That is why EML uses the standard library path here (the ADR-0001 D8
-  fallback); `.msg` is rejected with 415 for now.
+  fallback) and `.msg` is read with python-oxmsg directly (#23).
 - **docling PDF without models:** the standard `DocumentConverter` PDF pipeline needs the layout
   model even with `do_ocr=False, do_table_structure=False`. With `HF_HUB_OFFLINE=1` and no cache it
   raises `LocalEntryNotFoundError`. docling's own parser backend (`ThreadedDoclingParseDocumentBackend`,
@@ -225,6 +302,20 @@ container's stderr as potentially sensitive: do not ship it unfiltered to shared
   ~711 MB of it; opencv ~190 MB, scipy ~110 MB. The CPU wheel index
   `https://download.pytorch.org/whl/cpu` was reachable and is used through `[tool.uv.sources]`
   (`torch 2.14.0+cpu`, `torchvision 0.29.0+cpu`). Plus 164 MB for the layout model if it is used.
+- **OCR models and latency (2026-09-23, 4 vCPU Intel Xeon @ 2.10 GHz, CPU only):** Hugging Face
+  and modelscope.cn were reachable. First initialisation of the OCR converter downloaded the
+  layout model (164 MB, HF) and, through RapidOCR's own downloader from
+  `www.modelscope.cn/models/RapidAI/RapidOCR`, the torch checkpoints PP-OCRv6 det small (9.8 MB),
+  PP-OCRv4 cls (0.6 MB), PP-OCRv6 rec small (20.3 MB) and the dictionary: 34.6 s in total
+  (download + load). Without an artifacts path RapidOCR stores them **inside the venv**
+  (`site-packages/rapidocr/models`). With `docling-tools models download layout rapidocr
+  --rapidocr-backend-lang torch:de -o <dir>` (35.8 s; 31 MB RapidOCR + 164 MB layout, plus an
+  unused 164 MB `layout-heron-onnx` the CLI also fetches) and `DOCLING_ARTIFACTS_PATH=<dir>`,
+  `HF_HUB_OFFLINE=1`, the OCR pipeline starts and reads the scan offline. Warm: import 2.7 s,
+  model load 3.5 s (6.1 s from an artifacts dir), then **8.0–9.3 s per scanned A4 page**
+  (4 runs, 1 page each); a PDF with text on every page and `AI_PDF_OCR=auto` costs 7 ms (no
+  OCR). The layout model merged the three lines of the synthetic scan into one block, so OCR
+  segments are blocks, not lines.
 
 ## Unverified
 
@@ -232,12 +323,13 @@ container's stderr as potentially sensitive: do not ship it unfiltered to shared
   `gemini-3.5-flash` behaviour with this `responseSchema` (nullable nested objects, enums), real
   token counts and latency are unverified. The response fixtures are hand-written and synthetic.
 - Availability of `gemini-3.5-flash` in `eu` (taken from ADR-0001, not checked against the live API).
-- The Docker image was not built; its size and the `PREFETCH_LAYOUT_MODEL` step are unverified.
-- OCR for scans and table structure (docling OCR and TableFormer models) are not enabled or tested.
-  A PDF without a text layer returns no segments, all fields `missing` and the warning `no_text`,
-  without a model call.
-- `.msg` via docling's EMAIL backend (possible, but no line provenance) and other attachment formats
-  (DOCX/XLSX) are not wired yet.
+- The Docker image was not built; its size and the `PREFETCH_LAYOUT_MODEL` /
+  `PREFETCH_OCR_MODELS` steps are unverified (the same CLI command was run outside Docker).
+- Table structure (TableFormer) is not enabled. OCR quality on real scans (skew, noise, low
+  resolution) is untested; only one clean synthetic scan was OCR'd.
+- `.msg` files written by real Outlook versions were not available (synthetic files from the
+  in-test CFB writer only); RTF-only bodies, Unicode vs. 8-bit string properties from old
+  clients and signed/encrypted messages are untested.
 - Slow-body clients: the early checks bound how much a client may send, not how slowly. Timeouts
   for slow uploads belong to the ASGI server / proxy in front of the service.
 
@@ -252,10 +344,18 @@ container's stderr as potentially sensitive: do not ship it unfiltered to shared
 | python-multipart | 0.0.32 | Apache-2.0 | Multipart uploads |
 | google-genai | 2.25.0 | Apache-2.0 | Vertex AI / Gemini SDK |
 | google-auth | 2.58.0 | Apache-2.0 | ADC / Workload Identity |
-| torch / torchvision (CPU) | 2.14.0 / 0.29.0 | BSD-style / BSD | Required by docling |
+| torch / torchvision (CPU) | 2.14.0 / 0.29.0 | BSD-style / BSD | Required by docling; also the RapidOCR backend |
+| openpyxl | 3.1.5 | MIT | XLSX rows with cell locators (#23; already a docling dependency, pinned directly) |
+| python-docx | 1.2.0 | MIT | DOCX paragraphs and table cells (#23; already a docling dependency) |
+| python-oxmsg | 0.0.2 | MIT | Outlook `.msg` properties and attachments (#23; already a docling dependency). Early version: one private attribute (`Attachment._storage`) is used for embedded messages, covered by tests |
+| olefile | 0.47 | BSD | OLE container check in detection (#23; already a python-oxmsg dependency) |
 | dev: ruff, pyright, pytest, httpx, pyyaml, reportlab | 0.16.8, 1.1.414, 9.1.1, 0.28.1, 6.0.3, 5.0.1 | MIT, MIT, MIT, BSD-3, MIT, BSD | Lint, types, tests, contract export, fixtures |
 
 Transitive packages include mail-parser (Apache-2.0), python-oxmsg (MIT), pypdfium2
 (Apache-2.0/BSD-3), rapidocr (Apache-2.0), opencv-python (Apache-2.0) and transformers (Apache-2.0).
 A scan of all 124 installed distributions found no GPL/AGPL license. Only certifi and tqdm are
-MPL-2.0 (file-level copyleft, unmodified use). PyMuPDF is not in the lock.
+MPL-2.0 (file-level copyleft, unmodified use). PyMuPDF is not in the lock. `extract-msg` (GPL-3.0)
+is deliberately not used for `.msg`. OCR uses rapidocr (Apache-2.0) with the PP-OCR checkpoints
+it downloads (converted PaddleOCR models; PaddleOCR is Apache-2.0, the licence of the checkpoint
+files themselves was not checked separately); defusedxml (PSF) and Pillow (MIT-CMU, fixture script
+only) are transitive.
