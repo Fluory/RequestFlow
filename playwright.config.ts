@@ -19,6 +19,9 @@ const defaults: Record<string, string> = {
   AI_SERVICE_URL: "http://127.0.0.1:8799",
   AI_SERVICE_TOKEN: "local-dev-only-ai-token-0123456789",
   AI_STUB_PORT: "8799",
+  ERP_BASE_URL: `http://127.0.0.1:${port}/api/erp-mock`,
+  ERP_TOKEN: "local-dev-only-erp-token-0123456789",
+  ERP_MOCK_ENABLED: "true",
   SEED_PASSWORD: "demo-password-local-only",
 };
 const env: Record<string, string> = Object.fromEntries(Object.entries(defaults).map(([name, value]) => [name, process.env[name] ?? value]));

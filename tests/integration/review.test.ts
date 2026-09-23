@@ -102,6 +102,19 @@ describe("review: fields beside their source, corrections, approve or reject", (
     expect((await auditOf(clerk, requestId)).map((event) => event.action)).not.toContain("field.corrected");
   });
 
+  it("refuses approval while a value is too long for the ERP, so the clerk can still correct it", async () => {
+    const long = "L".repeat(501);
+    const { requestId } = await requestInReview(clerk, { company: { value: long, status: "uncertain", evidence: null, modelStatus: "uncertain", reason: null } });
+
+    await expect(approveRequest({ tenancy, boss }, clerk, requestId)).rejects.toMatchObject({ code: "value_too_long" });
+    expect(await statusOf(clerk, requestId)).toBe("REVIEW");
+
+    await correctField(tenancy, clerk, requestId, "company", "Musterbau Beispiel GmbH");
+    await approveRequest({ tenancy, boss }, clerk, requestId);
+    expect(await statusOf(clerk, requestId)).toBe("APPROVED");
+    await stack.database.pool.query("delete from pgboss.job where name = $1 and singleton_key = $2", [QUEUES.exportRequest, requestId]);
+  });
+
   it("approve: APPROVED and the export job in one transaction, audited", async () => {
     const { requestId } = await requestInReview(clerk);
 

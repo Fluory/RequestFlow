@@ -254,3 +254,39 @@ export const fieldCorrections = appSchema
     ],
   )
   .enableRLS();
+
+export const EXPORT_STATUSES = ["pending", "succeeded"] as const;
+
+/**
+ * One row per request that entered the export (#9, ADR-0001 D9). `unique(request_id)` is one of the
+ * three exactly-once guards (with the idempotency key and the APPROVED → EXPORTED row lock).
+ */
+export const requestExports = appSchema
+  .table(
+    "request_exports",
+    {
+      id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+      companyId: uuid("company_id")
+        .notNull()
+        .references(() => organization.id, { onDelete: "restrict" }),
+      requestId: uuid("request_id").notNull().unique("request_exports_request_id_unique"),
+      idempotencyKey: uuid("idempotency_key").notNull(),
+      status: text("status", { enum: EXPORT_STATUSES }).default("pending").notNull(),
+      erpReference: text("erp_reference"),
+      attempts: integer("attempts").default(0).notNull(),
+      lastError: text("last_error"),
+      createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+      exportedAt: timestamp("exported_at", { withTimezone: true }),
+    },
+    (table) => [
+      check("request_exports_status_check", sql.raw(`status in (${EXPORT_STATUSES.map((s) => `'${s}'`).join(", ")})`)),
+      check("request_exports_succeeded_has_reference", sql`status <> 'succeeded' or (erp_reference is not null and exported_at is not null)`),
+      foreignKey({
+        name: "request_exports_request_same_company_fk",
+        columns: [table.requestId, table.companyId],
+        foreignColumns: [requests.id, requests.companyId],
+      }).onDelete("cascade"),
+      tenantPolicy("request_exports"),
+    ],
+  )
+  .enableRLS();

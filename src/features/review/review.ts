@@ -2,6 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { fieldCorrections } from "@/db/schema";
 import { recordAudit } from "@/features/audit";
 import { listDocuments, type DocumentRow } from "@/features/documents";
+import { exportLimitViolations, getExportRecord, type ExportRecord } from "@/features/export";
 import { HEADER_FIELDS, latestRun, listSegments } from "@/features/extraction";
 import { authorize, type Actor } from "@/features/identity";
 import { enqueueRequestExport, type JobSender } from "@/features/jobs";
@@ -40,9 +41,11 @@ export interface ReviewView {
   fields: ReviewField[];
   documents: DocumentRow[];
   skippedDocuments: Array<{ documentId: string; reason: string }>;
+  /** Export state (#9): reference once exported, attempts and last error while retrying. */
+  exportRecord: ExportRecord | null;
 }
 
-export type ReviewRefusal = "not_in_review" | "unknown_field" | "reason_missing" | "reason_too_long";
+export type ReviewRefusal = "not_in_review" | "unknown_field" | "reason_missing" | "reason_too_long" | "value_too_long";
 
 /** Refused action: request missing (or of another company – RLS), not in REVIEW, or invalid input. */
 export class ReviewRefused extends Error {
@@ -60,14 +63,30 @@ async function currentCorrections(tx: TenantTx, requestId: string) {
   return latest;
 }
 
+/**
+ * The reviewed value of every header field: the latest correction, else the extracted value. Runs in
+ * the caller's tenant transaction (the export reads it under the request's row lock, #9).
+ */
+export async function currentFieldValues(tx: TenantTx, requestId: string): Promise<Record<string, string | null>> {
+  const corrections = await currentCorrections(tx, requestId);
+  const extraction = await latestRun(tx, requestId);
+  return Object.fromEntries(
+    HEADER_FIELDS.map((key) => {
+      const correction = corrections.get(key);
+      return [key, correction ? correction.newValue : (extraction?.fields.find((field) => field.fieldKey === key)?.value ?? null)];
+    }),
+  );
+}
+
 export async function loadReview(tenancy: Tenancy, actor: Actor, requestId: string): Promise<ReviewView | null> {
   authorize(actor, "requests.process");
   return tenancy.withTenant(actor.companyId, async (tx) => {
     const request = await getRequest(tx, requestId);
     if (!request) return null;
     const documents = await listDocuments(tx, requestId);
+    const exportRecord = await getExportRecord(tx, requestId);
     const extraction = await latestRun(tx, requestId);
-    if (!extraction) return { request, fields: [], documents, skippedDocuments: [] };
+    if (!extraction) return { request, fields: [], documents, skippedDocuments: [], exportRecord };
     const segments = await listSegments(tx, extraction.run.id);
     const corrections = await currentCorrections(tx, requestId);
     const byKey = new Map(extraction.fields.map((field) => [field.fieldKey, field]));
@@ -92,7 +111,7 @@ export async function loadReview(tenancy: Tenancy, actor: Actor, requestId: stri
     const skippedDocuments = (extraction.run.documents as Array<{ documentId: string; skipped?: string }>)
       .filter((entry) => entry.skipped)
       .map((entry) => ({ documentId: entry.documentId, reason: entry.skipped! }));
-    return { request, fields, documents, skippedDocuments };
+    return { request, fields, documents, skippedDocuments, exportRecord };
   });
 }
 
@@ -124,11 +143,16 @@ export async function correctField(tenancy: Tenancy, actor: Actor, requestId: st
   });
 }
 
-/** REVIEW → APPROVED and the export job in ONE transaction (ADR-0001 D9), audited. */
+/**
+ * REVIEW → APPROVED and the export job in ONE transaction (ADR-0001 D9), audited. Refused while a
+ * value would break the ERP contract – otherwise the export could never succeed and, after approval,
+ * the value can no longer be corrected.
+ */
 export async function approveRequest(deps: { tenancy: Tenancy; boss: JobSender }, actor: Actor, requestId: string): Promise<void> {
   authorize(actor, "requests.process");
   await deps.tenancy.withTenant(actor.companyId, async (tx) => {
     const request = await lockForReview(tx, requestId);
+    if (exportLimitViolations(request.subject, await currentFieldValues(tx, requestId)).length > 0) throw new ReviewRefused("value_too_long");
     await transitionRequest(tx, request, "approve");
     await enqueueRequestExport(deps.boss, tx, requestId);
     await recordAudit(tx, { actorUserId: actor.userId, action: "request.approved", entityType: "request", entityId: requestId });

@@ -28,8 +28,8 @@ Every new file belongs to one of these modules – otherwise add the module here
 | `extraction` | `src/features/extraction/` | AI-service client, persists runs/fields/evidence | internal | confidential + personal | tenant context, contract validation | built: AI-service client (timeout, error classes), field merge, runs/segments/fields |
 | `requests` | `src/features/requests/` | request aggregate, status machine | internal | confidential | tenant context | built: repository, status machine, processing state |
 | `review` | `src/features/review/` | review UI, corrections, approve/reject | authenticated UI | confidential + personal | session, role check, audit | built: review page (fields + status badges + source view), corrections with history, approve (→ export job) / reject with reason |
-| `export` | `src/features/export/` | ERP port + REST adapter, idempotency | outbound HTTP | confidential | idempotency key, unique export, timeout | skeleton |
-| `erp-mock` | `src/features/erp-mock/` | simulated ERP REST API | route behind flag | synthetic | disabled unless `ERP_MOCK_ENABLED` | skeleton |
+| `export` | `src/features/export/` | ERP port + REST adapter, idempotency | outbound HTTP | confidential | idempotency key, unique export, timeout | built: REST adapter (timeout, error classes, contract validation), export handler under row lock, `drainExports()`, `request_exports` |
+| `erp-mock` | `src/features/erp-mock/` | simulated ERP REST API | route behind flag | synthetic | disabled unless `ERP_MOCK_ENABLED` | built: idempotent receiver (replay → same reference, 409 on a different body), fault injection, bounded in-memory store, route `/api/erp-mock/v1/quote-requests` |
 | `identity` | `src/features/identity/` | Better Auth, users, companies, roles | public login route | personal (staff) | rate limit, invite-only | partial: Better Auth (invite-only, organization + admin plugins), `authorize()`, invite, seed |
 | `tenancy` | `src/features/tenancy/` | `withTenant()`, RLS policies | internal | – | forced RLS, `app_rw` without BYPASSRLS | built: `withTenant()`, forced RLS on `app.*` |
 | `audit` | `src/features/audit/` | append-only audit events | internal | personal (staff) | INSERT/SELECT only | partial: `recordAudit()` (append-only enforced by grants) |
@@ -38,9 +38,9 @@ Every new file belongs to one of these modules – otherwise add the module here
 | `observability` | `src/features/observability/` | logger, health, request-list ops data | `/api/health` | IDs only | no PII in logs | partial: health aggregation (database, storage) |
 | `db` | `src/db/`, deploy step `src/setup.ts` | Drizzle schema, migrations, DB roles | internal | – | migrations as owner role | built: roles check, schema `app`, default grants for `app_rw` |
 | `config` | `src/config/` | typed runtime configuration, validated at start (zod) | internal | secrets (in memory only) | errors name variables, never values | built |
-| `app` | `src/app/` | Next.js routes and pages; composition root `src/app/_server/` (pool, storage client) | `/`, `/login`, `/signup`, `/invite`, `/requests`, `/api/requests`, `/api/documents/:id`, `/api/auth/*`, `/api/health` | – | calls module APIs only (dependency-cruiser) | partial: login, sign-up, invite, home |
+| `app` | `src/app/` | Next.js routes and pages; composition root `src/app/_server/` (pool, storage client) | `/`, `/login`, `/signup`, `/invite`, `/requests`, `/requests/:id`, `/api/requests`, `/api/documents/:id`, `/api/auth/*`, `/api/health`, `/api/erp-mock/v1/quote-requests` (flag) | – | calls module APIs only (dependency-cruiser) | partial: login, sign-up, invite, home, requests, review page, ERP mock route |
 | AI service | `services/ai/` | docling parsing, extraction, grounding, evals | internal HTTP | confidential + personal (transient) | bearer token, stateless, no DB/storage access | partial: `POST /v1/extract` – EML + PDF (text layer) → segments, 3 header fields, grounding verifier, bearer auth; Vertex adapter with recorded responses (live call unverified) |
-| Contracts | `contracts/` | OpenAPI: AI service, ERP export | – | – | contract tests | partial: `contracts/ai-service.openapi.yaml` (generated from the service; TS types + drift test) |
+| Contracts | `contracts/` | OpenAPI: AI service, ERP export | – | – | contract tests | built: `ai-service.openapi.yaml` (generated from the service), `erp-export.openapi.yaml` (hand-written); TS types + drift tests |
 
 ## Exceptions register
 
@@ -73,7 +73,7 @@ failure at any step ─► retry with backoff ─► dead letter ─► requests
 | PostgreSQL 17 | all state incl. queue and auth | local container · showcase Neon (aws-eu-central-1) |
 | S3-compatible storage | original mails and attachments | local SeaweedFS · showcase Cloudflare R2 (EU jurisdiction) |
 | Vertex AI (`eu` endpoint, gemini-3.5-flash) | extraction | showcase + customer; local dev may use the Gemini free tier with synthetic data |
-| ERP | export target | pilot: `erp-mock`; contract `contracts/erp-export.openapi.yaml` (planned) |
+| ERP | export target | pilot: `erp-mock`; contract `contracts/erp-export.openapi.yaml` |
 
 No secrets in this document; every variable is documented in `.env.example`.
 

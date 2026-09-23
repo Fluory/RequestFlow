@@ -22,3 +22,19 @@ describe("AI service contract types", () => {
     expect(committed).toContain('status: "found" | "uncertain" | "missing" | "unverified"');
   });
 });
+
+describe("ERP export contract types", () => {
+  it("are up to date with contracts/erp-export.openapi.yaml", async () => {
+    const committed = readFileSync(new URL("src/features/export/erp-export.contract.ts", root), "utf8");
+
+    const generated = astToString(await openapiTS(new URL("contracts/erp-export.openapi.yaml", root)));
+
+    expect(committed.includes(generated.trim())).toBe(true);
+  });
+
+  it("requires the Idempotency-Key header (ADR-0001 D9)", () => {
+    const committed = readFileSync(fileURLToPath(new URL("src/features/export/erp-export.contract.ts", root)), "utf8");
+
+    expect(committed).toContain('"Idempotency-Key": string;');
+  });
+});

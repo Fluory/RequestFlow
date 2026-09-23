@@ -24,7 +24,7 @@
     "verify:full": "pnpm verify && pnpm e2e",
     "setup:deploy": "tsx src/setup.ts",
     "seed:demo": "tsx src/seed.ts",
-    "contract:types": "openapi-typescript contracts/ai-service.openapi.yaml -o src/features/extraction/ai-service.contract.ts",
+    "contract:types": "openapi-typescript contracts/ai-service.openapi.yaml -o src/features/extraction/ai-service.contract.ts && openapi-typescript contracts/erp-export.openapi.yaml -o src/features/export/erp-export.contract.ts",
     "e2e": "playwright test"
   },
   "dependencies": {

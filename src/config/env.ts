@@ -21,9 +21,22 @@ const schema = z.object({
   AI_SERVICE_TOKEN: z.string().min(24).optional(),
   AI_SERVICE_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
   UPLOAD_MAX_REQUEST_BYTES: z.coerce.number().int().positive().default(40 * 1024 * 1024),
+  // ERP port (ADR-0001 D9). The pilot points ERP_BASE_URL at the in-app mock.
+  ERP_BASE_URL: z.url().default("http://127.0.0.1:3000/api/erp-mock"),
+  ERP_TOKEN: z.string().min(24).optional(),
+  // Capped below the database statement_timeout (30 s): the export holds the request's row lock during
+  // the call, and a redelivered job waiting on that lock must not time out first (#9 review).
+  ERP_TIMEOUT_MS: z.coerce.number().int().positive().max(20_000).default(10_000),
+  ERP_MOCK_ENABLED: z.enum(["true", "false"]).default("false"),
+  // Fault injection of the mock: comma list of 503 | lost | timeout (checked at start, not per request).
+  ERP_MOCK_FAULTS: z
+    .string()
+    .default("")
+    .refine((value) => value.split(",").map((entry) => entry.trim()).filter(Boolean).every((entry) => ["503", "lost", "timeout"].includes(entry))),
 });
 
 const LOCAL_PLACEHOLDER_SECRETS = new Set(["local-dev-only-secret-change-me-0123456789"]);
+const LOCAL_PLACEHOLDER_ERP_TOKENS = new Set(["local-dev-only-erp-token-0123456789"]);
 const list = (value: string) => value.split(",").map((item) => item.trim()).filter(Boolean);
 
 export interface AppConfig {
@@ -52,6 +65,12 @@ export interface AppConfig {
     maxFiles: number;
     maxRequestBytes: number;
   };
+  erp: {
+    baseUrl: string;
+    token: string | undefined;
+    timeoutMs: number;
+    mock: { enabled: boolean; faults: string };
+  };
 }
 
 // Errors list variable names only – values may be secrets and end up in logs.
@@ -65,6 +84,10 @@ export function loadConfig(source: Record<string, string | undefined> = process.
   // The committed local default must never sign sessions of a real deployment.
   if (env.APP_ENV !== "local" && LOCAL_PLACEHOLDER_SECRETS.has(env.BETTER_AUTH_SECRET)) {
     throw new Error("Invalid or missing configuration: BETTER_AUTH_SECRET");
+  }
+  // The committed ERP token would let anyone post to an enabled mock of a public deployment.
+  if (env.APP_ENV !== "local" && env.ERP_TOKEN && LOCAL_PLACEHOLDER_ERP_TOKENS.has(env.ERP_TOKEN)) {
+    throw new Error("Invalid or missing configuration: ERP_TOKEN");
   }
   return {
     databaseUrl: env.DATABASE_URL,
@@ -84,5 +107,11 @@ export function loadConfig(source: Record<string, string | undefined> = process.
     },
     aiService: { baseUrl: env.AI_SERVICE_URL, token: env.AI_SERVICE_TOKEN, timeoutMs: env.AI_SERVICE_TIMEOUT_MS },
     upload: { maxFileBytes: env.UPLOAD_MAX_FILE_BYTES, maxFiles: env.UPLOAD_MAX_FILES, maxRequestBytes: env.UPLOAD_MAX_REQUEST_BYTES },
+    erp: {
+      baseUrl: env.ERP_BASE_URL,
+      token: env.ERP_TOKEN,
+      timeoutMs: env.ERP_TIMEOUT_MS,
+      mock: { enabled: env.ERP_MOCK_ENABLED === "true", faults: env.ERP_MOCK_FAULTS },
+    },
   };
 }

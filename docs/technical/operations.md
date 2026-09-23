@@ -28,6 +28,26 @@
   (integration test). Known gap: a request whose job vanished completely (e.g. deleted by hand) stays
   in `NEW`/`PROCESSING` – a cross-company sweep needs a privileged path and follows with #26/#28.
 
+## ERP export
+
+- The worker also drains `request-export` (approved requests). It posts to `ERP_BASE_URL` with
+  `Idempotency-Key: <requestId>` and `ERP_TIMEOUT_MS` (max 20 s – below the database statement
+  timeout, since the request's row lock is held during the call); HTTP 408, 429, 500, 502, 503, 504,
+  timeouts, an unreachable ERP and a body that breaks off while reading are retried (8 × 30 s … 30 min, backoff), other 4xx and a contract-breaking answer are permanent.
+  The request stays `APPROVED` while retrying – the page shows attempts and the last cause – and ends in
+  `ERROR` (stage `export`) when retries run out. Reprocess puts it back to `APPROVED` with a new job;
+  the same key makes the ERP answer with the existing reference instead of a second record.
+- Exactly once = row lock on the request (held across the time-bounded ERP call) + `unique(request_id)`
+  on `request_exports` + the idempotent receiver. Keep all three (ADR-0001 D9).
+- The worker refuses to start without `ERP_TOKEN`; the committed local token is refused outside
+  `APP_ENV=local`. In compose the worker calls the mock inside `web` (`http://web:3000/api/erp-mock`).
+- Demo of retries: `ERP_MOCK_FAULTS=503,lost` on `web` (consumed in order after each start; checked at start).
+- Approval is refused while a reviewed value exceeds the ERP limits (500 chars per field) – the clerk
+  corrects it first; after approval values are frozen.
+- The mock keeps its keys in memory: if `web` restarts between a stored-but-unanswered call ("lost") and
+  the retry, the mock creates a second record. Our side (unique export row, `EXPORTED`) is unaffected;
+  a real ERP must keep its keys durably (decision-needed in #9).
+
 ## Deploy step
 
 `setup` (compose) / `pnpm setup:deploy` applies the migrations as `app_owner` and creates the private
@@ -62,6 +82,8 @@ self-service password reset yet – recovery is an operator task (delete the use
 | `setup` exits with `role app_rw missing …` | data volume created before the init script existed | `docker compose down -v` (local only) |
 | health `storage: failed` | SeaweedFS still starting or wrong S3 credentials | wait a few seconds; compare `S3_*` with `.env.example` |
 | health `config: failed` | a required variable is missing | the web log names the variable (never its value) |
+| request stays `Freigegeben`, page shows "Export wird wiederholt" | ERP unreachable / 5xx / timeout | check `ERP_BASE_URL`, `ERP_TOKEN` on worker and web, `ERP_MOCK_ENABLED` on web; retries continue on their own |
+| request in `ERROR` with "ERP hat den Export abgelehnt (HTTP 409)" | the mock knows the key with a different body (e.g. data changed by hand) | resolve the conflict on the ERP side first (the key is fixed, a reprocess sends the same body and gets 409 again); with the real ERP: clarify with the ERP owner |
 
 ## Rollback
 
