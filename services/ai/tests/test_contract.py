@@ -96,4 +96,48 @@ def test_contract_reason_enum_grows_additively() -> None:
         "value_not_in_quote",
         "ambiguous_quote",
         "calendar_week_only",
+        "ocr_only",  # #23, appended
+    ]
+
+
+def test_contract_formats_grow_additively() -> None:
+    """#23: new document kinds, locators, OCR flag and attachment report; nothing removed."""
+    schemas = committed()["components"]["schemas"]
+    response = schemas["ExtractResponse"]
+    assert response["properties"]["documentKind"]["enum"] == ["pdf", "eml", "xlsx", "docx", "msg"]
+    assert response["properties"]["warnings"]["items"]["enum"] == ["no_text", "attachment_failed"]
+    # New response field is optional so older clients stay valid.
+    assert "attachments" in response["properties"]
+    assert "attachments" not in response["required"]
+
+    mapping = schemas["Segment"]["properties"]["locator"]["discriminator"]["mapping"]
+    assert set(mapping) == {"pdf", "email", "xlsx", "docx", "msg"}
+
+    pdf = schemas["PdfLocator"]
+    assert pdf["required"] == ["kind", "page", "bbox", "coordOrigin"]  # unchanged
+    assert pdf["properties"]["ocr"]["type"] == "boolean"
+    assert pdf["properties"]["ocr"]["default"] is False
+
+    assert set(schemas["XlsxLocator"]["required"]) == {"kind", "sheet", "row", "cellRange"}
+    assert set(schemas["DocxLocator"]["properties"]) == {
+        "kind",
+        "part",
+        "paragraph",
+        "table",
+        "row",
+        "cell",
+    }
+    msg = schemas["MsgLocator"]["properties"]
+    assert msg["part"]["enum"] == ["header", "body", "attachment"]
+    inner_refs = {option["$ref"] for option in msg["inner"]["anyOf"][0]["oneOf"]}
+    assert "#/components/schemas/MsgLocator" in inner_refs  # nested messages
+
+    attachment = schemas["AttachmentResult"]["properties"]
+    assert attachment["error"]["anyOf"][0]["enum"] == [
+        "unsupported_media_type",
+        "document_unparseable",
+        "document_too_long",
+        "nesting_too_deep",
+        "too_many_attachments",
+        "not_attached_by_value",
     ]

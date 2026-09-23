@@ -20,11 +20,18 @@ RUN uv sync --frozen --no-dev
 
 # Optional: bake the docling layout model into the image for AI_PDF_PIPELINE=layout
 # (~164 MB). The default textlines pipeline needs no models.
+# PREFETCH_OCR_MODELS=true (for AI_PDF_OCR=auto) adds the layout model plus the RapidOCR torch
+# models for German/Latin (~31 MB); with DOCLING_ARTIFACTS_PATH set, RapidOCR never downloads
+# at runtime (checked offline 2026-09-23; the image build itself is unverified).
 ARG PREFETCH_LAYOUT_MODEL=false
+ARG PREFETCH_OCR_MODELS=false
 ENV DOCLING_ARTIFACTS_PATH=/opt/docling-models
-RUN if [ "$PREFETCH_LAYOUT_MODEL" = "true" ]; then \
-      /app/.venv/bin/docling-tools models download layout -o /opt/docling-models; \
-    else mkdir -p /opt/docling-models; fi
+RUN mkdir -p /opt/docling-models && \
+    if [ "$PREFETCH_LAYOUT_MODEL" = "true" ] || [ "$PREFETCH_OCR_MODELS" = "true" ]; then \
+      /app/.venv/bin/docling-tools models download layout -o /opt/docling-models; fi && \
+    if [ "$PREFETCH_OCR_MODELS" = "true" ]; then \
+      /app/.venv/bin/docling-tools models download rapidocr \
+        --rapidocr-backend-lang torch:de -o /opt/docling-models; fi
 
 RUN useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin app
 USER 10001

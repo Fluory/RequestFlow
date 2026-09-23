@@ -1,0 +1,25 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "text": "{\"company\": {\"value\": \"Fluidtechnik Beispiel GmbH\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l9\", \"quote\": \"Fluidtechnik Beispiel GmbH\"}}, \"contact_person\": {\"value\": \"Ben Beispiel\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l8\", \"quote\": \"Ben Beispiel\"}}, \"email\": {\"value\": \"ben.beispiel@example.com\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-h-from\", \"quote\": \"<ben.beispiel@example.com>\"}}, \"phone\": {\"value\": \"0521 777 888\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l10\", \"quote\": \"Tel. 0521 777 888\"}}, \"requested_delivery_date\": {\"value\": \"2026-11-02\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l5\", \"quote\": \"Liefertermin: 02.11.2026\"}}, \"additional_requirements\": {\"value\": \"Schläuche einzeln verpackt und etikettiert\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l6\", \"quote\": \"Schläuche einzeln verpackt und etikettiert.\"}}, \"line_items\": [{\"description\": {\"value\": \"Hydraulikschlauch 2SN\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l3\", \"quote\": \"Hydraulikschlauch 2SN\"}}, \"quantity\": {\"value\": \"40\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l3\", \"quote\": \"40 Stk.\"}}, \"unit\": {\"value\": \"Stk.\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l3\", \"quote\": \"40 Stk.\"}}, \"material\": {\"value\": \"2SN\", \"status\": \"uncertain\", \"evidence\": {\"segment_id\": \"eml-l3\", \"quote\": \"Hydraulikschlauch 2SN\"}}, \"dimensions\": {\"value\": \"DN12, 1000 mm\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l3\", \"quote\": \"DN12, 1000 mm\"}}}, {\"description\": {\"value\": \"Pressfitting\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l4\", \"quote\": \"Pressfitting\"}}, \"quantity\": {\"value\": \"40\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l4\", \"quote\": \"40 Stk.\"}}, \"unit\": {\"value\": \"Stk.\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l4\", \"quote\": \"40 Stk.\"}}, \"material\": {\"value\": \"Stahl verzinkt\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l4\", \"quote\": \"Werkstoff Stahl verzinkt\"}}, \"dimensions\": {\"value\": \"DN12\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l4\", \"quote\": \"DN12\"}}}]}"
+          }
+        ]
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.0147
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 760,
+    "candidatesTokenCount": 522,
+    "totalTokenCount": 1282,
+    "trafficType": "ON_DEMAND"
+  },
+  "modelVersion": "gemini-3.5-flash",
+  "createTime": "2026-09-23T09:11:00.000000Z",
+  "responseId": "synthetic-eval-n03-eml-html-items"
+}

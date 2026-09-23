@@ -1,0 +1,1 @@
+ALTER TABLE "app"."field_corrections" ADD COLUMN "item_index" integer;

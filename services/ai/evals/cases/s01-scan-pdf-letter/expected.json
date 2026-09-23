@@ -1,0 +1,37 @@
+{
+  "id": "s01-scan-pdf-letter",
+  "categories": [
+    "scanned"
+  ],
+  "description": "Image-only PDF (typed letter). No text layer: until OCR (#23) the service returns no_text, no model call, all fields missing.",
+  "document": "document.pdf",
+  "declared_type": "application/pdf",
+  "fields": {
+    "company": null,
+    "contact_person": null,
+    "email": null,
+    "phone": null,
+    "requested_delivery_date": null,
+    "additional_requirements": null
+  },
+  "line_items": [],
+  "after_ocr": {
+    "fields": {
+      "company": "Metallbau Beispiel GmbH",
+      "contact_person": "Frank Beispiel",
+      "email": null,
+      "phone": "0711 223344",
+      "requested_delivery_date": "2026-11-09",
+      "additional_requirements": null
+    },
+    "line_items": [
+      {
+        "description": "Winkelkonsole",
+        "quantity": "60",
+        "unit": "pcs",
+        "material": "S235JR",
+        "dimensions": "120 x 80 x 8 mm"
+      }
+    ]
+  }
+}

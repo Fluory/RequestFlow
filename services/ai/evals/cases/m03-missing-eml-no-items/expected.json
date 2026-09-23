@@ -1,0 +1,18 @@
+{
+  "id": "m03-missing-eml-no-items",
+  "categories": [
+    "missing"
+  ],
+  "description": "Framework request without positions and without phone or requirements. Model mistakes: takes the recipient company from the salutation (verified quote, wrong value) and misses the delivery date.",
+  "document": "document.eml",
+  "declared_type": "message/rfc822",
+  "fields": {
+    "company": "Lasertechnik Beispiel AG",
+    "contact_person": "Nina Beispiel",
+    "email": "nina.beispiel@example.org",
+    "phone": null,
+    "requested_delivery_date": "2026-12-04",
+    "additional_requirements": null
+  },
+  "line_items": []
+}

@@ -44,7 +44,10 @@ export async function correctFieldAction(formData: FormData): Promise<void> {
   const requestId = requestIdOf(formData);
   const fieldKey = String(formData.get("field") ?? "");
   const raw = String(formData.get("value") ?? "");
-  await guarded(requestId, () => correctField(getRuntime().tenancy, actor, requestId, fieldKey, raw === "" ? null : raw), "corrected");
+  // Line-item field (#25): the position travels as `item`; anything but a small integer is refused.
+  const item = formData.get("item");
+  const itemIndex = item === null ? null : /^\d{1,4}$/.test(String(item)) ? Number(item) : -1;
+  await guarded(requestId, () => correctField(getRuntime().tenancy, actor, requestId, fieldKey, raw === "" ? null : raw, itemIndex), "corrected");
 }
 
 export async function approveAction(formData: FormData): Promise<void> {

@@ -24,7 +24,7 @@ from requestflow_ai.parsing.segments import EmailLocator, Segment
 
 _log = logging.getLogger(__name__)
 _HEADERS = (("From", "eml-h-from"), ("Subject", "eml-h-subject"))
-_LINE_BREAK = re.compile(r"\r\n|\r|\n")
+LINE_BREAK = re.compile(r"\r\n|\r|\n")
 _BLOCK_TAGS = {
     "address", "article", "blockquote", "br", "dd", "div", "dl", "dt", "footer", "h1", "h2",
     "h3", "h4", "h5", "h6", "header", "hr", "li", "ol", "p", "pre", "section", "table", "td",
@@ -56,11 +56,11 @@ class _HtmlText(HTMLParser):
             self.parts.append(data)
 
 
-def _html_to_text(html: str) -> str:
+def html_to_text(html: str) -> str:
     parser = _HtmlText()
     parser.feed(html)
     parser.close()
-    lines = (" ".join(line.split()) for line in _LINE_BREAK.split("".join(parser.parts)))
+    lines = (" ".join(line.split()) for line in LINE_BREAK.split("".join(parser.parts)))
     return "\n".join(line for line in lines if line)
 
 
@@ -86,7 +86,7 @@ def _body_text(message: EmailMessage) -> str:
         return ""
     text = _part_text(body)
     if body.get_content_subtype() == "html":
-        return _html_to_text(text)
+        return html_to_text(text)
     return text
 
 
@@ -121,7 +121,7 @@ def parse_eml(data: bytes) -> list[Segment]:
         body = _body_text(message)
     except Exception as exc:
         raise DocumentParseError("could not decode e-mail body") from exc
-    for number, line in enumerate(_LINE_BREAK.split(body), start=1):
+    for number, line in enumerate(LINE_BREAK.split(body), start=1):
         text = line.strip()
         if text:
             segments.append(

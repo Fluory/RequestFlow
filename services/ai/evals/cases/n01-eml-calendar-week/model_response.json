@@ -1,0 +1,25 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          {
+            "text": "{\"company\": {\"value\": \"Stahlkonstruktion Muster GmbH\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l9\", \"quote\": \"Stahlkonstruktion Muster GmbH\"}}, \"contact_person\": {\"value\": \"Eva Muster\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l8\", \"quote\": \"Eva Muster\"}}, \"email\": {\"value\": \"eva.muster@example.net\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-h-from\", \"quote\": \"eva.muster@example.net\"}}, \"phone\": {\"value\": \"0911 / 556677\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l10\", \"quote\": \"Tel. 0911 / 556677\"}}, \"requested_delivery_date\": {\"value\": \"2026-11-02\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l4\", \"quote\": \"Liefertermin: KW 45/2026\"}}, \"additional_requirements\": {\"value\": \"feuerverzinkt nach DIN EN ISO 1461\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l5\", \"quote\": \"Oberfläche: feuerverzinkt nach DIN EN ISO 1461.\"}}, \"line_items\": [{\"description\": {\"value\": \"Schweißbaugruppe Grundrahmen\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l3\", \"quote\": \"Schweißbaugruppe Grundrahmen\"}}, \"quantity\": {\"value\": \"12\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l3\", \"quote\": \"12 Stk.\"}}, \"unit\": {\"value\": \"Stk.\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l3\", \"quote\": \"12 Stk.\"}}, \"material\": {\"value\": \"S355J2\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l3\", \"quote\": \"Werkstoff S355J2\"}}, \"dimensions\": {\"value\": \"1200 x 800 mm\", \"status\": \"found\", \"evidence\": {\"segment_id\": \"eml-l3\", \"quote\": \"1200 x 800 mm\"}}}]}"
+          }
+        ]
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.0147
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 655,
+    "candidatesTokenCount": 378,
+    "totalTokenCount": 1033,
+    "trafficType": "ON_DEMAND"
+  },
+  "modelVersion": "gemini-3.5-flash",
+  "createTime": "2026-09-23T09:09:00.000000Z",
+  "responseId": "synthetic-eval-n01-eml-calendar-week"
+}
