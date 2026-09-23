@@ -4,6 +4,7 @@ export {
   findDuplicate,
   getRequest,
   listRequests,
+  type RequestFilter,
   lockDuplicateDetection,
   lockRequest,
   recordProcessingFailure,

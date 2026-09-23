@@ -4,4 +4,4 @@ export { errorCodes, errorSchema, quoteRequestSchema, receiptSchema, type QuoteR
 export { createErpClient, ErpExportError, type ErpExporter, type ErpSettings } from "./erp-client";
 export { describeExportFailure, drainExports, exportRequestJob, type ExportDeps, type ExportDrainDeps, type ExportDrainOptions, type ExportDrainResult } from "./export-job";
 export { buildQuoteRequest, ERP_LIMITS, ExportNotPossible, exportLimitViolations, type FieldValues } from "./payload";
-export { getExportRecord, type ExportRecord } from "./repository";
+export { getExportRecord, listExportRecords, type ExportRecord } from "./repository";

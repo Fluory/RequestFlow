@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { requestExports } from "@/db/schema";
 import { tenantOf, type TenantTx } from "@/features/tenancy";
 
@@ -36,4 +36,12 @@ export async function recordExportAttemptFailure(tx: TenantTx, requestId: string
       set: { attempts: sql`${requestExports.attempts} + 1`, lastError: cause },
       setWhere: sql`${requestExports.status} = 'pending'`,
     });
+}
+
+/** Export state of several requests at once (request list, #26) – keyed by request id. */
+export async function listExportRecords(tx: TenantTx, requestIds: string[]): Promise<Map<string, ExportRecord>> {
+  tenantOf(tx);
+  if (requestIds.length === 0) return new Map();
+  const rows = await tx.select().from(requestExports).where(inArray(requestExports.requestId, requestIds));
+  return new Map(rows.map((row) => [row.requestId, row]));
 }

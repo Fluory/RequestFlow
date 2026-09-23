@@ -17,9 +17,20 @@ export interface NewRequest {
 
 // Repository of the request aggregate. Every function needs a tenant transaction; the company id is
 // taken from it, never from the caller – RLS enforces the same rule in the database.
-export async function listRequests(tx: TenantTx): Promise<RequestRow[]> {
+export interface RequestFilter {
+  status?: RequestStatus;
+  /** true: only possible duplicates; false: only non-duplicates; undefined: all. */
+  possibleDuplicate?: boolean;
+}
+
+/** The company's requests, newest first, optionally filtered (#26). */
+export async function listRequests(tx: TenantTx, filter: RequestFilter = {}): Promise<RequestRow[]> {
   tenantOf(tx);
-  return tx.select().from(requests).orderBy(desc(requests.createdAt));
+  const conditions = [
+    filter.status ? eq(requests.status, filter.status) : undefined,
+    filter.possibleDuplicate === undefined ? undefined : eq(requests.possibleDuplicate, filter.possibleDuplicate),
+  ].filter((condition) => condition !== undefined);
+  return tx.select().from(requests).where(and(...conditions)).orderBy(desc(requests.createdAt));
 }
 
 export async function getRequest(tx: TenantTx, id: string): Promise<RequestRow | null> {
