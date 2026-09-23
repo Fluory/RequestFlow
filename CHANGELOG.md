@@ -6,6 +6,9 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
+- Review of line items: positions appear as a table with a status per field; each field opens its source
+  (mail line, PDF page – marked when it comes from text recognition –, Excel cell, Word paragraph or table
+  cell) and can be corrected, audited like header fields.
 - Extraction schema v2: e-mail, phone and additional requirements as header fields, plus line items
   (description, quantity, unit, material, dimensions), each with its own status and source quote; German
   number formats, units and dates are normalised, a bare calendar week ("KW 42") stays at most uncertain.
