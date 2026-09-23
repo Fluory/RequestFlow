@@ -14,6 +14,10 @@ describe("request status machine (ADR-0001: NEW → PROCESSING → REVIEW → AP
     ["REVIEW", "reject", "REJECTED"],
     ["APPROVED", "export.succeeded", "EXPORTED"],
     ["APPROVED", "export.failed", "ERROR"],
+    // Duplicate decision (#27): before approval, never while a worker holds the request.
+    ["NEW", "reject.duplicate", "REJECTED"],
+    ["REVIEW", "reject.duplicate", "REJECTED"],
+    ["ERROR", "reject.duplicate", "REJECTED"],
   ] as const)("%s --%s--> %s", (from, event, to) => {
     expect(nextStatus(from, event as RequestEvent)).toBe(to);
   });
@@ -29,6 +33,10 @@ describe("request status machine (ADR-0001: NEW → PROCESSING → REVIEW → AP
     ["REJECTED", "reprocess.processing"],
     ["REVIEW", "reprocess.processing"],
     ["EXPORTED", "reprocess.export"],
+    ["PROCESSING", "reject.duplicate"],
+    ["APPROVED", "reject.duplicate"],
+    ["EXPORTED", "reject.duplicate"],
+    ["REJECTED", "reject.duplicate"],
   ] as const)("refuses %s --%s", (from, event) => {
     expect(() => nextStatus(from, event as RequestEvent)).toThrow(InvalidTransition);
   });
