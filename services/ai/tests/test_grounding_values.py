@@ -230,6 +230,9 @@ def test_unknown_unit_has_no_canonical_form(raw: str) -> None:
         ("t", "Menge: 2,5 t", "t"),
         ("Satz", "3 Satz Dichtungen", "Satz"),
         (" Paar ", "2 Paar Handschuhe", "Paar"),
+        # A table cell holding only the unit.
+        ("Stk.", "Stk.", "pcs"),
+        ("kg", " kg ", "kg"),
     ],
 )
 def test_unit_value_is_checked_and_canonicalised(value: str, quote: str, normalized: str) -> None:
@@ -249,6 +252,11 @@ def test_unit_value_is_checked_and_canonicalised(value: str, quote: str, normali
         ("m", "Modul 2"),
         ("t", "Flansch DN50"),
         ("Satz", "3 Paar Dichtungen"),
+        # Not after a number: a steel grade, a thickness (#22 review).
+        ("pcs", "St 37-2 Blech"),
+        ("Stk.", "Werkstoff St 52"),
+        ("t", "Blech t=5"),
+        ("t", "t 5 mm"),
     ],
 )
 def test_unit_not_in_quote_is_not_ok(value: str, quote: str) -> None:
@@ -309,6 +317,9 @@ def test_phone_value_matches_digits_and_is_kept_as_written(
         ("+49 30 12345678", "Tel. 030 12345678"),
         ("12", "Tel. 12"),
         ("Zentrale", "Tel. Zentrale 030 12345678"),
+        # A date or a dotted number is not a phone number (#22 review).
+        ("12102026", "Liefertermin 12.10.2026"),
+        ("12.10.2026", "Liefertermin 12.10.2026"),
     ],
 )
 def test_phone_not_in_quote_is_not_ok(value: str, quote: str) -> None:
