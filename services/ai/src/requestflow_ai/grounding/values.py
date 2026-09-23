@@ -66,8 +66,8 @@ _UNITS: dict[str, str] = {
     for canonical, spellings in _UNIT_SPELLINGS.items()
     for spelling in spellings
 }
-# A known unit counts only right after a number ("250mm", "1.250 Stk.") – or when the whole quote is
-# the unit (a table cell). A bare "St 37-2" (steel grade) or "t=5" (thickness) is not a unit (#22 review).
+# A known unit counts only right after a number ("250mm", "1.250 Stk.") or when the whole quote is
+# the unit (a table cell). A bare "St 37-2" (steel grade) or "t=5" (thickness) is not a unit.
 _UNIT_AFTER_NUMBER = re.compile(r"\d[\s\u00a0]*(?P<unit>[^\W\d_]+)\.?(?![^\W_])")
 
 _EMAIL_SHAPE = re.compile(r"[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+")
