@@ -27,6 +27,9 @@ export default async function HomePage() {
       <p>
         Firma: <strong>{company?.name}</strong> · Rolle: {actor.role === "admin" ? "Administration" : "Sachbearbeitung"}
       </p>
+      <p>
+        <Link href="/requests">Anfragen</Link>
+      </p>
       {actor.role === "admin" && (
         <p>
           <Link href="/invite">Mitarbeitende einladen</Link>

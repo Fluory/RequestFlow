@@ -10,6 +10,7 @@
 |---|---|---|---|
 | `app` | `app_owner` | DML via default privileges, no CREATE | every table: `company_id` + RLS **enabled and forced**, policy `<table>_tenant_isolation` |
 | `auth` | `app_owner` | DML on all tables, no CREATE | none – Better Auth data, server code only (exceptions register) |
+| `pgboss` | `app_owner` (deploy step installs schema + queues) | DML only | none – job queue, IDs only (exceptions register) |
 | `drizzle` | `app_owner` | none | migration journal |
 
 Tenant policy (all `app` tables): `company_id = nullif(current_setting('app.company_id', true), '')::uuid`
@@ -26,8 +27,37 @@ query sees zero rows and every write fails.
 | `company_id` | uuid FK → `auth.organization.id` | tenant key, `ON DELETE RESTRICT` | internal |
 | `status` | text | `NEW · PROCESSING · REVIEW · APPROVED · EXPORTED · REJECTED · ERROR` (check constraint) | internal |
 | `created_at` | timestamptz | | internal |
+| `source` | text | `upload` (mailbox later) | internal |
+| `created_by` | uuid | uploading user | personal (staff) |
+| `subject` | text | mail subject or first file name, max 300 chars | confidential |
+| `message_id` | text | `Message-ID` of an uploaded mail – duplicate key | personal |
+| `fingerprint` | text | SHA-256 over the sorted file hashes – duplicate key | internal |
+| `possible_duplicate` / `duplicate_of_id` | boolean / uuid | exact duplicate within the company; composite FK `(duplicate_of_id, company_id)` | internal |
 
-Purpose: one quote request per row. Retention: open question for the customer (ADR-0001 open points).
+Unique `(id, company_id)` so child tables can pin the company with composite foreign keys (FK checks
+bypass RLS). Purpose: one quote request per row. Retention: open question for the customer (ADR-0001 open points).
+
+### `app.documents` – originals of a request (#5)
+
+| Column | Type | Notes | Class |
+|---|---|---|---|
+| `id`, `company_id`, `request_id` | uuid | composite FK `(request_id, company_id)` → `requests` | internal |
+| `filename`, `content_type`, `kind` | text | kind `eml · msg · pdf · xlsx · docx` | confidential |
+| `size_bytes`, `sha256` | bigint, text | SHA-256 of the raw bytes (integrity, duplicates) | internal |
+| `storage_key` | text | `{companyId}/{requestId}/{documentId}` in the private bucket | internal |
+
+The bytes (confidential + personal) live only in object storage; served via `GET /api/documents/:id`.
+
+### `app.audit_events` – append-only business audit (#5, ADR-0001 D10)
+
+| Column | Type | Notes | Class |
+|---|---|---|---|
+| `company_id`, `entity_type`, `entity_id` | | what changed | internal |
+| `actor_user_id` | uuid | who | personal (staff) |
+| `action`, `data` | text, jsonb | e.g. `request.uploaded`; old/new values later – no document content | internal/confidential |
+
+`app_rw` has INSERT and SELECT only (UPDATE/DELETE/TRUNCATE revoked). Written in the same transaction
+as the change.
 
 ### `auth.*` – Better Auth 1.7.5 (generated with the Better Auth CLI, timestamps with time zone)
 
@@ -51,4 +81,7 @@ company's first admin; it can never obtain a session.
 auth.organization 1─n auth.member n─1 auth.user 1─n auth.session / auth.account
 auth.organization 1─n auth.invitation
 auth.organization 1─n app.requests            (company_id)
+app.requests      1─n app.documents           (request_id, company_id)
+app.requests      0─1 app.requests            (duplicate_of_id, company_id)
+app.*             1─n app.audit_events        (entity_type, entity_id – no FK, append-only)
 ```

@@ -1,5 +1,6 @@
 import { loadConfig, type AppConfig } from "@/config/env";
 import { createDatabase, type DatabaseHandle } from "@/db";
+import { createJobQueue } from "@/db/job-queue-client";
 import { createAuth, getActor, type Actor, type Auth } from "@/features/identity";
 import { S3BlobStore } from "@/features/storage";
 import { createTenancy, type Tenancy } from "@/features/tenancy";
@@ -29,6 +30,17 @@ export function getRuntime(): Runtime {
     };
   }
   return runtime;
+}
+
+let jobClient: ReturnType<typeof createJobQueue> | undefined;
+
+/** pg-boss client of the web process (send only, no supervision). */
+export function getJobClient(): ReturnType<typeof createJobQueue> {
+  jobClient ??= createJobQueue(getRuntime().config.databaseUrl).catch((error: unknown) => {
+    jobClient = undefined;
+    throw error;
+  });
+  return jobClient;
 }
 
 /** The signed-in actor for the current request, or null. */

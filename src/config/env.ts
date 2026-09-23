@@ -15,6 +15,9 @@ const schema = z.object({
   // Deployment environment – set explicitly everywhere (compose, CI, .env). Only `local` may use the
   // committed local-default secret.
   APP_ENV: z.enum(["local", "showcase", "production"]),
+  UPLOAD_MAX_FILE_BYTES: z.coerce.number().int().positive().default(20 * 1024 * 1024),
+  UPLOAD_MAX_FILES: z.coerce.number().int().positive().max(50).default(10),
+  UPLOAD_MAX_REQUEST_BYTES: z.coerce.number().int().positive().default(40 * 1024 * 1024),
 });
 
 const LOCAL_PLACEHOLDER_SECRETS = new Set(["local-dev-only-secret-change-me-0123456789"]);
@@ -35,6 +38,11 @@ export interface AppConfig {
     baseURL: string;
     ipAddressHeaders: string[];
     trustedProxies: string[];
+  };
+  upload: {
+    maxFileBytes: number;
+    maxFiles: number;
+    maxRequestBytes: number;
   };
 }
 
@@ -66,5 +74,6 @@ export function loadConfig(source: Record<string, string | undefined> = process.
       ipAddressHeaders: list(env.AUTH_IP_HEADERS),
       trustedProxies: list(env.AUTH_TRUSTED_PROXIES),
     },
+    upload: { maxFileBytes: env.UPLOAD_MAX_FILE_BYTES, maxFiles: env.UPLOAD_MAX_FILES, maxRequestBytes: env.UPLOAD_MAX_REQUEST_BYTES },
   };
 }

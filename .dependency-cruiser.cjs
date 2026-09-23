@@ -29,7 +29,14 @@ module.exports = {
       severity: "error",
       comment: "Feature modules never open connections or run migrations: createDatabase()/runMigrations() belong to the composition roots (src/app/_server, src/*.ts entrypoints). Types and table definitions (src/db/schema) are fine.",
       from: { path: "^src/features/" },
-      to: { path: "^src/db/(index|client|migrate)\\.ts$", dependencyTypesNot: ["type-only"] },
+      to: { path: "^src/db/(index|client|migrate|job-queue-client)\\.ts$", dependencyTypesNot: ["type-only"] },
+    },
+    {
+      name: "pg-boss-client-only-in-db",
+      severity: "error",
+      comment: "pg-boss opens its own pool: construct it only in src/db (job-queue.ts); features use injected JobSender types.",
+      from: { path: "^src/", pathNot: "^src/db/" },
+      to: { path: "(^|/)node_modules/pg-boss(/|$)", dependencyTypesNot: ["type-only"] },
     },
     {
       name: "not-to-unresolvable",

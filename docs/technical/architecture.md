@@ -12,9 +12,9 @@ approve them, and exports each approved request exactly once to an ERP (mock in 
 It is a TypeScript modular monolith (`web` + `worker` from one codebase) on PostgreSQL, plus the
 AI service. Decisions and rationale: [ADR-0001](../decisions/ADR-0001-pilot-architecture.md).
 
-**Current state (2026-09-23): app skeleton (#3) + identity/tenancy (#4)** – runnable stack, health
-endpoint, database roles, invite-only login, companies, `withTenant()` with forced RLS, module
-skeletons with enforced boundaries. Tables: [data-model.md](data-model.md). Status per module below (`skeleton` = public
+**Current state (2026-09-23): #3 skeleton, #4 identity/tenancy, #5 intake** – runnable stack, health
+endpoint, invite-only login, companies, `withTenant()` with forced RLS, upload with atomic enqueue
+and duplicate flags, module boundaries enforced. Tables: [data-model.md](data-model.md). Status per module below (`skeleton` = public
 `index.ts` only).
 
 ## Modules
@@ -23,8 +23,8 @@ Every new file belongs to one of these modules – otherwise add the module here
 
 | Module | Location | Task | Exposure | Data class | Protection | Status |
 |---|---|---|---|---|---|---|
-| `intake` | `src/features/intake/` | upload, duplicate fingerprint, creates request + documents | authenticated UI/route | confidential + personal | session, tenant context, size/type limits | skeleton |
-| `documents` | `src/features/documents/` | document records, storage references, hashes | internal | confidential | tenant context | skeleton |
+| `intake` | `src/features/intake/` | upload, duplicate fingerprint, creates request + documents | authenticated UI/route | confidential + personal | session, tenant context, size/type limits | built: upload validation (extension + signature, size), fingerprint, atomic submit |
+| `documents` | `src/features/documents/` | document records, storage references, hashes | internal | confidential | tenant context | built: records, SHA-256, storage keys |
 | `extraction` | `src/features/extraction/` | AI-service client, persists runs/fields/evidence | internal | confidential + personal | tenant context, contract validation | skeleton |
 | `requests` | `src/features/requests/` | request aggregate, status machine | internal | confidential | tenant context | partial: `app.requests` + repository (status machine: #7) |
 | `review` | `src/features/review/` | review UI, corrections, approve/reject | authenticated UI | confidential + personal | session, role check, audit | skeleton |
@@ -32,13 +32,13 @@ Every new file belongs to one of these modules – otherwise add the module here
 | `erp-mock` | `src/features/erp-mock/` | simulated ERP REST API | route behind flag | synthetic | disabled unless `ERP_MOCK_ENABLED` | skeleton |
 | `identity` | `src/features/identity/` | Better Auth, users, companies, roles | public login route | personal (staff) | rate limit, invite-only | partial: Better Auth (invite-only, organization + admin plugins), `authorize()`, invite, seed |
 | `tenancy` | `src/features/tenancy/` | `withTenant()`, RLS policies | internal | – | forced RLS, `app_rw` without BYPASSRLS | built: `withTenant()`, forced RLS on `app.*` |
-| `audit` | `src/features/audit/` | append-only audit events | internal | personal (staff) | INSERT/SELECT only | skeleton |
-| `jobs` | `src/features/jobs/`, entrypoint `src/worker.ts` | pg-boss, job handlers, `drain()`, worker entrypoint | internal | IDs only | transactional enqueue | skeleton (no-op worker) |
-| `storage` | `src/features/storage/` | `BlobStore` port + S3 adapter | internal | confidential | private bucket, access via app routes | partial: S3 adapter, bucket setup, health ping |
+| `audit` | `src/features/audit/` | append-only audit events | internal | personal (staff) | INSERT/SELECT only | partial: `recordAudit()` (append-only enforced by grants) |
+| `jobs` | `src/features/jobs/`, entrypoint `src/worker.ts` | pg-boss, job handlers, `drain()`, worker entrypoint | internal | IDs only | transactional enqueue | partial: queues + transactional enqueue; worker no-op until #7 |
+| `storage` | `src/features/storage/` | `BlobStore` port + S3 adapter | internal | confidential | private bucket, access via app routes | built: S3 adapter (put/get/delete, bucket setup, ping) |
 | `observability` | `src/features/observability/` | logger, health, request-list ops data | `/api/health` | IDs only | no PII in logs | partial: health aggregation (database, storage) |
 | `db` | `src/db/`, deploy step `src/setup.ts` | Drizzle schema, migrations, DB roles | internal | – | migrations as owner role | built: roles check, schema `app`, default grants for `app_rw` |
 | `config` | `src/config/` | typed runtime configuration, validated at start (zod) | internal | secrets (in memory only) | errors name variables, never values | built |
-| `app` | `src/app/` | Next.js routes and pages; composition root `src/app/_server/` (pool, storage client) | `/`, `/login`, `/signup`, `/invite`, `/api/auth/*`, `/api/health` | – | calls module APIs only (dependency-cruiser) | partial: login, sign-up, invite, home |
+| `app` | `src/app/` | Next.js routes and pages; composition root `src/app/_server/` (pool, storage client) | `/`, `/login`, `/signup`, `/invite`, `/requests`, `/api/requests`, `/api/documents/:id`, `/api/auth/*`, `/api/health` | – | calls module APIs only (dependency-cruiser) | partial: login, sign-up, invite, home |
 | AI service | `services/ai/` | docling parsing, extraction, grounding, evals | internal HTTP | confidential + personal (transient) | bearer token, stateless, no DB/storage access | planned |
 | Contracts | `contracts/` | OpenAPI: AI service, ERP export | – | – | contract tests | planned |
 
@@ -51,6 +51,8 @@ Deliberately accepted risks – without an entry here a deviation counts as a de
 | No RLS on the `auth` and `pgboss` schemas | Not company-owned business data; reachable only by server code (ADR-0001 D7) | Fluory | 2026-12-31 (review at M3) |
 | Showcase without unattended retries (Vercel Hobby cron once/day) | Showcase only; production runs a worker (D2) | Fluory | when a production-like demo is needed |
 | Better Auth admin plugin mounted without any holder of its admin role | ADR-0001 D6 names the plugin; nobody holds `platform-admin`, so `/api/auth/admin/*` rejects every caller (tested); user management runs through `identity` | Fluory | with #30 (decide: keep for ban/deactivate or remove) |
+| Upload endpoint without a per-user rate limit | Authenticated staff only; body bounded by `Content-Length` + `UPLOAD_MAX_REQUEST_BYTES` before reading | Fluory | before any public deployment (#19) |
+| `.msg` uploads checked by OLE signature only | Structure check of Outlook messages needs a CFB parser; files are served only as attachments with `nosniff` and parsed later by the stateless AI service | Fluory | with #23 (MSG parsing) |
 | Gemini API free tier for local development | Synthetic data only; never showcase or customer data (D8) | Fluory | when a Vertex development budget exists |
 
 ## Data flow

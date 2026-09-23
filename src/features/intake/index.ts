@@ -1,3 +1,3 @@
-// Public API of the `intake` module: upload, duplicate fingerprint, creates request + documents.
-// Other modules import only from this file (dependency-cruiser, ADR-0001 D1). Planned – see docs/technical/architecture.md.
-export {};
+// Public API of the `intake` module: upload, validation, duplicate fingerprint.
+export { submitUpload, type IntakeDeps, type SubmittedRequest, type UploadedFile } from "./submit";
+export { UploadRejected, type UploadLimits } from "./files";

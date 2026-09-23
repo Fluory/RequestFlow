@@ -1,3 +1,4 @@
-// Public API of the `jobs` module: pg-boss, job handlers, drain(), worker entrypoint.
-// Other modules import only from this file (dependency-cruiser, ADR-0001 D1). Planned – see docs/technical/architecture.md.
-export {};
+// Public API of the `jobs` module: queue definitions, transactional enqueue (worker + drain(): #7).
+// The pg-boss client itself is created in src/db (it opens a pool) and injected.
+export { enqueueRequestProcessing, type JobSender } from "./boss";
+export { QUEUE_DEFINITIONS, QUEUES, type QueueName, type RequestJob } from "./queues";
