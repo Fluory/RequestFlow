@@ -33,7 +33,6 @@ query sees zero rows and every write fails.
 | `message_id` | text | `Message-ID` of an uploaded mail – duplicate key | personal |
 | `fingerprint` | text | SHA-256 over the sorted file hashes – duplicate key | internal |
 | `possible_duplicate` / `duplicate_of_id` | boolean / uuid | exact duplicate within the company; composite FK `(duplicate_of_id, company_id)` | internal |
-
 | `error_stage`, `error_message` | text | `processing`/`export`; readable cause for staff – no stack traces, hosts or document content | internal |
 | `attempts`, `next_retry_at` | int, timestamptz | processing attempts; next retry while pg-boss retries | internal |
 
@@ -48,7 +47,8 @@ bypass RLS). Purpose: one quote request per row. Retention: open question for th
 | `extraction_segments` | segment text + locator (page/bbox, mail line) per document | confidential + personal | source view of the review UI |
 | `extracted_fields` | one merged value per header field: value, status (`found` only with a verified quote – check constraint), model status, reason, document, segment, quote | confidential + personal | corrections come with #8 |
 
-All three: `company_id`, forced RLS, composite FKs to the run/request of the same company.
+All three: `company_id`, forced RLS, composite FKs to the run and request of the same company;
+`extracted_fields` evidence `(run_id, document_id, segment_id)` must reference a stored segment.
 
 ### `app.documents` – originals of a request (#5)
 

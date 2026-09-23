@@ -26,6 +26,8 @@ const aiCalls: string[] = [];
 
 const suffix = randomUUID().slice(0, 8);
 const TEST_QUEUES = { process: `test-process-${suffix}`, dead: `test-process-dead-${suffix}` };
+// Short expiry: simulates a worker that crashed mid-job (job stays active until pg-boss expires it).
+const RECOVERY_QUEUES = { process: `test-recovery-${suffix}`, dead: `test-recovery-dead-${suffix}` };
 
 describe("processing: worker, AI service, retries and visible errors", () => {
   let stack: Stack;
@@ -40,7 +42,7 @@ describe("processing: worker, AI service, retries and visible errors", () => {
   const MAIL = enc("From: Einkauf <einkauf@example.com>\r\nSubject: Anfrage\r\nMessage-ID: <p@example.com>\r\n\r\nMusterbau Beispiel GmbH\r\n");
 
   /** A NEW request with stored documents and a job on the test queue – like intake, but isolated. */
-  async function newRequest(actor: Actor, files: Array<{ name: string; kind: "eml" | "pdf" | "xlsx"; bytes: Uint8Array }>) {
+  async function newRequest(actor: Actor, files: Array<{ name: string; kind: "eml" | "pdf" | "xlsx"; bytes: Uint8Array }>, queue = TEST_QUEUES.process) {
     const requestId = randomUUID();
     const documents = files.map((file) => {
       const id = randomUUID();
@@ -50,7 +52,7 @@ describe("processing: worker, AI service, retries and visible errors", () => {
     const jobId = await deps.tenancy.withTenant(actor.companyId, async (tx) => {
       await createRequest(tx, { id: requestId, createdBy: actor.userId });
       await insertDocuments(tx, documents.map(({ bytes: _bytes, ...document }) => document));
-      return sendInTransaction(boss, tx, TEST_QUEUES.process, { requestId, companyId: actor.companyId }, { singletonKey: requestId });
+      return sendInTransaction(boss, tx, queue, { requestId, companyId: actor.companyId }, { singletonKey: requestId });
     });
     return { requestId, jobId, documentIds: documents.map((document) => document.id), job: { id: jobId, data: { requestId, companyId: actor.companyId } } };
   }
@@ -89,10 +91,12 @@ describe("processing: worker, AI service, retries and visible errors", () => {
     await installJobQueues(process.env.MIGRATION_DATABASE_URL!, [
       { name: TEST_QUEUES.dead, policy: "standard" },
       { name: TEST_QUEUES.process, policy: "exclusive", retryLimit: 1, retryDelay: 0, retryBackoff: false, deadLetter: TEST_QUEUES.dead },
+      { name: RECOVERY_QUEUES.dead, policy: "standard" },
+      { name: RECOVERY_QUEUES.process, policy: "exclusive", retryLimit: 2, retryDelay: 0, retryBackoff: false, expireInSeconds: 1, deadLetter: RECOVERY_QUEUES.dead },
     ]);
     stack = createStack();
     storage = new S3BlobStore(config.storage);
-    boss = await createJobQueue(config.databaseUrl);
+    boss = await createJobQueue(config.databaseUrl, { monitorIntervalSeconds: 1 });
     deps = {
       tenancy: createTenancy(stack.database.db),
       storage,
@@ -145,13 +149,19 @@ describe("processing: worker, AI service, retries and visible errors", () => {
     expect(await countIn(admin, sql`select count(*)::int as n from app.extraction_runs where request_id = ${requestId}`)).toBe(1);
   });
 
-  it("is idempotent under concurrent duplicate delivery: one run, one REVIEW", async () => {
+  // Both deliveries may claim and call the AI service (at-least-once); persistence is what is
+  // idempotent: exactly one run, one REVIEW, and every attempt counted.
+  it("persists exactly one run under concurrent duplicate delivery", async () => {
     reply = (documentId) => ({ status: 200, body: syntheticExtractResponse(documentId) });
-    const { requestId, job } = await newRequest(admin, [{ name: "a.eml", kind: "eml", bytes: MAIL }]);
+    const { requestId, job, documentIds } = await newRequest(admin, [{ name: "a.eml", kind: "eml", bytes: MAIL }]);
 
     const results = await Promise.all([processRequestJob(deps, job), processRequestJob(deps, job)]);
 
     expect(results.sort()).toEqual(["processed", "skipped"]);
+    const calls = aiCalls.filter((id) => id === documentIds[0]).length;
+    expect(calls).toBeGreaterThanOrEqual(1);
+    expect(calls).toBeLessThanOrEqual(2);
+    expect((await requestOf(admin, requestId))?.attempts).toBe(calls);
     expect(await countIn(admin, sql`select count(*)::int as n from app.extraction_runs where request_id = ${requestId}`)).toBe(1);
     expect((await requestOf(admin, requestId))?.status).toBe("REVIEW");
   });
@@ -220,6 +230,38 @@ describe("processing: worker, AI service, retries and visible errors", () => {
     expect(jobs.rows[0].n).toBe(1);
     const audit = await deps.tenancy.withTenant(admin.companyId, (tx) => listAuditEvents(tx, "request", requestId));
     expect(audit.map((event) => event.action)).toEqual(expect.arrayContaining(["request.failed", "request.reprocessed"]));
+    // Leave the shared queue as we found it (a local worker would otherwise pick this job up).
+    await stack.database.pool.query("delete from pgboss.job where name = $1 and singleton_key = $2", [QUEUES.processRequest, requestId]);
+  });
+
+  it("skips a job whose company does not own the request (the payload is re-checked, never trusted)", async () => {
+    reply = (documentId) => ({ status: 200, body: syntheticExtractResponse(documentId) });
+    const { requestId, job } = await newRequest(admin, [{ name: "a.eml", kind: "eml", bytes: MAIL }]);
+
+    const result = await processRequestJob(deps, { id: job.id, data: { requestId, companyId: otherAdmin.companyId } });
+
+    expect(result).toBe("skipped");
+    expect(await requestOf(admin, requestId)).toMatchObject({ status: "NEW", attempts: 0 });
+  });
+
+  it("recovers a request whose worker crashed mid-job: pg-boss expires the job, supervise() as app_rw retries it", async () => {
+    reply = (documentId) => ({ status: 200, body: syntheticExtractResponse(documentId) });
+    const { requestId, jobId } = await newRequest(admin, [{ name: "a.eml", kind: "eml", bytes: MAIL }], RECOVERY_QUEUES.process);
+    // The "crashed" worker fetched the job and claimed the request, then vanished.
+    const [fetched] = await boss.fetch(RECOVERY_QUEUES.process);
+    expect(fetched?.id).toBe(jobId);
+    await deps.tenancy.withTenant(admin.companyId, async (tx) => {
+      const { lockRequest, transitionRequest } = await import("@/features/requests");
+      await transitionRequest(tx, (await lockRequest(tx, requestId))!, "processing.started", { attempts: 1 });
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 2_500));
+    await boss.supervise(RECOVERY_QUEUES.process);
+    expect((await boss.getJobById(RECOVERY_QUEUES.process, jobId))?.state).toBe("retry");
+    await drain(deps, { maxMs: 5_000, queues: RECOVERY_QUEUES });
+
+    expect(await requestOf(admin, requestId)).toMatchObject({ status: "REVIEW", attempts: 2 });
+    expect(await countIn(admin, sql`select count(*)::int as n from app.extraction_runs where request_id = ${requestId}`)).toBe(1);
   });
 
   it("logs IDs only – no document content, no e-mail addresses", async () => {

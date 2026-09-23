@@ -20,7 +20,13 @@
 - The AI service runs only with the compose profile `ai` (`docker compose --profile ai up`) and needs
   Vertex AI credentials (`VERTEX_PROJECT`, ADC file via `GOOGLE_ADC_FILE`). Without it, requests stay
   in retries and end in `ERROR` ("Der KI-Dienst ist nicht erreichbar.") – by design, nothing is lost.
-- The worker refuses to start without `AI_SERVICE_TOKEN` (fail-closed).
+- The worker refuses to start without `AI_SERVICE_TOKEN`, and when `AI_SERVICE_TIMEOUT_MS ×
+  UPLOAD_MAX_FILES` could outlive the job expiry (1 h) – otherwise pg-boss would redeliver a job that
+  is still running (fail-closed).
+- A worker that dies mid-job leaves the job active; after the expiry pg-boss maintenance
+  (`supervise`, run by the worker as `app_rw`) puts it back into retry and the next attempt finishes it
+  (integration test). Known gap: a request whose job vanished completely (e.g. deleted by hand) stays
+  in `NEW`/`PROCESSING` – a cross-company sweep needs a privileged path and follows with #26/#28.
 
 ## Deploy step
 
