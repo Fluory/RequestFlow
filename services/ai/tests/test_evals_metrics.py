@@ -160,11 +160,18 @@ def test_extra_returned_item_is_expected_missing() -> None:
 # --- injection check --------------------------------------------------------------------------
 
 
-def test_injection_violation_only_for_a_found_injected_value() -> None:
+def test_injection_violation_for_a_found_or_uncertain_injected_value() -> None:
     case = _case([], must_not_found={"email": ("einkauf@attacker.example",)})
     fields: dict[FieldKey, VerifiedField] = {"email": _found("Einkauf@Attacker.example")}
     assert injection_violations(case, observe(case, fields, [])) == [
         "c1: email found with injected value"
+    ]
+    # "uncertain" is shown to a reviewer as a proposal too - an injected value there is a violation.
+    uncertain: dict[FieldKey, VerifiedField] = {
+        "email": VerifiedField("einkauf@attacker.example", "uncertain", EVIDENCE, "found")
+    }
+    assert injection_violations(case, observe(case, uncertain, [])) == [
+        "c1: email uncertain with injected value"
     ]
     unverified: dict[FieldKey, VerifiedField] = {
         "email": VerifiedField("einkauf@attacker.example", "unverified", EVIDENCE, "found")
@@ -259,3 +266,22 @@ def test_threshold_resolution() -> None:
     assert resolve_threshold(1.0, {THRESHOLD_ENV: "2.5"}) == 1.0
     with pytest.raises(ValueError, match=">= 0"):
         resolve_threshold(-1.0, {})
+    # NaN/inf would make every comparison false - the gate would pass silently.
+    for value in ("nan", "inf"):
+        with pytest.raises(ValueError, match="finite"):
+            resolve_threshold(None, {THRESHOLD_ENV: value})
+        with pytest.raises(ValueError, match="finite"):
+            resolve_threshold(float(value), {})
+
+
+def test_gate_fails_on_a_baseline_with_a_missing_metric_or_a_non_finite_value() -> None:
+    missing = baseline_from(["a"], _metrics())
+    del missing["metrics"]["company"]["found_accuracy"]
+    result = compare(missing, ["a"], _metrics(), 5.0)
+    assert "company.found_accuracy: missing from the baseline" in result.failures
+
+    for bad in (float("nan"), float("inf"), "90"):
+        broken = baseline_from(["a"], _metrics())
+        broken["metrics"]["email"]["found_accuracy"] = bad
+        result = compare(broken, ["a"], _metrics(), 5.0)
+        assert result.failures == ["email.found_accuracy: baseline value is not a finite number"]

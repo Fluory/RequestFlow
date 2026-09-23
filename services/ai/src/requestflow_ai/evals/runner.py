@@ -16,7 +16,11 @@ from requestflow_ai.evals.metrics import (
     observe,
 )
 from requestflow_ai.evals.model import ReplayMissingError
-from requestflow_ai.extraction.model_client import ModelClient, ModelClientError
+from requestflow_ai.extraction.model_client import (
+    ModelClient,
+    ModelClientError,
+    ModelClientInitError,
+)
 from requestflow_ai.extraction.prompt import PROMPT_VERSION
 from requestflow_ai.extraction.schema import SCHEMA_VERSION
 from requestflow_ai.pipeline import run_extraction
@@ -69,6 +73,9 @@ def run_case(case: EvalCase, model_factory: ModelFactory) -> CaseResult:
             model=model_factory(case),
             pdf_pipeline="textlines",
         )
+    except ModelClientInitError:
+        # No client (e.g. no credentials in --live): abort the whole run, never record case by case.
+        raise
     except Exception as exc:  # a broken case must fail the gate, not stop the other cases
         # Messages only from errors that are content-free by design; otherwise just the type.
         detail = f": {exc}" if isinstance(exc, ReplayMissingError | ModelClientError) else ""
