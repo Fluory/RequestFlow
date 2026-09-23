@@ -32,6 +32,13 @@ module.exports = {
       to: { path: "^src/db/(index|client|migrate)\\.ts$", dependencyTypesNot: ["type-only"] },
     },
     {
+      name: "pg-boss-client-only-in-db",
+      severity: "error",
+      comment: "pg-boss opens its own pool: construct it only in src/db (job-queue.ts); features use injected JobSender types.",
+      from: { path: "^src/", pathNot: "^src/db/" },
+      to: { path: "(^|/)node_modules/pg-boss(/|$)", dependencyTypesNot: ["type-only"] },
+    },
+    {
       name: "not-to-unresolvable",
       severity: "error",
       comment: "Every import must resolve – otherwise the boundary rules above would silently check nothing.",

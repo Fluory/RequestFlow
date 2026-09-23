@@ -70,6 +70,13 @@ export class S3BlobStore {
     return response.Body.transformToByteArray();
   }
 
+  /** Streams an object (downloads never buffer the whole file). */
+  async stream(key: string): Promise<{ body: ReadableStream<Uint8Array>; length: number | undefined }> {
+    const response = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+    if (!response.Body) throw new Error("empty object body");
+    return { body: response.Body.transformToWebStream() as ReadableStream<Uint8Array>, length: response.ContentLength };
+  }
+
   async delete(key: string): Promise<void> {
     await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
   }

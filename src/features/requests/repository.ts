@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, or, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, or, sql, type SQL } from "drizzle-orm";
 import { requests, type RequestStatus } from "@/db/schema";
 import { tenantOf, type TenantTx } from "@/features/tenancy";
 
@@ -32,6 +32,15 @@ export async function createRequest(tx: TenantTx, input: NewRequest = {}): Promi
   const [row] = await tx.insert(requests).values({ ...input, companyId, status: "NEW" satisfies RequestStatus }).returning();
   if (!row) throw new Error("insert returned no row");
   return row;
+}
+
+/**
+ * Serialises duplicate detection per company for the rest of the transaction, so two identical
+ * uploads at the same moment cannot both miss each other.
+ */
+export async function lockDuplicateDetection(tx: TenantTx): Promise<void> {
+  const companyId = tenantOf(tx);
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`intake-duplicates:${companyId}`}, 0))`);
 }
 
 /**

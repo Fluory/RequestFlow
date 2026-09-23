@@ -13,9 +13,11 @@ export async function POST(request: Request): Promise<Response> {
   if (!actor) return problem(401, "Nicht angemeldet.");
   const { config, tenancy, storage } = getRuntime();
 
-  const declared = Number(request.headers.get("content-length") ?? "0");
-  const bodyLimit = config.upload.maxFileBytes * config.upload.maxFiles + 1024 * 1024;
-  if (declared > bodyLimit) return problem(413, "Upload zu groß.");
+  // The body is buffered by formData(): bound it BEFORE reading. Node enforces the declared length,
+  // so a request without a numeric Content-Length (chunked) is refused.
+  const declared = request.headers.get("content-length");
+  if (!declared || !/^\d+$/.test(declared)) return problem(411, "Upload ohne Längenangabe wird nicht angenommen.");
+  if (Number(declared) > config.upload.maxRequestBytes) return problem(413, "Upload zu groß.");
 
   let form: FormData;
   try {
@@ -37,7 +39,9 @@ export async function POST(request: Request): Promise<Response> {
   } catch (error) {
     if (error instanceof UploadRejected) return problem(422, error.message);
     if (error instanceof AuthorizationError) return problem(403, "Keine Berechtigung.");
-    console.error(JSON.stringify({ level: "error", route: "POST /api/requests", companyId: actor.companyId, message: "upload failed" }));
+    const kind = error instanceof Error ? error.name : "unknown";
+    const code = (error as { code?: unknown } | null)?.code;
+    console.error(JSON.stringify({ level: "error", route: "POST /api/requests", companyId: actor.companyId, userId: actor.userId, error: kind, code: typeof code === "string" ? code : undefined }));
     return problem(500, "Upload fehlgeschlagen. Bitte erneut versuchen.");
   }
 }

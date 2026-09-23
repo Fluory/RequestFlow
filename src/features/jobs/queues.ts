@@ -2,8 +2,6 @@ import type { Queue } from "pg-boss";
 
 // Queue definitions (ADR-0001 D4). Installed by the deploy step as the owner role; the runtime role
 // only sends, fetches and completes jobs. Payloads carry IDs only – never document content.
-export const PGBOSS_SCHEMA = "pgboss";
-
 export const QUEUES = {
   processRequest: "request-process",
   processRequestDead: "request-process-dead",

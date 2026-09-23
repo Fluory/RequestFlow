@@ -17,11 +17,11 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const document = await tenancy.withTenant(actor.companyId, (tx) => getDocument(tx, id));
   if (!document) return Response.json({ error: { title: "Nicht gefunden." } }, { status: 404 });
 
-  const bytes = await storage.get(document.storageKey);
-  return new Response(new Blob([bytes as BlobPart]), {
+  const { body, length } = await storage.stream(document.storageKey);
+  return new Response(body, {
     headers: {
       "content-type": document.contentType,
-      "content-length": String(bytes.byteLength),
+      ...(length === undefined ? {} : { "content-length": String(length) }),
       "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(document.filename)}`,
       "x-content-type-options": "nosniff",
       "cache-control": "private, no-store",

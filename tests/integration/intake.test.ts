@@ -5,7 +5,8 @@ import { listAuditEvents } from "@/features/audit";
 import { listDocuments } from "@/features/documents";
 import { getActor, type Actor } from "@/features/identity";
 import { submitUpload, UploadRejected, type IntakeDeps } from "@/features/intake";
-import { createJobClient, QUEUES } from "@/features/jobs";
+import { createJobQueue } from "@/db/job-queue";
+import { QUEUES } from "@/features/jobs";
 import { getRequest } from "@/features/requests";
 import { S3BlobStore } from "@/features/storage";
 import { createTenancy } from "@/features/tenancy";
@@ -39,7 +40,7 @@ describe("intake: upload a request and enqueue processing atomically", () => {
     stack = createStack();
     const config = loadConfig();
     storage = new S3BlobStore(config.storage);
-    boss = await createJobClient(config.databaseUrl);
+    boss = await createJobQueue(config.databaseUrl);
     deps = { tenancy: createTenancy(stack.database.db), storage, boss, limits: { maxFileBytes: 1024 * 1024, maxFiles: 5 } };
 
     const a = await companyWithAdmin(stack);
