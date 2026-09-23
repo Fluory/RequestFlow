@@ -1,5 +1,5 @@
-// Source view of the review screen (#8): the page or mail around a value's evidence, with the cited
-// segment and quote marked. Pure – rendered by the page, tested with fixtures. The pilot shows PDF
+// Source view of the review screen (#8, all formats #25): the page, sheet, document or mail around a
+// value's evidence, with the cited segment and quote marked. Pure – rendered by the page, tested with fixtures. The pilot shows PDF
 // pages as text in reading order (decision-needed in #8); bounding boxes are stored for a later
 // rendered view.
 export interface StoredSegment {
@@ -17,8 +17,10 @@ export interface SourceLine {
 }
 
 export interface SourceView {
-  kind: "pdf" | "email";
+  kind: "pdf" | "email" | "xlsx" | "docx";
   heading: string;
+  /** The cited segment comes from text recognition (scanned PDF) – the page says so (#25). */
+  ocr: boolean;
   lines: SourceLine[];
 }
 
@@ -26,7 +28,31 @@ function label(locator: Record<string, unknown>): string {
   if (locator.kind === "email") {
     return locator.part === "header" ? `Kopf: ${String(locator.header ?? "")}` : `Zeile ${String(locator.line)}`;
   }
+  if (locator.kind === "xlsx") return `${String(locator.sheet)}!${String(locator.cell)}`;
+  if (locator.kind === "docx") {
+    return locator.table !== undefined ? `Tabelle ${String(locator.table)}, Zeile ${String(locator.row)}, Zelle ${String(locator.cell)}` : `Absatz ${String(locator.paragraph)}`;
+  }
   return `Seite ${String(locator.page)}`;
+}
+
+/** Segments shown around the cited one: the same PDF page or XLSX sheet; a whole mail or Word file. */
+function sameContext(cited: Record<string, unknown>, other: Record<string, unknown>): boolean {
+  if (other.kind !== cited.kind || other.attachment !== cited.attachment) return false;
+  if (cited.kind === "pdf") return other.page === cited.page;
+  if (cited.kind === "xlsx") return other.sheet === cited.sheet;
+  return true;
+}
+
+function headingOf(locator: Record<string, unknown>): string {
+  const base =
+    locator.kind === "pdf"
+      ? `Seite ${String(locator.page)}${locator.ocr === true ? " (Texterkennung)" : ""}`
+      : locator.kind === "xlsx"
+        ? `Tabellenblatt ${String(locator.sheet)}`
+        : locator.kind === "docx"
+          ? "Word-Dokument"
+          : "E-Mail";
+  return typeof locator.attachment === "string" ? `Anhang ${locator.attachment} – ${base}` : base;
 }
 
 function markQuote(text: string, quote: string): SourceLine["parts"] {
@@ -48,13 +74,12 @@ export function buildSourceView(segments: StoredSegment[], evidence: { segmentId
   if (!evidence) return null;
   const cited = segments.find((segment) => segment.segmentId === evidence.segmentId);
   if (!cited) return null;
-  const isPdf = cited.locator.kind === "pdf";
-  const context = segments
-    .filter((segment) => !isPdf || segment.locator.page === cited.locator.page)
-    .sort((a, b) => a.position - b.position);
+  const context = segments.filter((segment) => sameContext(cited.locator, segment.locator)).sort((a, b) => a.position - b.position);
+  const kind = cited.locator.kind;
   return {
-    kind: isPdf ? "pdf" : "email",
-    heading: isPdf ? `Seite ${String(cited.locator.page)}` : "E-Mail",
+    kind: kind === "pdf" || kind === "xlsx" || kind === "docx" ? kind : "email",
+    heading: headingOf(cited.locator),
+    ocr: cited.locator.ocr === true,
     lines: context.map((segment) => ({
       segmentId: segment.segmentId,
       label: label(segment.locator),
