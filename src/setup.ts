@@ -4,6 +4,7 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import { loadConfig } from "@/config/env";
 import { runMigrations } from "@/db/migrate";
+import { installJobQueues } from "@/features/jobs";
 import { S3BlobStore } from "@/features/storage";
 
 const ATTEMPTS = 30;
@@ -42,13 +43,14 @@ async function main(): Promise<void> {
   const config = loadConfig();
 
   await withRetry("migrations", () => runMigrations(migrationUrl));
+  await withRetry("job queues", () => installJobQueues(migrationUrl));
   const store = new S3BlobStore(config.storage);
   try {
     await withRetry("bucket", () => store.ensureBucket());
   } finally {
     store.destroy();
   }
-  log("info", "migrations applied, bucket ready");
+  log("info", "migrations applied, job queues installed, bucket ready");
 }
 
 main().catch((error: unknown) => {

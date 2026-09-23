@@ -27,7 +27,7 @@ export async function createJobClient(connectionString: string, options: { super
  * Enqueues processing of a request IN the caller's tenant transaction (transactional outbox without
  * an outbox table): the job exists exactly when the transaction commits.
  */
-export async function enqueueRequestProcessing(boss: PgBoss, tx: TenantTx, requestId: string): Promise<string | null> {
+export async function enqueueRequestProcessing(boss: Pick<PgBoss, "send">, tx: TenantTx, requestId: string): Promise<string | null> {
   const job: RequestJob = { requestId, companyId: tenantOf(tx) };
   return boss.send(QUEUES.processRequest, job, { db: fromDrizzle(tx, sql), singletonKey: requestId });
 }

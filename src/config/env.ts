@@ -10,6 +10,8 @@ const schema = z.object({
   S3_FORCE_PATH_STYLE: z.enum(["true", "false"]).default("true"),
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.url(),
+  UPLOAD_MAX_FILE_BYTES: z.coerce.number().int().positive().default(20 * 1024 * 1024),
+  UPLOAD_MAX_FILES: z.coerce.number().int().positive().max(50).default(10),
 });
 
 export interface AppConfig {
@@ -25,6 +27,10 @@ export interface AppConfig {
   auth: {
     secret: string;
     baseURL: string;
+  };
+  upload: {
+    maxFileBytes: number;
+    maxFiles: number;
   };
 }
 
@@ -47,5 +53,6 @@ export function loadConfig(source: Record<string, string | undefined> = process.
       forcePathStyle: env.S3_FORCE_PATH_STYLE === "true",
     },
     auth: { secret: env.BETTER_AUTH_SECRET, baseURL: env.BETTER_AUTH_URL },
+    upload: { maxFileBytes: env.UPLOAD_MAX_FILE_BYTES, maxFiles: env.UPLOAD_MAX_FILES },
   };
 }

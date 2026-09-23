@@ -1,6 +1,9 @@
 import {
   CreateBucketCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
   HeadBucketCommand,
+  PutObjectCommand,
   S3Client,
   S3ServiceException,
 } from "@aws-sdk/client-s3";
@@ -50,6 +53,25 @@ export class S3BlobStore {
       if (error instanceof S3ServiceException && ["BucketAlreadyOwnedByYou", "BucketAlreadyExists"].includes(error.name)) return;
       throw error;
     }
+  }
+
+  /** Object key convention (ADR-0001 D5): `{companyId}/{requestId}/{documentId}`. */
+  static documentKey(companyId: string, requestId: string, documentId: string): string {
+    return `${companyId}/${requestId}/${documentId}`;
+  }
+
+  async put(key: string, bytes: Uint8Array, contentType: string): Promise<void> {
+    await this.client.send(new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: bytes, ContentType: contentType }));
+  }
+
+  async get(key: string): Promise<Uint8Array> {
+    const response = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+    if (!response.Body) throw new Error("empty object body");
+    return response.Body.transformToByteArray();
+  }
+
+  async delete(key: string): Promise<void> {
+    await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
   }
 
   destroy(): void {
