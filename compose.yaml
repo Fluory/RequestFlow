@@ -57,6 +57,8 @@ services:
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-local-dev-only-secret-change-me-0123456789}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
       APP_ENV: ${APP_ENV:-local}
+      AI_SERVICE_URL: ${AI_SERVICE_URL:-http://ai:8080}
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-local-dev-only-ai-token-0123456789}
     depends_on:
       postgres:
         condition: service_healthy
@@ -87,6 +89,23 @@ services:
     depends_on:
       setup:
         condition: service_completed_successfully
+
+  # AI service (services/ai). Opt-in profile: it refuses to start without Vertex AI credentials
+  # (fail-closed, ADR-0001 D8). Without it, processing jobs retry and end in ERROR with a visible cause.
+  #   docker compose --profile ai up
+  ai:
+    build: ./services/ai
+    profiles: ["ai"]
+    environment:
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-local-dev-only-ai-token-0123456789}
+      VERTEX_PROJECT: ${VERTEX_PROJECT:-}
+      VERTEX_LOCATION: ${VERTEX_LOCATION:-eu}
+      VERTEX_MODEL: ${VERTEX_MODEL:-gemini-3.5-flash}
+      GOOGLE_APPLICATION_CREDENTIALS: /secrets/adc.json
+    volumes:
+      - ${GOOGLE_ADC_FILE:-./.secrets/adc.json}:/secrets/adc.json:ro
+    ports:
+      - "${AI_PORT:-8000}:8080"
 
 volumes:
   pgdata:

@@ -25,15 +25,15 @@ Every new file belongs to one of these modules – otherwise add the module here
 |---|---|---|---|---|---|---|
 | `intake` | `src/features/intake/` | upload, duplicate fingerprint, creates request + documents | authenticated UI/route | confidential + personal | session, tenant context, size/type limits | built: upload validation (extension + signature, size), fingerprint, atomic submit |
 | `documents` | `src/features/documents/` | document records, storage references, hashes | internal | confidential | tenant context | built: records, SHA-256, storage keys |
-| `extraction` | `src/features/extraction/` | AI-service client, persists runs/fields/evidence | internal | confidential + personal | tenant context, contract validation | partial: contract types (client + persistence: #7) |
-| `requests` | `src/features/requests/` | request aggregate, status machine | internal | confidential | tenant context | partial: `app.requests` + repository (status machine: #7) |
+| `extraction` | `src/features/extraction/` | AI-service client, persists runs/fields/evidence | internal | confidential + personal | tenant context, contract validation | built: AI-service client (timeout, error classes), field merge, runs/segments/fields |
+| `requests` | `src/features/requests/` | request aggregate, status machine | internal | confidential | tenant context | built: repository, status machine, processing state |
 | `review` | `src/features/review/` | review UI, corrections, approve/reject | authenticated UI | confidential + personal | session, role check, audit | skeleton |
 | `export` | `src/features/export/` | ERP port + REST adapter, idempotency | outbound HTTP | confidential | idempotency key, unique export, timeout | skeleton |
 | `erp-mock` | `src/features/erp-mock/` | simulated ERP REST API | route behind flag | synthetic | disabled unless `ERP_MOCK_ENABLED` | skeleton |
 | `identity` | `src/features/identity/` | Better Auth, users, companies, roles | public login route | personal (staff) | rate limit, invite-only | partial: Better Auth (invite-only, organization + admin plugins), `authorize()`, invite, seed |
 | `tenancy` | `src/features/tenancy/` | `withTenant()`, RLS policies | internal | – | forced RLS, `app_rw` without BYPASSRLS | built: `withTenant()`, forced RLS on `app.*` |
 | `audit` | `src/features/audit/` | append-only audit events | internal | personal (staff) | INSERT/SELECT only | partial: `recordAudit()` (append-only enforced by grants) |
-| `jobs` | `src/features/jobs/`, entrypoint `src/worker.ts` | pg-boss, job handlers, `drain()`, worker entrypoint | internal | IDs only | transactional enqueue | partial: queues + transactional enqueue; worker no-op until #7 |
+| `jobs` | `src/features/jobs/`, entrypoint `src/worker.ts` | pg-boss, job handlers, `drain()`, worker entrypoint | internal | IDs only | transactional enqueue | built: queues, transactional enqueue, handler, `drain()`, dead letter → ERROR, reprocess, worker loop |
 | `storage` | `src/features/storage/` | `BlobStore` port + S3 adapter | internal | confidential | private bucket, access via app routes | built: S3 adapter (put/get/delete, bucket setup, ping) |
 | `observability` | `src/features/observability/` | logger, health, request-list ops data | `/api/health` | IDs only | no PII in logs | partial: health aggregation (database, storage) |
 | `db` | `src/db/`, deploy step `src/setup.ts` | Drizzle schema, migrations, DB roles | internal | – | migrations as owner role | built: roles check, schema `app`, default grants for `app_rw` |
