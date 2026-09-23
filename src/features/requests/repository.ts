@@ -71,7 +71,7 @@ export async function lockRequest(tx: TenantTx, id: string): Promise<RequestRow 
   return row ?? null;
 }
 
-type StatePatch = Partial<Pick<RequestRow, "errorStage" | "errorMessage" | "attempts" | "nextRetryAt">>;
+type StatePatch = Partial<Pick<RequestRow, "errorStage" | "errorMessage" | "attempts" | "nextRetryAt" | "rejectionReason">>;
 
 /** Applies a status-machine event to a locked row; illegal transitions throw before any write. */
 export async function transitionRequest(tx: TenantTx, row: RequestRow, event: RequestEvent, patch: StatePatch = {}): Promise<RequestRow> {

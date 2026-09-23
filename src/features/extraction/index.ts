@@ -4,4 +4,4 @@ export type { components as AiServiceComponents, paths as AiServicePaths } from 
 export type { ExtractResponse, FieldResult } from "./types";
 export { AiServiceError, createAiServiceClient, type AiServiceClient, type AiServiceSettings, type ExtractInput } from "./ai-client";
 export { HEADER_FIELDS, mergeFields, type HeaderField, type MergedField } from "./merge";
-export { latestRun, persistExtractionRun, runExistsForJob, type DocumentOutcome } from "./repository";
+export { latestRun, listSegments, persistExtractionRun, runExistsForJob, type DocumentOutcome } from "./repository";

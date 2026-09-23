@@ -13,3 +13,9 @@ export async function enqueueRequestProcessing(queue: JobSender, tx: TenantTx, r
   const job: RequestJob = { requestId, companyId: tenantOf(tx) };
   return sendInTransaction(queue, tx, QUEUES.processRequest, job, { singletonKey: requestId });
 }
+
+/** Enqueues the ERP export IN the approval transaction (ADR-0001 D9); handler: #9. */
+export async function enqueueRequestExport(queue: JobSender, tx: TenantTx, requestId: string): Promise<string> {
+  const job: RequestJob = { requestId, companyId: tenantOf(tx) };
+  return sendInTransaction(queue, tx, QUEUES.exportRequest, job, { singletonKey: requestId });
+}

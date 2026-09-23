@@ -86,3 +86,17 @@ export async function latestRun(tx: TenantTx, requestId: string) {
   const fields = await tx.select().from(extractedFields).where(and(eq(extractedFields.runId, run.id)));
   return { run, fields };
 }
+
+export async function listSegments(tx: TenantTx, runId: string) {
+  tenantOf(tx);
+  return tx
+    .select({
+      documentId: extractionSegments.documentId,
+      segmentId: extractionSegments.segmentId,
+      position: extractionSegments.position,
+      text: extractionSegments.text,
+      locator: extractionSegments.locator,
+    })
+    .from(extractionSegments)
+    .where(eq(extractionSegments.runId, runId));
+}
