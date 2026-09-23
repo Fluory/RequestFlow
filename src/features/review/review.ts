@@ -3,7 +3,7 @@ import { fieldCorrections } from "@/db/schema";
 import { recordAudit } from "@/features/audit";
 import { listDocuments, type DocumentRow } from "@/features/documents";
 import { exportLimitViolations, getExportRecord, type ExportRecord } from "@/features/export";
-import { HEADER_FIELDS, latestRun, listSegments } from "@/features/extraction";
+import { HEADER_FIELDS, ITEM_FIELDS, latestRun, listSegments } from "@/features/extraction";
 import { authorize, type Actor } from "@/features/identity";
 import { enqueueRequestExport, type JobSender } from "@/features/jobs";
 import { getRequest, lockRequest, transitionRequest, type RequestRow } from "@/features/requests";
@@ -17,6 +17,12 @@ export const FIELD_LABELS: Record<string, string> = {
   phone: "Telefon",
   requested_delivery_date: "Gewünschter Liefertermin",
   additional_requirements: "Zusätzliche Anforderungen",
+  // Line-item fields (#25).
+  description: "Beschreibung",
+  quantity: "Menge",
+  unit: "Einheit",
+  material: "Werkstoff",
+  dimensions: "Abmessungen",
 };
 
 export type FieldStatus = "found" | "uncertain" | "missing" | "unverified";
@@ -27,6 +33,8 @@ export const REJECTION_REASON_MAX = 1000;
 
 export interface ReviewField {
   key: string;
+  /** Line item position (#25); null for header fields. */
+  itemIndex: number | null;
   label: string;
   /** Current value: the latest correction, else the extracted value. */
   value: string | null;
@@ -39,9 +47,16 @@ export interface ReviewField {
   source: (SourceView & { documentId: string; filename: string }) | null;
 }
 
+export interface ReviewLineItem {
+  itemIndex: number;
+  fields: ReviewField[];
+}
+
 export interface ReviewView {
   request: RequestRow;
   fields: ReviewField[];
+  /** Line items (#25), in run order; each item field with its own status, source and corrections. */
+  lineItems: ReviewLineItem[];
   documents: DocumentRow[];
   skippedDocuments: Array<{ documentId: string; reason: string }>;
   /** Per document: attachments of an Outlook message that could not be read (#23), and warnings. */
@@ -60,11 +75,14 @@ export class ReviewRefused extends Error {
   }
 }
 
+/** Corrections are per field and – for line items – per position (#25). */
+const correctionKey = (fieldKey: string, itemIndex: number | null) => (itemIndex === null ? fieldKey : `${fieldKey}#${itemIndex}`);
+
 async function currentCorrections(tx: TenantTx, requestId: string) {
   tenantOf(tx);
   const rows = await tx.select().from(fieldCorrections).where(eq(fieldCorrections.requestId, requestId)).orderBy(asc(fieldCorrections.createdAt));
   const latest = new Map<string, (typeof rows)[number]>();
-  for (const row of rows) latest.set(row.fieldKey, row);
+  for (const row of rows) latest.set(correctionKey(row.fieldKey, row.itemIndex), row);
   return latest;
 }
 
@@ -77,7 +95,7 @@ export async function currentFieldValues(tx: TenantTx, requestId: string): Promi
   const extraction = await latestRun(tx, requestId);
   return Object.fromEntries(
     HEADER_FIELDS.map((key) => {
-      const correction = corrections.get(key);
+      const correction = corrections.get(correctionKey(key, null));
       return [key, correction ? correction.newValue : (extraction?.fields.find((field) => field.fieldKey === key)?.value ?? null)];
     }),
   );
@@ -91,18 +109,20 @@ export async function loadReview(tenancy: Tenancy, actor: Actor, requestId: stri
     const documents = await listDocuments(tx, requestId);
     const exportRecord = await getExportRecord(tx, requestId);
     const extraction = await latestRun(tx, requestId);
-    if (!extraction) return { request, fields: [], documents, skippedDocuments: [], documentNotes: [], exportRecord };
+    if (!extraction) return { request, fields: [], lineItems: [], documents, skippedDocuments: [], documentNotes: [], exportRecord };
     const segments = await listSegments(tx, extraction.run.id);
     const corrections = await currentCorrections(tx, requestId);
-    const byKey = new Map(extraction.fields.map((field) => [field.fieldKey, field]));
-    const fields: ReviewField[] = HEADER_FIELDS.map((key) => {
-      const field = byKey.get(key);
-      const correction = corrections.get(key);
+    type FieldRow = (typeof extraction.fields)[number];
+    const toReviewField = (key: string, itemIndex: number | null, field: FieldRow | undefined): ReviewField => {
+      const stored = corrections.get(correctionKey(key, itemIndex));
+      // Item positions belong to one run: a correction made before a newer run is not mapped onto it.
+      const correction = itemIndex !== null && stored && stored.createdAt < extraction.run.createdAt ? undefined : stored;
       const documentSegments = segments.filter((segment) => segment.documentId === field?.documentId) as Array<StoredSegment & { documentId: string }>;
       const view = field?.segmentId && field.quote ? buildSourceView(documentSegments, { segmentId: field.segmentId, quote: field.quote }) : null;
       const document = documents.find((candidate) => candidate.id === field?.documentId);
       return {
         key,
+        itemIndex,
         label: FIELD_LABELS[key] ?? key,
         value: correction ? correction.newValue : (field?.value ?? null),
         extractedValue: field?.value ?? null,
@@ -112,6 +132,12 @@ export async function loadReview(tenancy: Tenancy, actor: Actor, requestId: stri
         corrected: correction ? { by: correction.correctedBy, at: correction.createdAt } : null,
         source: view && document ? { ...view, documentId: document.id, filename: document.filename } : null,
       };
+    };
+    const byKey = new Map(extraction.fields.map((field) => [field.fieldKey, field]));
+    const fields = HEADER_FIELDS.map((key) => toReviewField(key, null, byKey.get(key)));
+    const lineItems = extraction.lineItems.map((item) => {
+      const itemFields = new Map(item.fields.map((field) => [field.fieldKey, field]));
+      return { itemIndex: item.itemIndex, fields: ITEM_FIELDS.map((key) => toReviewField(key, item.itemIndex, itemFields.get(key))) };
     });
     const skippedDocuments = (extraction.run.documents as Array<{ documentId: string; skipped?: string }>)
       .filter((entry) => entry.skipped)
@@ -119,7 +145,7 @@ export async function loadReview(tenancy: Tenancy, actor: Actor, requestId: stri
     const documentNotes = (extraction.run.documents as Array<{ documentId: string; failedAttachments?: Array<{ name: string | null; error: string | null }>; warnings?: string[] }>).map(
       (entry) => ({ documentId: entry.documentId, failedAttachments: entry.failedAttachments ?? [], warnings: entry.warnings ?? [] }),
     );
-    return { request, fields, documents, skippedDocuments, documentNotes, exportRecord };
+    return { request, fields, lineItems, documents, skippedDocuments, documentNotes, exportRecord };
   });
 }
 
@@ -129,24 +155,38 @@ async function lockForReview(tx: TenantTx, requestId: string): Promise<RequestRo
   return request;
 }
 
-/** Stores a correction and its audit event (old value, new value, user, time) in ONE transaction. */
-export async function correctField(tenancy: Tenancy, actor: Actor, requestId: string, fieldKey: string, newValue: string | null): Promise<void> {
+/**
+ * Stores a correction and its audit event (old value, new value, user, time) in ONE transaction – for a
+ * header field, or with `itemIndex` for a field of an existing line item (#25).
+ */
+export async function correctField(
+  tenancy: Tenancy,
+  actor: Actor,
+  requestId: string,
+  fieldKey: string,
+  newValue: string | null,
+  itemIndex: number | null = null,
+): Promise<void> {
   authorize(actor, "requests.process");
-  if (!(HEADER_FIELDS as readonly string[]).includes(fieldKey)) throw new ReviewRefused("unknown_field");
+  const known = itemIndex === null ? (HEADER_FIELDS as readonly string[]) : (ITEM_FIELDS as readonly string[]);
+  if (!known.includes(fieldKey) || (itemIndex !== null && (!Number.isInteger(itemIndex) || itemIndex < 0))) throw new ReviewRefused("unknown_field");
   const value = newValue === null ? null : newValue.trim().slice(0, 500) || null;
   await tenancy.withTenant(actor.companyId, async (tx) => {
     await lockForReview(tx, requestId);
-    const previous = (await currentCorrections(tx, requestId)).get(fieldKey);
-    const extracted = (await latestRun(tx, requestId))?.fields.find((field) => field.fieldKey === fieldKey);
+    const run = await latestRun(tx, requestId);
+    const rows = itemIndex === null ? run?.fields : run?.lineItems.find((item) => item.itemIndex === itemIndex)?.fields;
+    if (itemIndex !== null && !rows) throw new ReviewRefused("unknown_field");
+    const previous = (await currentCorrections(tx, requestId)).get(correctionKey(fieldKey, itemIndex));
+    const extracted = rows?.find((field) => field.fieldKey === fieldKey);
     const oldValue = previous ? previous.newValue : (extracted?.value ?? null);
     if (oldValue === value) return;
-    await tx.insert(fieldCorrections).values({ companyId: actor.companyId, requestId, fieldKey, oldValue, newValue: value, correctedBy: actor.userId });
+    await tx.insert(fieldCorrections).values({ companyId: actor.companyId, requestId, fieldKey, itemIndex, oldValue, newValue: value, correctedBy: actor.userId });
     await recordAudit(tx, {
       actorUserId: actor.userId,
       action: "field.corrected",
       entityType: "request",
       entityId: requestId,
-      data: { field: fieldKey, oldValue, newValue: value },
+      data: itemIndex === null ? { field: fieldKey, oldValue, newValue: value } : { field: fieldKey, item: itemIndex, oldValue, newValue: value },
     });
   });
 }

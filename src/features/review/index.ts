@@ -13,6 +13,7 @@ export {
   type ReviewRefusal,
   type ReviewStatus,
   type ReviewField,
+  type ReviewLineItem,
   type ReviewView,
 } from "./review";
 export { buildSourceView, type SourceLine, type SourceView } from "./source-view";

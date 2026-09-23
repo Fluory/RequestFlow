@@ -6,6 +6,9 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
+- Review of line items: positions appear as a table with a status per field; each field opens its source
+  (mail line, PDF page – marked when it comes from text recognition –, Excel cell, Word paragraph or table
+  cell) and can be corrected, audited like header fields.
 - AI eval set and gate: 15 synthetic cases (tables, scans, missing values, prompt injection) measure
   extraction quality per field; every change to the AI service is checked against a committed
   baseline and fails when a field gets worse by more than 5 points or an injected value is accepted.

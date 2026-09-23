@@ -47,6 +47,11 @@ function Source({ field }: { field: ReviewField }) {
       <h3 id="source-heading">
         Quelle: {source.filename} – {source.heading}
       </h3>
+      {source.ocr && (
+        <p role="note">
+          <strong>⚠ Texterkennung (OCR):</strong> Der Text stammt aus einem gescannten Dokument – bitte mit dem Original vergleichen.
+        </p>
+      )}
       {field.corrected && <p>Fundstelle des erkannten Werts „{field.extractedValue ?? "–"}“ – der aktuelle Wert wurde manuell korrigiert.</p>}
       <ol className="source-lines">
         {source.lines.map((line) => (
@@ -76,9 +81,14 @@ export default async function RequestPage({
   if (!UUID.test(id)) notFound();
   const view = await loadReview(getRuntime().tenancy, actor, id);
   if (!view) notFound();
-  const { request, fields, documents, skippedDocuments, documentNotes, exportRecord } = view;
+  const { request, fields, lineItems, documents, skippedDocuments, documentNotes, exportRecord } = view;
   const query = await searchParams;
-  const selected = fields.find((field) => field.key === query.field);
+  // `?field=<key>` selects a header field, `?field=<key>&item=<n>` a line-item field (#25).
+  const selectedItem = query.item !== undefined && /^\d{1,4}$/.test(query.item) ? Number(query.item) : null;
+  const selected =
+    selectedItem === null
+      ? fields.find((field) => field.key === query.field)
+      : lineItems.find((item) => item.itemIndex === selectedItem)?.fields.find((field) => field.key === query.field);
   const inReview = request.status === "REVIEW";
   const done = messageFor(DONE_MESSAGES, query.done);
   const error = messageFor(ERROR_MESSAGES, query.error);
@@ -155,7 +165,72 @@ export default async function RequestPage({
               ))}
             </tbody>
           </table>
-          {selected && <Source field={selected} />}
+          {selected && selected.itemIndex === null && <Source field={selected} />}
+        </>
+      )}
+
+      {lineItems.length > 0 && (
+        <>
+          <h2>Positionen</h2>
+          <table data-testid="line-items">
+            <thead>
+              <tr>
+                <th scope="col">Pos.</th>
+                {lineItems[0]!.fields.map((field) => (
+                  <th scope="col" key={field.key}>
+                    {field.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {lineItems.map((item) => (
+                <tr key={item.itemIndex}>
+                  <th scope="row">{item.itemIndex + 1}</th>
+                  {item.fields.map((field) => (
+                    <td
+                      key={field.key}
+                      data-testid={`item-${item.itemIndex}-${field.key}`}
+                      className={field.reviewStatus === "unverified" || field.reviewStatus === "uncertain" ? "attention" : undefined}
+                    >
+                      {/* The accessible name contains the visible value (WCAG 2.5.3 label in name). */}
+                      <Link
+                        href={`/requests/${request.id}?field=${field.key}&item=${item.itemIndex}`}
+                        aria-label={`Position ${item.itemIndex + 1}, ${field.label}: ${field.value ?? "–"}`}
+                      >
+                        {field.value ?? "–"}
+                      </Link>{" "}
+                      <StatusBadge status={field.reviewStatus} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {selected && selected.itemIndex !== null && (
+            <section aria-labelledby="item-field-heading">
+              <h3 id="item-field-heading">
+                Position {selected.itemIndex + 1}: {selected.label}
+              </h3>
+              <p>
+                Wert: <strong data-testid="selected-item-value">{selected.value ?? "–"}</strong> <StatusBadge status={selected.reviewStatus} />
+                {selected.corrected && <small> (erkannt: {selected.extractedValue ?? "–"}, {STATUS_LABEL[selected.status]})</small>}
+              </p>
+              {inReview && (
+                <form action={correctFieldAction}>
+                  <input type="hidden" name="requestId" value={request.id} />
+                  <input type="hidden" name="field" value={selected.key} />
+                  <input type="hidden" name="item" value={selected.itemIndex} />
+                  <label>
+                    Neuer Wert für Position {selected.itemIndex + 1}, {selected.label}{" "}
+                    <input name="value" defaultValue={selected.value ?? ""} maxLength={500} />
+                  </label>{" "}
+                  <button type="submit">Speichern</button>
+                </form>
+              )}
+              <Source field={selected} />
+            </section>
+          )}
         </>
       )}
 
