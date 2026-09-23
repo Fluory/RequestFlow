@@ -1,3 +1,2 @@
-// Public API of the `tenancy` module: withTenant(), RLS policies.
-// Other modules import only from this file (dependency-cruiser, ADR-0001 D1). Planned – see docs/technical/architecture.md.
-export {};
+// Public API of the `tenancy` module: tenant context and forced RLS (ADR-0001 D7).
+export { createTenancy, tenantOf, MissingTenantError, type Tenancy, type TenantTx } from "./with-tenant";

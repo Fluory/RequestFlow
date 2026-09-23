@@ -25,6 +25,20 @@ migration aborts if `app_owner`/`app_rw` are missing or could bypass RLS – fix
 customer) an operator creates `app_owner` and `app_rw` once with the same statements (passwords from
 the secret manager), before the first `setup` run; the first migration refuses to run otherwise.
 
+## Login rate limit and client IP
+
+Better Auth limits `/api/auth/*` per client IP (5 sign-ins/sign-ups per minute, counters in
+`auth.rate_limit`). The IP comes from `AUTH_IP_HEADERS`; that header is only trustworthy when a
+reverse proxy sets it and clients cannot reach the web container directly. Any deployment beyond the
+local machine puts a proxy in front and lists it in `AUTH_TRUSTED_PROXIES`. A per-account limit is a
+follow-up (not in the pilot).
+
+## Invitations and account recovery
+
+Invite-only: an admin creates an invitation on `/invite` and hands over the link
+(`/signup?invitation=<id>`, 7 days valid); e-mail delivery is not part of the pilot. There is no
+self-service password reset yet – recovery is an operator task (delete the user row, invite again).
+
 ## Frequent failures
 
 | Symptom | Cause | Action |

@@ -8,6 +8,20 @@
       "when": 1790113205929,
       "tag": "0000_app_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790142267590,
+      "tag": "0001_identity_tenancy",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790142279511,
+      "tag": "0002_auth_grants_force_rls",
+      "breakpoints": true
     }
   ]
 }

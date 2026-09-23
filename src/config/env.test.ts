@@ -8,6 +8,9 @@ const valid = {
   S3_BUCKET: "requestflow-documents",
   S3_ACCESS_KEY_ID: "local-key",
   S3_SECRET_ACCESS_KEY: "s3-secret-value",
+  BETTER_AUTH_SECRET: "test-only-secret-with-at-least-32-characters",
+  BETTER_AUTH_URL: "http://localhost:3000",
+  APP_ENV: "local",
 };
 
 describe("loadConfig", () => {
@@ -49,5 +52,26 @@ describe("loadConfig", () => {
 
   it("reads S3_FORCE_PATH_STYLE=false as false", () => {
     expect(loadConfig({ ...valid, S3_FORCE_PATH_STYLE: "false" }).storage.forcePathStyle).toBe(false);
+  });
+
+  it("refuses the committed local auth secret outside APP_ENV=local", () => {
+    const local = { ...valid, BETTER_AUTH_SECRET: "local-dev-only-secret-change-me-0123456789" };
+
+    expect(() => loadConfig({ ...local, APP_ENV: "production" })).toThrow(/BETTER_AUTH_SECRET/);
+    expect(() => loadConfig({ ...local, APP_ENV: "showcase" })).toThrow(/BETTER_AUTH_SECRET/);
+    expect(() => loadConfig(local)).not.toThrow();
+  });
+
+  it("requires an explicit APP_ENV", () => {
+    const { APP_ENV: _env, ...withoutEnv } = valid;
+
+    expect(() => loadConfig(withoutEnv)).toThrow(/APP_ENV/);
+  });
+
+  it("reads the client-IP headers and trusted proxies for the auth rate limit as lists", () => {
+    const config = loadConfig({ ...valid, AUTH_IP_HEADERS: "x-real-ip, x-forwarded-for", AUTH_TRUSTED_PROXIES: "10.0.0.2" });
+
+    expect(config.auth.ipAddressHeaders).toEqual(["x-real-ip", "x-forwarded-for"]);
+    expect(config.auth.trustedProxies).toEqual(["10.0.0.2"]);
   });
 });

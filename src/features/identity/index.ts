@@ -1,3 +1,5 @@
-// Public API of the `identity` module: Better Auth, users, companies, roles.
-// Other modules import only from this file (dependency-cruiser, ADR-0001 D1). Planned – see docs/technical/architecture.md.
-export {};
+// Public API of the `identity` module: Better Auth, companies, company roles (ADR-0001 D6/D7).
+export { createAuth, type Auth, type AuthSettings } from "./auth";
+export { getActor } from "./actor";
+export { bootstrapCompany, getCompany, inviteUser, type Company } from "./companies";
+export { authorize, AuthorizationError, isCompanyRole, COMPANY_ROLES, type Action, type Actor, type CompanyRole } from "./authorize";

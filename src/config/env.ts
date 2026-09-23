@@ -8,7 +8,17 @@ const schema = z.object({
   S3_ACCESS_KEY_ID: z.string().min(1),
   S3_SECRET_ACCESS_KEY: z.string().min(1),
   S3_FORCE_PATH_STYLE: z.enum(["true", "false"]).default("true"),
+  BETTER_AUTH_SECRET: z.string().min(32),
+  BETTER_AUTH_URL: z.url(),
+  AUTH_IP_HEADERS: z.string().default("x-forwarded-for"),
+  AUTH_TRUSTED_PROXIES: z.string().default(""),
+  // Deployment environment – set explicitly everywhere (compose, CI, .env). Only `local` may use the
+  // committed local-default secret.
+  APP_ENV: z.enum(["local", "showcase", "production"]),
 });
+
+const LOCAL_PLACEHOLDER_SECRETS = new Set(["local-dev-only-secret-change-me-0123456789"]);
+const list = (value: string) => value.split(",").map((item) => item.trim()).filter(Boolean);
 
 export interface AppConfig {
   databaseUrl: string;
@@ -20,6 +30,12 @@ export interface AppConfig {
     secretAccessKey: string;
     forcePathStyle: boolean;
   };
+  auth: {
+    secret: string;
+    baseURL: string;
+    ipAddressHeaders: string[];
+    trustedProxies: string[];
+  };
 }
 
 // Errors list variable names only – values may be secrets and end up in logs.
@@ -30,6 +46,10 @@ export function loadConfig(source: Record<string, string | undefined> = process.
     throw new Error(`Invalid or missing configuration: ${names.join(", ")}`);
   }
   const env = parsed.data;
+  // The committed local default must never sign sessions of a real deployment.
+  if (env.APP_ENV !== "local" && LOCAL_PLACEHOLDER_SECRETS.has(env.BETTER_AUTH_SECRET)) {
+    throw new Error("Invalid or missing configuration: BETTER_AUTH_SECRET");
+  }
   return {
     databaseUrl: env.DATABASE_URL,
     storage: {
@@ -39,6 +59,12 @@ export function loadConfig(source: Record<string, string | undefined> = process.
       accessKeyId: env.S3_ACCESS_KEY_ID,
       secretAccessKey: env.S3_SECRET_ACCESS_KEY,
       forcePathStyle: env.S3_FORCE_PATH_STYLE === "true",
+    },
+    auth: {
+      secret: env.BETTER_AUTH_SECRET,
+      baseURL: env.BETTER_AUTH_URL,
+      ipAddressHeaders: list(env.AUTH_IP_HEADERS),
+      trustedProxies: list(env.AUTH_TRUSTED_PROXIES),
     },
   };
 }

@@ -6,6 +6,11 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
+- Invite-only login (e-mail + password): admins invite staff into their own company and hand over
+  an invitation link; sign-up without a valid invitation link creates no account. Roles `admin` and `clerk` per company.
+- Tenant isolation: every company-owned table has forced row-level security; data access runs
+  inside `withTenant()`.
+- Login rate limit (stored in the database) and `pnpm seed:demo` with two synthetic companies.
 - Runnable local stack: `docker compose up` starts PostgreSQL 17, SeaweedFS (S3), a one-shot `setup`
   step (migrations + private bucket), the web app and a no-op worker.
 - `GET /api/health` reports database and storage status (200 / 503, no connection details).

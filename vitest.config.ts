@@ -15,6 +15,9 @@ const localStackDefaults: Record<string, string> = {
   S3_ACCESS_KEY_ID: "local-access-key",
   S3_SECRET_ACCESS_KEY: "local-secret-key",
   S3_FORCE_PATH_STYLE: "true",
+  BETTER_AUTH_SECRET: "local-dev-only-secret-change-me-0123456789",
+  BETTER_AUTH_URL: "http://localhost:3000",
+  APP_ENV: "local",
 };
 const integrationEnv = Object.fromEntries(
   Object.entries(localStackDefaults).map(([name, value]) => [name, process.env[name] ?? value]),
