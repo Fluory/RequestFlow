@@ -2,7 +2,7 @@
 // (FORCE is added by a hand-written migration – drizzle-kit only emits ENABLE) with the policy
 // `tenant_isolation` (ADR-0001 D7). Access only via `withTenant()` as `app_rw`.
 import { sql } from "drizzle-orm";
-import { bigint, boolean, check, foreignKey, index, jsonb, pgPolicy, pgSchema, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, check, foreignKey, index, integer, jsonb, pgPolicy, pgSchema, primaryKey, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { organization } from "./auth";
 
 export const appSchema = pgSchema("app");
@@ -41,6 +41,11 @@ export const requests = appSchema
       fingerprint: text("fingerprint"),
       possibleDuplicate: boolean("possible_duplicate").default(false).notNull(),
       duplicateOfId: uuid("duplicate_of_id"),
+      // Processing state (#7, ADR-0001 D4): visible cause, attempts and next retry for the request list.
+      errorStage: text("error_stage").$type<"processing" | "export">(),
+      errorMessage: text("error_message"),
+      attempts: integer("attempts").default(0).notNull(),
+      nextRetryAt: timestamp("next_retry_at", { withTimezone: true }),
     },
     (table) => [
       index("requests_company_id_idx").on(table.companyId),
@@ -113,5 +118,98 @@ export const auditEvents = appSchema
       createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     },
     (table) => [index("audit_events_entity_idx").on(table.companyId, table.entityType, table.entityId), tenantPolicy("audit_events")],
+  )
+  .enableRLS();
+
+// One extraction run per processing job (#7): unique job_id makes a redelivered job a no-op.
+// `documents` keeps per-document metadata (model, prompt/schema version, tokens, latency, warnings,
+// or why a document was skipped) – no document content.
+export const extractionRuns = appSchema
+  .table(
+    "extraction_runs",
+    {
+      id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+      companyId: uuid("company_id")
+        .notNull()
+        .references(() => organization.id, { onDelete: "restrict" }),
+      requestId: uuid("request_id").notNull(),
+      jobId: text("job_id").notNull().unique("extraction_runs_job_id_unique"),
+      modelId: text("model_id"),
+      promptVersion: text("prompt_version"),
+      schemaVersion: text("schema_version"),
+      totalTokens: integer("total_tokens"),
+      latencyMs: integer("latency_ms"),
+      documents: jsonb("documents").$type<Array<Record<string, unknown>>>().default([]).notNull(),
+      createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    },
+    (table) => [
+      index("extraction_runs_request_idx").on(table.companyId, table.requestId, table.createdAt),
+      unique("extraction_runs_id_company_unique").on(table.id, table.companyId),
+      foreignKey({
+        name: "extraction_runs_request_same_company_fk",
+        columns: [table.requestId, table.companyId],
+        foreignColumns: [requests.id, requests.companyId],
+      }).onDelete("cascade"),
+      tenantPolicy("extraction_runs"),
+    ],
+  )
+  .enableRLS();
+
+// Segments with stable locators, as returned by the AI service – the source view of the review UI.
+export const extractionSegments = appSchema
+  .table(
+    "extraction_segments",
+    {
+      companyId: uuid("company_id").notNull(),
+      runId: uuid("run_id").notNull(),
+      documentId: uuid("document_id").notNull(),
+      segmentId: text("segment_id").notNull(),
+      position: integer("position").notNull(),
+      text: text("text").notNull(),
+      locator: jsonb("locator").$type<Record<string, unknown>>().notNull(),
+    },
+    (table) => [
+      primaryKey({ name: "extraction_segments_pk", columns: [table.runId, table.documentId, table.segmentId] }),
+      foreignKey({
+        name: "extraction_segments_run_same_company_fk",
+        columns: [table.runId, table.companyId],
+        foreignColumns: [extractionRuns.id, extractionRuns.companyId],
+      }).onDelete("cascade"),
+      tenantPolicy("extraction_segments"),
+    ],
+  )
+  .enableRLS();
+
+// Extracted values after grounding verification. `status` found only if the AI service's verifier
+// confirmed the quote (ADR-0001 D8); corrections (#8) are stored separately with audit.
+export const extractedFields = appSchema
+  .table(
+    "extracted_fields",
+    {
+      id: uuid("id").default(sql`gen_random_uuid()`).primaryKey(),
+      companyId: uuid("company_id").notNull(),
+      runId: uuid("run_id").notNull(),
+      requestId: uuid("request_id").notNull(),
+      fieldKey: text("field_key").notNull(),
+      value: text("value"),
+      status: text("status").$type<"found" | "uncertain" | "missing" | "unverified">().notNull(),
+      modelStatus: text("model_status"),
+      reason: text("reason"),
+      documentId: uuid("document_id"),
+      segmentId: text("segment_id"),
+      quote: text("quote"),
+    },
+    (table) => [
+      unique("extracted_fields_run_field_unique").on(table.runId, table.fieldKey),
+      index("extracted_fields_request_idx").on(table.companyId, table.requestId),
+      check("extracted_fields_status_check", sql`status in ('found', 'uncertain', 'missing', 'unverified')`),
+      check("extracted_fields_found_has_evidence", sql`status <> 'found' or (quote is not null and segment_id is not null)`),
+      foreignKey({
+        name: "extracted_fields_run_same_company_fk",
+        columns: [table.runId, table.companyId],
+        foreignColumns: [extractionRuns.id, extractionRuns.companyId],
+      }).onDelete("cascade"),
+      tenantPolicy("extracted_fields"),
+    ],
   )
   .enableRLS();
