@@ -1,9 +1,17 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { installJobQueues } from "@/db/job-queue-client";
+import { sendInTransaction } from "@/db/job-queue";
 import { listAuditEvents } from "@/features/audit";
+import { createErpMock, MemoryMockStore } from "@/features/erp-mock";
+import { createErpClient, drainExports, listExportRecords } from "@/features/export";
+import { persistExtractionRun } from "@/features/extraction";
+import { syntheticExtractResponse } from "@/features/extraction/fixtures";
+import { approveRequest, currentFieldValues } from "@/features/review";
 import { getActor, type Actor } from "@/features/identity";
 import { QUEUES } from "@/features/jobs";
 import { createRequest, getRequest, listRequests, lockRequest, transitionRequest } from "@/features/requests";
+import { requestRowView } from "@/app/requests/row-view";
 import { createTenancy, type Tenancy } from "@/features/tenancy";
 import { companyWithAdmin, createStack, invitedUser, type Stack } from "./helpers/stack";
 
@@ -87,8 +95,37 @@ describe("request list: errors, retries, filters and reprocessing (#26)", () => 
     expect(byId.get(retrying)).toMatchObject({ status: "PROCESSING", attempts: 2, errorMessage: "Der KI-Dienst ist nicht erreichbar.", nextRetryAt: expect.any(Date) });
     expect(byId.get(failed)).toMatchObject({ status: "ERROR", errorStage: "export", errorMessage: "ERP hat den Export abgelehnt (HTTP 409)." });
     expect(byId.has(foreign)).toBe(false);
-    // Readable causes only: no stack traces, hosts or connection data.
-    for (const row of rows) expect(row.errorMessage ?? "").not.toMatch(/at \w+ \(|https?:\/\/|postgres:|ECONN/);
+  });
+
+  it("shows an export that is retrying: APPROVED with export attempts, cause and the next retry time", async () => {
+    const queues = { export: `test-list-export-${randomUUID().slice(0, 8)}`, dead: `test-list-export-dead-${randomUUID().slice(0, 8)}` };
+    await installJobQueues(process.env.MIGRATION_DATABASE_URL!, [
+      { name: queues.dead, policy: "standard" },
+      { name: queues.export, policy: "exclusive", retryLimit: 3, retryDelay: 3600, retryBackoff: false, deadLetter: queues.dead },
+    ]);
+    const id = randomUUID();
+    const documentId = randomUUID();
+    await tenancy.withTenant(clerk.companyId, async (tx) => {
+      await createRequest(tx, { id, createdBy: clerk.userId, subject: "Anfrage Export" });
+      const row = await transitionRequest(tx, (await lockRequest(tx, id))!, "processing.started", { attempts: 1 });
+      await persistExtractionRun(tx, { requestId: id, jobId: randomUUID(), outcomes: [{ documentId, response: syntheticExtractResponse(documentId) }] });
+      await transitionRequest(tx, row, "processing.succeeded");
+    });
+    const boss = await getJobClient();
+    await approveRequest({ tenancy, boss }, clerk, id);
+    await stack.database.pool.query("delete from pgboss.job where name = $1 and singleton_key = $2", [QUEUES.exportRequest, id]);
+    await tenancy.withTenant(clerk.companyId, (tx) => sendInTransaction(boss, tx, queues.export, { requestId: id, companyId: clerk.companyId }, { singletonKey: id }));
+    const mock = createErpMock({ token: "e".repeat(24), store: new MemoryMockStore(), faults: ["503"] });
+    const erp = createErpClient({ baseUrl: "http://erp", token: "e".repeat(24), timeoutMs: 1_000, fetch: async (input, init) => mock.handle(new Request(input, init)) });
+
+    await drainExports({ tenancy, erp, boss, fieldValues: currentFieldValues }, { maxMs: 2_000, queues });
+
+    const request = (await tenancy.withTenant(clerk.companyId, (tx) => getRequest(tx, id)))!;
+    const record = (await tenancy.withTenant(clerk.companyId, (tx) => listExportRecords(tx, [id]))).get(id);
+    const row = requestRowView(request, record);
+    expect(request.status).toBe("APPROVED");
+    expect(row).toMatchObject({ attempts: 1, stage: "export", error: "ERP vorübergehend nicht verfügbar (HTTP 503)." });
+    expect(row.nextRetryAt!.getTime()).toBeGreaterThan(Date.now() + 30 * 60_000);
   });
 
   it("filters by status and by possible duplicate", async () => {

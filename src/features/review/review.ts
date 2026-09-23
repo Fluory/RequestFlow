@@ -119,7 +119,9 @@ export async function loadReview(tenancy: Tenancy, actor: Actor, requestId: stri
     const corrections = await currentCorrections(tx, requestId);
     type FieldRow = (typeof extraction.fields)[number];
     const toReviewField = (key: string, itemIndex: number | null, field: FieldRow | undefined): ReviewField => {
-      const correction = corrections.get(correctionKey(key, itemIndex));
+      const stored = corrections.get(correctionKey(key, itemIndex));
+      // Item positions belong to one run: a correction made before a newer run is not mapped onto it.
+      const correction = itemIndex !== null && stored && stored.createdAt < extraction.run.createdAt ? undefined : stored;
       const documentSegments = segments.filter((segment) => segment.documentId === field?.documentId) as Array<StoredSegment & { documentId: string }>;
       const view = field?.segmentId && field.quote ? buildSourceView(documentSegments, { segmentId: field.segmentId, quote: field.quote }) : null;
       const document = documents.find((candidate) => candidate.id === field?.documentId);
@@ -235,6 +237,14 @@ function reasonOf(reason: string): string {
   return text;
 }
 
+/**
+ * Where a duplicate decision is possible (#27): NEW (a queued job then skips a rejected request),
+ * REVIEW and ERROR from processing – never while a worker holds it (PROCESSING) or after approval.
+ */
+export function duplicateDecidable(request: Pick<RequestRow, "status" | "errorStage">): boolean {
+  return request.status === "NEW" || request.status === "REVIEW" || (request.status === "ERROR" && request.errorStage === "processing");
+}
+
 /** Locks a possible duplicate that is still undecided; anything else is refused. */
 async function lockUndecidedDuplicate(tx: TenantTx, requestId: string): Promise<RequestRow> {
   const request = await lockRequest(tx, requestId);
@@ -248,7 +258,8 @@ export async function confirmNotDuplicate(tenancy: Tenancy, actor: Actor, reques
   authorize(actor, "requests.process");
   await tenancy.withTenant(actor.companyId, async (tx) => {
     const request = await lockUndecidedDuplicate(tx, requestId);
-    if (request.status === "APPROVED" || request.status === "EXPORTED" || request.status === "REJECTED") throw new ReviewRefused();
+    // Same states the page offers (#27 review): before approval, not while a worker holds it.
+    if (!duplicateDecidable(request)) throw new ReviewRefused();
     await recordDuplicateDecision(tx, request, "distinct");
     await recordAudit(tx, { actorUserId: actor.userId, action: "request.duplicate_dismissed", entityType: "request", entityId: requestId, data: { duplicateOf: request.duplicateOfId } });
   });
@@ -263,9 +274,15 @@ export async function rejectAsDuplicate(tenancy: Tenancy, actor: Actor, requestI
   const text = reasonOf(reason);
   await tenancy.withTenant(actor.companyId, async (tx) => {
     const request = await lockUndecidedDuplicate(tx, requestId);
-    const exportFailed = request.status === "ERROR" && request.errorStage !== "processing";
-    if (exportFailed || !canTransition(request.status, "reject.duplicate")) throw new ReviewRefused();
-    await transitionRequest(tx, request, "reject.duplicate", { rejectionReason: text, duplicateDecision: "duplicate", nextRetryAt: null });
+    if (!duplicateDecidable(request) || !canTransition(request.status, "reject.duplicate")) throw new ReviewRefused();
+    // A rejected duplicate carries no stale error (#27 review) – it is decided, not failing.
+    await transitionRequest(tx, request, "reject.duplicate", {
+      rejectionReason: text,
+      duplicateDecision: "duplicate",
+      nextRetryAt: null,
+      errorStage: null,
+      errorMessage: null,
+    });
     await recordAudit(tx, {
       actorUserId: actor.userId,
       action: "request.rejected",

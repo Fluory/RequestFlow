@@ -1,7 +1,7 @@
 import { recordAudit } from "@/features/audit";
 import { QUEUES, type JobRunner, type RequestJob } from "@/features/jobs";
 import { logEvent } from "@/features/observability";
-import { canTransition, lockRequest, transitionRequest } from "@/features/requests";
+import { canTransition, lockRequest, recordExportRetry, transitionRequest } from "@/features/requests";
 import type { Tenancy } from "@/features/tenancy";
 import { ErpExportError, type ErpExporter } from "./erp-client";
 import { buildQuoteRequest, ExportNotPossible, type FieldValues } from "./payload";
@@ -20,7 +20,7 @@ export interface ExportDeps {
 }
 
 export interface ExportDrainDeps extends ExportDeps {
-  boss: Pick<JobRunner, "fetch" | "complete" | "fail">;
+  boss: Pick<JobRunner, "fetch" | "complete" | "fail" | "getJobById">;
 }
 
 export interface ExportDrainOptions {
@@ -133,6 +133,14 @@ async function runExportJob(deps: ExportDrainDeps, queue: string, job: Job): Pro
       return false;
     }
     await deps.boss.fail(queue, job.id, { error: code });
+    // The request list shows when the next attempt runs (#26) – bookkeeping only, never aborts.
+    try {
+      const updated = await deps.boss.getJobById(queue, job.id);
+      const nextRetryAt = updated?.state === "retry" && updated.startAfter ? new Date(updated.startAfter) : null;
+      await deps.tenancy.withTenant(job.data.companyId, (tx) => recordExportRetry(tx, job.data.requestId, nextRetryAt));
+    } catch (bookkeeping) {
+      logEvent("error", "export.bookkeeping_failed", ids, { code: bookkeeping instanceof Error ? bookkeeping.name : "unknown" });
+    }
     return false;
   }
 }
