@@ -6,8 +6,8 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
-- Invite-only login (e-mail + password): admins invite staff into their own company; sign-up
-  without an invitation creates no account. Roles `admin` and `clerk` per company.
+- Invite-only login (e-mail + password): admins invite staff into their own company and hand over
+  an invitation link; sign-up without a valid invitation link creates no account. Roles `admin` and `clerk` per company.
 - Tenant isolation: every company-owned table has forced row-level security; data access runs
   inside `withTenant()`.
 - Login rate limit (stored in the database) and `pnpm seed:demo` with two synthetic companies.

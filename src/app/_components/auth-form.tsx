@@ -5,7 +5,7 @@ import { useState, type FormEvent } from "react";
 
 // Posts JSON straight to Better Auth (/api/auth/*); cookies are set by that response, so no extra
 // auth plugin is needed for server actions.
-export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
+export function AuthForm({ mode, invitationId }: { mode: "sign-in" | "sign-up"; invitationId?: string }) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -18,7 +18,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     const body = {
       email: String(form.get("email") ?? ""),
       password: String(form.get("password") ?? ""),
-      ...(mode === "sign-up" ? { name: String(form.get("name") ?? "") } : {}),
+      ...(mode === "sign-up" ? { name: String(form.get("name") ?? ""), invitationId } : {}),
     };
     const response = await fetch(`/api/auth/${mode}/email`, {
       method: "POST",

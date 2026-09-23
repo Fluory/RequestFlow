@@ -12,3 +12,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE app_owner IN SCHEMA auth GRANT SELECT, INSERT,
 -- 2) Forced RLS: drizzle-kit emits only ENABLE. FORCE makes the policy apply to the table owner too,
 --    so no role except a superuser ever reads company data without `app.company_id`.
 ALTER TABLE app.requests FORCE ROW LEVEL SECURITY;
+--> statement-breakpoint
+-- 3) One company per user in the pilot: the session hook and getActor resolve THE membership.
+CREATE UNIQUE INDEX member_one_company_per_user ON auth.member (user_id);

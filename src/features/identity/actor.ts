@@ -1,23 +1,26 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { Database } from "@/db";
 import * as schema from "@/db/schema";
 import type { Auth } from "./auth";
 import { isCompanyRole, type Actor } from "./authorize";
 
 /**
- * The signed-in actor of a request: user, company and company role. The company comes from the
- * session's active organization and is re-checked against a live membership on every call, so a
- * removed membership takes effect immediately. Never from client input (ADR-0001 D7).
+ * The signed-in actor of a request: user, company and company role (ADR-0001 D7). The company is
+ * the user's live membership (one company per user, unique index) – re-read on every call, so a
+ * removed membership takes effect immediately; never from client input. A session whose active
+ * organization disagrees with the membership fails closed. Better Auth clears the active
+ * organization after a refused switch; the membership still identifies the company then.
  */
 export async function getActor(auth: Auth, db: Database, headers: Headers): Promise<Actor | null> {
   const session = await auth.api.getSession({ headers });
-  const companyId = session?.session.activeOrganizationId;
-  if (!session || !companyId) return null;
+  if (!session) return null;
   const [membership] = await db
-    .select({ role: schema.member.role })
+    .select({ companyId: schema.member.organizationId, role: schema.member.role })
     .from(schema.member)
-    .where(and(eq(schema.member.userId, session.user.id), eq(schema.member.organizationId, companyId)))
+    .where(eq(schema.member.userId, session.user.id))
     .limit(1);
   if (!membership || !isCompanyRole(membership.role)) return null;
-  return { userId: session.user.id, companyId, role: membership.role };
+  const active = session.session.activeOrganizationId;
+  if (active && active !== membership.companyId) return null;
+  return { userId: session.user.id, companyId: membership.companyId, role: membership.role };
 }

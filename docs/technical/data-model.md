@@ -38,8 +38,8 @@ Purpose: one quote request per row. Retention: open question for the customer (A
 | `session` | token, expiry, IP, user agent, `active_organization_id` | personal (staff) | session; carries the active company |
 | `verification` | verification tokens | confidential | e-mail verification (unused in the pilot) |
 | `organization` | company name, slug | internal | company = tenant |
-| `member` | user ↔ company, company role `admin`/`clerk` | internal | membership + role |
-| `invitation` | e-mail, company, role, status, expiry, inviter | personal (staff) | invite-only sign-up |
+| `member` | user ↔ company, company role `admin`/`clerk`; unique `user_id` (one company per user) | internal | membership + role |
+| `invitation` | e-mail, company, role, status, expiry, inviter; the random `id` is the sign-up token (link) | personal (staff) | invite-only sign-up |
 | `rate_limit` | key (IP + path), counter | personal (IP) | built-in rate limit, database storage |
 
 A system user `system@requestflow.invalid` (no password account, no membership) is the inviter of each
