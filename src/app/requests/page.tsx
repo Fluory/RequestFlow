@@ -82,7 +82,9 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
               <thead>
                 <tr>
                   <th scope="col">Eingang</th>
-                  <th scope="col">Betreff</th>
+                  <th scope="col" className="subject">
+                    Betreff
+                  </th>
                   <th scope="col">Status</th>
                   <th scope="col" className="num">
                     Versuche
@@ -101,7 +103,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                   return (
                     <tr key={request.id} data-testid={`request-${request.id}`}>
                       <td className="nowrap muted">{dateFormat.format(request.createdAt)}</td>
-                      <td>
+                      <td className="subject">
                         <Link href={`/requests/${request.id}`}>{request.subject ?? "(ohne Betreff)"}</Link>
                       </td>
                       <td>

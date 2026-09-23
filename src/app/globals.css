@@ -331,6 +331,9 @@ main {
 .callout-warn h2 {
   font-size: 1.05rem;
 }
+.callout-warn input {
+  min-width: min(20rem, 100%);
+}
 .callout-warn a {
   color: var(--warn-text);
   font-weight: 600;
@@ -525,6 +528,9 @@ a.btn-link:hover {
 
 .table-wrap {
   overflow-x: auto;
+  /* Containing block for the absolutely positioned .visually-hidden labels inside cells – without
+     it they escape the scroll container and widen the page on narrow screens. */
+  position: relative;
 }
 table {
   border-collapse: collapse;
@@ -668,6 +674,15 @@ tr.attention:hover {
 .hint {
   font-size: 0.85rem;
 }
+.hint .badge {
+  white-space: normal;
+}
+.subject {
+  min-width: 15rem;
+}
+.subject a {
+  font-weight: 500;
+}
 
 /* ---------- Review: values, source ---------- */
 
@@ -768,8 +783,12 @@ mark {
   position: absolute;
   width: 1px;
   height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
   overflow: hidden;
   clip: rect(0 0 0 0);
+  clip-path: inset(50%);
   white-space: nowrap;
 }
 
@@ -780,8 +799,11 @@ mark {
   main {
     padding: 1.25rem 0.9rem 2rem;
   }
-  .card {
+  .card:not(.card-flush) {
     padding: 1rem;
+  }
+  .toolbar {
+    padding: 0.75rem 1rem;
   }
   .card:not(.card-flush) > .table-wrap {
     margin-left: -1rem;
