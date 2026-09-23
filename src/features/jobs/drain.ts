@@ -38,21 +38,26 @@ export async function drain(deps: DrainDeps, options: DrainOptions): Promise<Dra
   const result: DrainResult = { processed: 0, failed: 0, deadLettered: 0 };
   if (options.maintenance) await deps.boss.supervise(queues.process);
 
+  // Each round takes one dead-lettered job and one processing job, so errors become visible even
+  // under steady load. A failing dead-letter handler throws: pg-boss retries it (queue settings).
   while (Date.now() < deadline) {
+    const [dead] = await deps.boss.fetch<RequestJob>(queues.dead);
+    if (dead) {
+      try {
+        await markError(deps.tenancy, dead.data, null, dead.id);
+        await deps.boss.complete(queues.dead, dead.id);
+        result.deadLettered++;
+      } catch (error) {
+        logEvent("error", "dead_letter.failed", { requestId: dead.data.requestId, companyId: dead.data.companyId, jobId: dead.id }, { code: error instanceof Error ? error.name : "unknown" });
+        await deps.boss.fail(queues.dead, dead.id);
+      }
+    }
     const [job] = await deps.boss.fetch<RequestJob>(queues.process);
     if (job) {
       if (await runJob(deps, queues.process, job)) result.processed++;
       else result.failed++;
-      continue;
     }
-    const [dead] = await deps.boss.fetch<RequestJob>(queues.dead);
-    if (dead) {
-      await markError(deps.tenancy, dead.data, null, dead.id);
-      await deps.boss.complete(queues.dead, dead.id);
-      result.deadLettered++;
-      continue;
-    }
-    break;
+    if (!dead && !job) break;
   }
   return result;
 }

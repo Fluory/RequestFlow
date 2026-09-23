@@ -49,6 +49,21 @@ const responseSchema = z.object({
 }).loose();
 
 const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+const DOCUMENT_STATUS = new Set([413, 415, 422]);
+
+/**
+ * Invariants the contract promises beyond the shape: `found` has evidence, evidence cites a returned
+ * segment, segment ids are unique, the response belongs to the document sent. A violation would never
+ * succeed on retry, so it is permanent.
+ */
+function consistent(response: z.infer<typeof responseSchema>, documentId: string): boolean {
+  if (response.documentId !== documentId) return false;
+  const ids = new Set(response.segments.map((segment) => segment.id));
+  if (ids.size !== response.segments.length) return false;
+  return Object.values(response.fields).every(
+    (field) => (field.status !== "found" || field.evidence !== null) && (field.evidence === null || ids.has(field.evidence.segmentId)),
+  );
+}
 
 export interface AiServiceClient {
   extract(input: ExtractInput): Promise<ExtractResponse>;
@@ -80,11 +95,15 @@ export function createAiServiceClient(settings: AiServiceSettings): AiServiceCli
       if (!response.ok) {
         await response.body?.cancel();
         if (RETRYABLE_STATUS.has(response.status)) throw new AiServiceError("unavailable", true, "service", response.status);
-        const scope = response.status === 401 || response.status === 403 ? "service" : "document";
+        // Only these say "this document": everything else (400, 401, 403, 404, 405, …) points at the
+        // call itself – a misconfigured URL or client bug must not look like unreadable documents.
+        const scope = DOCUMENT_STATUS.has(response.status) ? "document" : "service";
         throw new AiServiceError("rejected", false, scope, response.status);
       }
       const parsed = responseSchema.safeParse(await response.json().catch(() => null));
-      if (!parsed.success) throw new AiServiceError("contract_violation", false, "service", response.status);
+      if (!parsed.success || !consistent(parsed.data, input.documentId)) {
+        throw new AiServiceError("contract_violation", false, "service", response.status);
+      }
       return parsed.data as unknown as ExtractResponse;
     },
   };

@@ -6,7 +6,7 @@ import { loadConfig } from "@/config/env";
 import { createDatabase } from "@/db";
 import { createJobQueue } from "@/db/job-queue-client";
 import { createAiServiceClient } from "@/features/extraction";
-import { drain } from "@/features/jobs";
+import { assertProcessingBudget, drain } from "@/features/jobs";
 import { logEvent } from "@/features/observability";
 import { S3BlobStore } from "@/features/storage";
 import { createTenancy } from "@/features/tenancy";
@@ -16,6 +16,7 @@ const IDLE_MS = 2_000;
 
 async function main(): Promise<void> {
   const config = loadConfig();
+  assertProcessingBudget({ aiTimeoutMs: config.aiService.timeoutMs, maxFiles: config.upload.maxFiles });
   const ai = createAiServiceClient(config.aiService);
   const database = createDatabase(config.databaseUrl, { max: 4 });
   const storage = new S3BlobStore(config.storage);

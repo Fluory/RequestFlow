@@ -85,5 +85,10 @@ export async function transitionRequest(tx: TenantTx, row: RequestRow, event: Re
 /** Keeps the last failure visible while a retry is pending (status unchanged). */
 export async function recordProcessingFailure(tx: TenantTx, id: string, failure: { message: string; nextRetryAt: Date | null }): Promise<void> {
   tenantOf(tx);
-  await tx.update(requests).set({ errorMessage: failure.message, nextRetryAt: failure.nextRetryAt }).where(eq(requests.id, id));
+  // Only while processing: a late failure of a redelivered attempt must not stamp a request that
+  // another attempt already moved on (REVIEW, ERROR).
+  await tx
+    .update(requests)
+    .set({ errorMessage: failure.message, nextRetryAt: failure.nextRetryAt })
+    .where(and(eq(requests.id, id), eq(requests.status, "PROCESSING")));
 }

@@ -209,6 +209,17 @@ export const extractedFields = appSchema
         columns: [table.runId, table.companyId],
         foreignColumns: [extractionRuns.id, extractionRuns.companyId],
       }).onDelete("cascade"),
+      foreignKey({
+        name: "extracted_fields_request_same_company_fk",
+        columns: [table.requestId, table.companyId],
+        foreignColumns: [requests.id, requests.companyId],
+      }).onDelete("cascade"),
+      // Evidence must point at a segment stored with the same run (MATCH SIMPLE: no evidence → no check).
+      foreignKey({
+        name: "extracted_fields_evidence_segment_fk",
+        columns: [table.runId, table.documentId, table.segmentId],
+        foreignColumns: [extractionSegments.runId, extractionSegments.documentId, extractionSegments.segmentId],
+      }),
       tenantPolicy("extracted_fields"),
     ],
   )

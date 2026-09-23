@@ -6,7 +6,10 @@ import { PgBoss, type Queue } from "pg-boss";
 export const PGBOSS_SCHEMA = "pgboss";
 
 /** Runtime client (`app_rw`): no schema creation or migration; polling, no LISTEN/NOTIFY. */
-export async function createJobQueue(connectionString: string, options: { supervise?: boolean } = {}): Promise<PgBoss> {
+export async function createJobQueue(
+  connectionString: string,
+  options: { supervise?: boolean; monitorIntervalSeconds?: number } = {},
+): Promise<PgBoss> {
   const boss = new PgBoss({
     connectionString,
     schema: PGBOSS_SCHEMA,
@@ -17,6 +20,7 @@ export async function createJobQueue(connectionString: string, options: { superv
     schedule: false,
     // Persisted queue statistics create daily partitions (DDL) – the runtime role has no DDL rights.
     persistQueueStats: false,
+    ...(options.monitorIntervalSeconds ? { monitorIntervalSeconds: options.monitorIntervalSeconds } : {}),
   });
   boss.on("error", (error: Error) => console.error(JSON.stringify({ level: "error", module: "jobs", message: error.message })));
   await boss.start();

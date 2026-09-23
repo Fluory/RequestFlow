@@ -89,7 +89,16 @@ export async function processRequestJob(deps: ProcessingDeps, job: { id: string;
   const done = await deps.tenancy.withTenant(companyId, async (tx) => {
     const request = await lockRequest(tx, requestId);
     if (!request || request.status !== "PROCESSING" || (await runExistsForJob(tx, job.id))) return false;
-    const runId = await persistExtractionRun(tx, { requestId, jobId: job.id, outcomes });
+    let runId: string | null;
+    try {
+      runId = await persistExtractionRun(tx, { requestId, jobId: job.id, outcomes });
+    } catch (error) {
+      // A constraint violation (23xxx) is a bad result, not a transient fault – retrying repeats it.
+      if (/^23/.test(String((error as { cause?: { code?: unknown } }).cause?.code ?? (error as { code?: unknown }).code ?? ""))) {
+        throw new PermanentProcessingError("Das Ergebnis des KI-Dienstes war unvollständig und wurde nicht übernommen.");
+      }
+      throw error;
+    }
     if (!runId) return false;
     await transitionRequest(tx, request, "processing.succeeded", { errorStage: null, errorMessage: null, nextRetryAt: null });
     await recordAudit(tx, {

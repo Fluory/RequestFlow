@@ -60,8 +60,10 @@ describe("AI service client", () => {
     [413, "document"],
     [415, "document"],
     [422, "document"],
-    [400, "document"],
+    [400, "service"],
     [401, "service"],
+    [404, "service"],
+    [405, "service"],
   ] as const)("classifies HTTP %i as permanent (scope %s)", async (status, scope) => {
     handler = (_request, response) => json(response, status, { error: { code: "x", message: "m" }, requestId: null });
     const client = createAiServiceClient({ baseUrl, token: "t".repeat(24), timeoutMs: 2000 });
@@ -85,6 +87,18 @@ describe("AI service client", () => {
 
   it("rejects a response that does not match the contract (permanent, service scope)", async () => {
     handler = (_request, response) => json(response, 200, { hello: "world" });
+    const client = createAiServiceClient({ baseUrl, token: "t".repeat(24), timeoutMs: 2000 });
+
+    await expect(client.extract(input)).rejects.toMatchObject({ retryable: false, code: "contract_violation" });
+  });
+
+  it.each([
+    ["found without evidence", (r: ReturnType<typeof syntheticExtractResponse>) => ({ ...r, fields: { ...r.fields, company: { ...r.fields.company, evidence: null } } })],
+    ["evidence citing an unknown segment", (r: ReturnType<typeof syntheticExtractResponse>) => ({ ...r, fields: { ...r.fields, company: { ...r.fields.company, evidence: { segmentId: "s99", quote: "x" } } } })],
+    ["duplicate segment ids", (r: ReturnType<typeof syntheticExtractResponse>) => ({ ...r, segments: [...r.segments, r.segments[0]!] })],
+    ["a different documentId", (r: ReturnType<typeof syntheticExtractResponse>) => ({ ...r, documentId: "other" })],
+  ])("rejects a response with %s as a contract violation (never retried)", async (_name, mutate) => {
+    handler = (_request, response) => json(response, 200, mutate(syntheticExtractResponse("doc-1")));
     const client = createAiServiceClient({ baseUrl, token: "t".repeat(24), timeoutMs: 2000 });
 
     await expect(client.extract(input)).rejects.toMatchObject({ retryable: false, code: "contract_violation" });

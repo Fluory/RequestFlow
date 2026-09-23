@@ -1,4 +1,5 @@
 import type { Queue } from "pg-boss";
+import { PROCESS_EXPIRE_SECONDS } from "./budget";
 
 // Queue definitions (ADR-0001 D4). Installed by the deploy step as the owner role; the runtime role
 // only sends, fetches and completes jobs. Payloads carry IDs only – never document content.
@@ -16,7 +17,8 @@ export interface RequestJob {
 
 // `exclusive` + singletonKey = requestId: at most one queued-or-active job per request.
 export const QUEUE_DEFINITIONS: Array<Queue> = [
-  { name: QUEUES.processRequestDead, policy: "standard", retentionSeconds: 60 * 60 * 24 * 14 },
+  // The dead-letter handler only marks ERROR; if even that fails (database down), it retries.
+  { name: QUEUES.processRequestDead, policy: "standard", retentionSeconds: 60 * 60 * 24 * 14, retryLimit: 10, retryDelay: 60, retryBackoff: true },
   {
     name: QUEUES.processRequest,
     policy: "exclusive",
@@ -24,7 +26,7 @@ export const QUEUE_DEFINITIONS: Array<Queue> = [
     retryDelay: 30,
     retryBackoff: true,
     retryDelayMax: 60 * 30,
-    expireInSeconds: 60 * 10,
+    expireInSeconds: PROCESS_EXPIRE_SECONDS,
     deadLetter: QUEUES.processRequestDead,
   },
 ];

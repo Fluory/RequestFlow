@@ -5,3 +5,4 @@ export { drain, type DrainDeps, type DrainOptions, type DrainResult, type JobRun
 export { describeFailure, PermanentProcessingError, processRequestJob, type ProcessingDeps } from "./process-request";
 export { QUEUE_DEFINITIONS, QUEUES, type QueueName, type RequestJob } from "./queues";
 export { reprocessRequest, ReprocessRefused } from "./reprocess";
+export { assertProcessingBudget, PROCESS_EXPIRE_SECONDS } from "./budget";
