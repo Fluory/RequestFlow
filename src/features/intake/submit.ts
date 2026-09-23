@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { recordAudit } from "@/features/audit";
 import { insertDocuments, type NewDocument } from "@/features/documents";
 import { authorize, type Actor } from "@/features/identity";
-import { enqueueRequestProcessing } from "@/features/jobs";
-import { createRequest, findDuplicate } from "@/features/requests";
+import { enqueueRequestProcessing, type JobSender } from "@/features/jobs";
+import { createRequest, findDuplicate, lockDuplicateDetection } from "@/features/requests";
 import { S3BlobStore } from "@/features/storage";
 import type { Tenancy } from "@/features/tenancy";
 import { classifyUpload, UploadRejected, type UploadLimits } from "./files";
@@ -13,7 +13,7 @@ import { parseMailHeaders } from "./mail-headers";
 export interface IntakeDeps {
   tenancy: Tenancy;
   storage: S3BlobStore;
-  boss: Pick<import("pg-boss").PgBoss, "send">;
+  boss: JobSender;
   limits: UploadLimits & { maxFiles: number };
 }
 
@@ -65,6 +65,7 @@ export async function submitUpload(deps: IntakeDeps, actor: Actor, files: Upload
       stored.push(document.storageKey);
     }
     return await deps.tenancy.withTenant(actor.companyId, async (tx) => {
+      await lockDuplicateDetection(tx);
       const duplicate = await findDuplicate(tx, { messageId: headers.messageId, fingerprint });
       await createRequest(tx, {
         id: requestId,
@@ -87,7 +88,14 @@ export async function submitUpload(deps: IntakeDeps, actor: Actor, files: Upload
       return { requestId, possibleDuplicate: duplicate !== null, duplicateOfId: duplicate?.id ?? null };
     });
   } catch (error) {
-    await Promise.allSettled(stored.map((key) => deps.storage.delete(key)));
+    // Nothing references these objects: remove them. A failed delete leaves an orphan without any
+    // row pointing to it – logged by key (IDs only) for a later cleanup sweep.
+    const results = await Promise.allSettled(stored.map((key) => deps.storage.delete(key)));
+    results.forEach((result, index) => {
+      if (result.status === "rejected") {
+        console.error(JSON.stringify({ level: "error", module: "intake", message: "orphaned object", key: stored[index] }));
+      }
+    });
     throw error;
   }
 }

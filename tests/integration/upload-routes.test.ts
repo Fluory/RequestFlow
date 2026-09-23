@@ -14,10 +14,17 @@ describe("upload and download routes", () => {
   let companyA: string;
 
   const pdf = (marker: string) => new File([`%PDF-1.7\n% synthetic ${marker}\n`], "anfrage.pdf", { type: "application/pdf" });
-  const post = (cookie: string | null, files: File[]) => {
+  // Serialise like a browser does, including Content-Length (the route refuses uploads without it).
+  const post = async (cookie: string | null, files: File[], override: { contentLength?: string | null } = {}) => {
     const form = new FormData();
     for (const file of files) form.append("files", file);
-    return upload(new Request("http://localhost:3000/api/requests", { method: "POST", body: form, headers: cookie ? { cookie } : {} }));
+    const encoded = new Response(form);
+    const body = new Uint8Array(await encoded.arrayBuffer());
+    const headers = new Headers({ "content-type": encoded.headers.get("content-type")! });
+    const length = override.contentLength === undefined ? String(body.byteLength) : override.contentLength;
+    if (length !== null) headers.set("content-length", length);
+    if (cookie) headers.set("cookie", cookie);
+    return upload(new Request("http://localhost:3000/api/requests", { method: "POST", body, headers }));
   };
   const get = (cookie: string | null, id: string) =>
     download(new Request(`http://localhost:3000/api/documents/${id}`, { headers: cookie ? { cookie } : {} }), {
@@ -65,6 +72,15 @@ describe("upload and download routes", () => {
 
     expect(rejected.status).toBe(422);
     expect(((await rejected.json()) as { error: { title: string } }).error.title).toMatch(/Dateityp nicht erlaubt/);
+  });
+
+  it("refuses uploads without Content-Length (411), above the request cap (413) and with too many files (422)", async () => {
+    expect((await post(cookieA, [pdf("a")], { contentLength: null })).status).toBe(411);
+    expect((await post(cookieA, [pdf("b")], { contentLength: String(1024 * 1024 * 1024) })).status).toBe(413);
+
+    const tooMany = await post(cookieA, Array.from({ length: 11 }, (_, i) => pdf(`many-${i}`)));
+
+    expect(tooMany.status).toBe(422);
   });
 
   it("answers 404 for a malformed document id", async () => {

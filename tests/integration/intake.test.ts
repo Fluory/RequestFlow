@@ -5,7 +5,8 @@ import { listAuditEvents } from "@/features/audit";
 import { listDocuments } from "@/features/documents";
 import { getActor, type Actor } from "@/features/identity";
 import { submitUpload, UploadRejected, type IntakeDeps } from "@/features/intake";
-import { createJobClient, QUEUES } from "@/features/jobs";
+import { createJobQueue } from "@/db/job-queue";
+import { QUEUES } from "@/features/jobs";
 import { getRequest } from "@/features/requests";
 import { S3BlobStore } from "@/features/storage";
 import { createTenancy } from "@/features/tenancy";
@@ -39,7 +40,7 @@ describe("intake: upload a request and enqueue processing atomically", () => {
     stack = createStack();
     const config = loadConfig();
     storage = new S3BlobStore(config.storage);
-    boss = await createJobClient(config.databaseUrl);
+    boss = await createJobQueue(config.databaseUrl);
     deps = { tenancy: createTenancy(stack.database.db), storage, boss, limits: { maxFileBytes: 1024 * 1024, maxFiles: 5 } };
 
     const a = await companyWithAdmin(stack);
@@ -81,12 +82,15 @@ describe("intake: upload a request and enqueue processing atomically", () => {
 
   it("rolls back request, documents and job when a failure happens after the inserts, and removes the stored objects", async () => {
     let requestId = "";
+    let jobsInsideTransaction = -1;
     const keys: string[] = [];
     const failingBoss: Pick<PgBoss, "send"> = {
       send: (async (...args: Parameters<PgBoss["send"]>) => {
-        const [, data] = args as [string, { requestId: string }];
+        const [, data, options] = args as [string, { requestId: string }, { db: { executeSql(t: string, v: unknown[]): Promise<{ rows: Array<{ n: number }> }> } }];
         requestId = data.requestId;
         await (boss.send as (...a: unknown[]) => Promise<unknown>)(...args); // the job row is really inserted …
+        const seen = await options.db.executeSql("select count(*)::int as n from pgboss.job where singleton_key = $1", [requestId]);
+        jobsInsideTransaction = seen.rows[0]!.n; // … visible inside the transaction …
         throw new Error("injected failure after the job insert"); // … and then the transaction fails
       }) as unknown as PgBoss["send"],
     };
@@ -103,7 +107,10 @@ describe("intake: upload a request and enqueue processing atomically", () => {
     ).rejects.toThrow(/injected failure/);
 
     expect(requestId).not.toBe("");
+    expect(jobsInsideTransaction).toBe(1);
     expect(await requestExists(clerkA, requestId)).toBe(false);
+    const audit = await deps.tenancy.withTenant(clerkA.companyId, (tx) => listAuditEvents(tx, "request", requestId));
+    expect(audit).toHaveLength(0);
     expect(await jobCount(requestId)).toBe(0);
     const documents = await deps.tenancy.withTenant(clerkA.companyId, (tx) => listDocuments(tx, requestId));
     expect(documents).toHaveLength(0);

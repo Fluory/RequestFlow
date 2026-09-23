@@ -22,9 +22,15 @@ export const unique = (prefix: string) => `${prefix}-${randomUUID().slice(0, 8)}
 export const syntheticEmail = (prefix: string) => `${unique(prefix)}@example.com`;
 export const PASSWORD = "synthetic-password-123";
 
-let ipCounter = 0;
-/** A fresh client IP per call site, so the rate limit of one test never bleeds into another. */
-export const freshIp = () => `198.51.100.${(ipCounter = (ipCounter % 250) + 1)}`;
+/**
+ * A fresh client IP per call, so the per-IP rate limit of one test never bleeds into another –
+ * across test files too. Random /64 prefixes in the IPv6 documentation range (Better Auth collapses
+ * IPv6 to /64 before keying).
+ */
+const group = () => Math.floor(Math.random() * 0x10000).toString(16).padStart(4, "0");
+export const freshIp = () => `2001:db8:${group()}:${group()}::1`;
+/** How Better Auth keys an IPv6 client in `auth.rate_limit` (expanded /64 prefix). */
+export const rateLimitKeyPrefix = (ip: string) => `2001:0db8:${ip.split(":")[2]}:${ip.split(":")[3]}:`;
 
 export async function call(
   auth: Auth,

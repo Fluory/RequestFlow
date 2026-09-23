@@ -8,6 +8,7 @@ import {
   createStack,
   freshIp,
   invitedUser,
+  rateLimitKeyPrefix,
   signIn,
   signUp,
   syntheticEmail,
@@ -193,7 +194,7 @@ describe("identity: invite-only login and companies", () => {
       for (let attempt = 0; attempt < 5; attempt++) statuses.push((await signIn(limited.auth, email, ip)).status);
 
       expect(statuses).toContain(429);
-      const rows = await limited.database.db.select().from(schema.rateLimit).where(sql`${schema.rateLimit.key} like ${`%${ip}%`}`);
+      const rows = await limited.database.db.select().from(schema.rateLimit).where(sql`${schema.rateLimit.key} like ${`${rateLimitKeyPrefix(ip)}%`}`);
       expect(rows.length).toBeGreaterThan(0);
     } finally {
       await limited.close();

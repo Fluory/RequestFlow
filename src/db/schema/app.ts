@@ -2,7 +2,7 @@
 // (FORCE is added by a hand-written migration – drizzle-kit only emits ENABLE) with the policy
 // `tenant_isolation` (ADR-0001 D7). Access only via `withTenant()` as `app_rw`.
 import { sql } from "drizzle-orm";
-import { type AnyPgColumn, bigint, boolean, check, index, jsonb, pgPolicy, pgSchema, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, check, foreignKey, index, jsonb, pgPolicy, pgSchema, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 import { organization } from "./auth";
 
 export const appSchema = pgSchema("app");
@@ -40,12 +40,19 @@ export const requests = appSchema
       messageId: text("message_id"),
       fingerprint: text("fingerprint"),
       possibleDuplicate: boolean("possible_duplicate").default(false).notNull(),
-      duplicateOfId: uuid("duplicate_of_id").references((): AnyPgColumn => requests.id, { onDelete: "set null" }),
+      duplicateOfId: uuid("duplicate_of_id"),
     },
     (table) => [
       index("requests_company_id_idx").on(table.companyId),
       index("requests_company_message_id_idx").on(table.companyId, table.messageId),
       index("requests_company_fingerprint_idx").on(table.companyId, table.fingerprint),
+      // FK checks bypass RLS: child rows pin company_id through composite keys.
+      unique("requests_id_company_unique").on(table.id, table.companyId),
+      foreignKey({
+        name: "requests_duplicate_same_company_fk",
+        columns: [table.duplicateOfId, table.companyId],
+        foreignColumns: [table.id, table.companyId],
+      }),
       check("requests_status_check", sql.raw(`status in (${REQUEST_STATUSES.map((s) => `'${s}'`).join(", ")})`)),
       tenantPolicy("requests"),
     ],
@@ -62,9 +69,7 @@ export const documents = appSchema
       companyId: uuid("company_id")
         .notNull()
         .references(() => organization.id, { onDelete: "restrict" }),
-      requestId: uuid("request_id")
-        .notNull()
-        .references(() => requests.id, { onDelete: "cascade" }),
+      requestId: uuid("request_id").notNull(),
       filename: text("filename").notNull(),
       contentType: text("content_type").notNull(),
       kind: text("kind").$type<DocumentKind>().notNull(),
@@ -76,6 +81,11 @@ export const documents = appSchema
     (table) => [
       index("documents_company_id_idx").on(table.companyId),
       index("documents_request_id_idx").on(table.requestId),
+      foreignKey({
+        name: "documents_request_same_company_fk",
+        columns: [table.requestId, table.companyId],
+        foreignColumns: [requests.id, requests.companyId],
+      }).onDelete("cascade"),
       check("documents_kind_check", sql.raw(`kind in (${DOCUMENT_KINDS.map((k) => `'${k}'`).join(", ")})`)),
       tenantPolicy("documents"),
     ],

@@ -1,7 +1,9 @@
 import type { DocumentKind } from "@/db/schema";
+import { inspectOoxml } from "./ooxml";
 
-// Upload validation (security rule: untrusted files). Allow-list by extension AND content signature,
-// so a renamed executable or a macro workbook (.xlsm) never enters storage. Messages are user-facing.
+// Upload validation (security rule: untrusted files). Allow-list by extension AND content: signature
+// for all types, OOXML package structure for .xlsx/.docx (no macros, no foreign ZIPs, no zip bombs).
+// Known limit: .msg is checked by its OLE signature only (registered risk). Messages are user-facing.
 export class UploadRejected extends Error {
   constructor(message: string) {
     super(message);
@@ -67,6 +69,12 @@ export function classifyUpload(name: string, bytes: Uint8Array, limits: UploadLi
   }
   if (!SIGNATURE_CHECK[kind](bytes)) {
     throw new UploadRejected(`Der Inhalt von ${filename} passt nicht zum Dateityp .${kind}.`);
+  }
+  if (kind === "xlsx" || kind === "docx") {
+    const check = inspectOoxml(bytes, kind);
+    if (!check.ok && check.reason === "macros") throw new UploadRejected(`Die Datei ${filename} enthält Makros – nicht erlaubt.`);
+    if (!check.ok && check.reason === "too-large") throw new UploadRejected(`Die Datei ${filename} ist entpackt zu groß.`);
+    if (!check.ok) throw new UploadRejected(`Der Inhalt von ${filename} passt nicht zum Dateityp .${kind}.`);
   }
   return { kind, filename, contentType: CONTENT_TYPES[kind] };
 }

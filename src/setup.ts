@@ -4,7 +4,8 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import { loadConfig } from "@/config/env";
 import { runMigrations } from "@/db/migrate";
-import { installJobQueues } from "@/features/jobs";
+import { installJobQueues } from "@/db/job-queue";
+import { QUEUE_DEFINITIONS } from "@/features/jobs";
 import { S3BlobStore } from "@/features/storage";
 
 const ATTEMPTS = 30;
@@ -43,7 +44,7 @@ async function main(): Promise<void> {
   const config = loadConfig();
 
   await withRetry("migrations", () => runMigrations(migrationUrl));
-  await withRetry("job queues", () => installJobQueues(migrationUrl));
+  await withRetry("job queues", () => installJobQueues(migrationUrl, QUEUE_DEFINITIONS));
   const store = new S3BlobStore(config.storage);
   try {
     await withRetry("bucket", () => store.ensureBucket());
