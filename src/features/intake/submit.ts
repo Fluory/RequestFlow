@@ -4,6 +4,7 @@ import { insertDocuments, type NewDocument } from "@/features/documents";
 import { authorize, type Actor } from "@/features/identity";
 import { enqueueRequestProcessing, type JobSender } from "@/features/jobs";
 import { createRequest, findDuplicate, lockDuplicateDetection } from "@/features/requests";
+import { logEvent } from "@/features/observability";
 import { S3BlobStore } from "@/features/storage";
 import type { Tenancy } from "@/features/tenancy";
 import { classifyUpload, UploadRejected, type UploadLimits } from "./files";
@@ -64,7 +65,7 @@ export async function submitUpload(deps: IntakeDeps, actor: Actor, files: Upload
       await deps.storage.put(document.storageKey, classified[index]!.file.bytes, document.contentType);
       stored.push(document.storageKey);
     }
-    return await deps.tenancy.withTenant(actor.companyId, async (tx) => {
+    const result = await deps.tenancy.withTenant(actor.companyId, async (tx) => {
       await lockDuplicateDetection(tx);
       const duplicate = await findDuplicate(tx, { messageId: headers.messageId, fingerprint });
       await createRequest(tx, {
@@ -87,13 +88,18 @@ export async function submitUpload(deps: IntakeDeps, actor: Actor, files: Upload
       await enqueueRequestProcessing(deps.boss, tx, requestId);
       return { requestId, possibleDuplicate: duplicate !== null, duplicateOfId: duplicate?.id ?? null };
     });
+    // Web side of the correlation (#28): the request id travels on to the worker and the AI service.
+    logEvent("info", "request.received", { requestId: result.requestId, companyId: actor.companyId }, { count: documents.length });
+    return result;
   } catch (error) {
     // Nothing references these objects: remove them. A failed delete leaves an orphan without any
     // row pointing to it – logged by key (IDs only) for a later cleanup sweep.
     const results = await Promise.allSettled(stored.map((key) => deps.storage.delete(key)));
     results.forEach((result, index) => {
       if (result.status === "rejected") {
-        console.error(JSON.stringify({ level: "error", module: "intake", message: "orphaned object", key: stored[index] }));
+        // The key is `{companyId}/{requestId}/{documentId}` – IDs only.
+        const [companyId, requestId, documentId] = (stored[index] ?? "").split("/");
+        logEvent("error", "intake.orphaned_object", { companyId, requestId, documentId });
       }
     });
     throw error;

@@ -120,3 +120,10 @@ export function createAiServiceClient(settings: AiServiceSettings): AiServiceCli
     },
   };
 }
+
+/** Reachability of the AI service (`GET /healthz`, open endpoint) for /api/health (#28). */
+export async function pingAiService(baseUrl: string, fetchImpl: typeof fetch = fetch): Promise<void> {
+  const response = await fetchImpl(new URL("/healthz", baseUrl), { signal: AbortSignal.timeout(2_000) });
+  await response.body?.cancel().catch(() => undefined);
+  if (!response.ok) throw new Error(`AI service health: HTTP ${response.status}`);
+}

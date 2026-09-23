@@ -3,7 +3,7 @@ import { sql, type SQL } from "drizzle-orm";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import type { PgBoss } from "pg-boss";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadConfig } from "@/config/env";
 import { sendInTransaction } from "@/db/job-queue";
 import { createJobQueue, installJobQueues } from "@/db/job-queue-client";
@@ -16,6 +16,7 @@ import { drain, processRequestJob, QUEUES, reprocessRequest, ReprocessRefused, t
 import { createRequest, getRequest } from "@/features/requests";
 import { S3BlobStore } from "@/features/storage";
 import { createTenancy } from "@/features/tenancy";
+import { captureLogs } from "@/features/observability";
 import { companyWithAdmin, createStack, type Stack } from "./helpers/stack";
 
 // The AI service is replaced by a local HTTP stub (external I/O boundary); database, storage and
@@ -291,9 +292,7 @@ describe("processing: worker, AI service, retries and visible errors", () => {
   it("logs IDs only – no document content, no e-mail addresses", async () => {
     reply = (documentId) => ({ status: 200, body: syntheticExtractResponse(documentId) });
     const lines: string[] = [];
-    const spies = [vi.spyOn(console, "log"), vi.spyOn(console, "error")].map((spy) =>
-      spy.mockImplementation((...args: unknown[]) => void lines.push(args.map(String).join(" "))),
-    );
+    const restore = captureLogs(lines);
     try {
       const { requestId } = await newRequest(admin, [{ name: "a.eml", kind: "eml", bytes: MAIL }]);
       await drainUntil(async () => (await requestOf(admin, requestId))?.status === "REVIEW");
@@ -301,7 +300,7 @@ describe("processing: worker, AI service, retries and visible errors", () => {
       expect(lines.some((line) => line.includes(requestId))).toBe(true);
       expect(lines.join("\n")).not.toMatch(/Musterbau|Erika|example\.com|15\.10\.2026/);
     } finally {
-      spies.forEach((spy) => spy.mockRestore());
+      restore();
     }
   });
 });

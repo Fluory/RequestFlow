@@ -1,6 +1,7 @@
 import { currentActor, getJobClient, getRuntime } from "@/app/_server/runtime";
 import { AuthorizationError } from "@/features/identity";
 import { submitUpload, UploadRejected } from "@/features/intake";
+import { logEvent } from "@/features/observability";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,7 @@ export async function POST(request: Request): Promise<Response> {
     if (error instanceof AuthorizationError) return problem(403, "Keine Berechtigung.");
     const kind = error instanceof Error ? error.name : "unknown";
     const code = (error as { code?: unknown } | null)?.code;
-    console.error(JSON.stringify({ level: "error", route: "POST /api/requests", companyId: actor.companyId, userId: actor.userId, error: kind, code: typeof code === "string" ? code : undefined }));
+    logEvent("error", "upload.failed", { companyId: actor.companyId }, { code: typeof code === "string" ? `${kind}:${code}` : kind });
     return problem(500, "Upload fehlgeschlagen. Bitte erneut versuchen.");
   }
 }
