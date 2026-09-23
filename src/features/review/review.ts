@@ -60,6 +60,21 @@ async function currentCorrections(tx: TenantTx, requestId: string) {
   return latest;
 }
 
+/**
+ * The reviewed value of every header field: the latest correction, else the extracted value. Runs in
+ * the caller's tenant transaction (the export reads it under the request's row lock, #9).
+ */
+export async function currentFieldValues(tx: TenantTx, requestId: string): Promise<Record<string, string | null>> {
+  const corrections = await currentCorrections(tx, requestId);
+  const extraction = await latestRun(tx, requestId);
+  return Object.fromEntries(
+    HEADER_FIELDS.map((key) => {
+      const correction = corrections.get(key);
+      return [key, correction ? correction.newValue : (extraction?.fields.find((field) => field.fieldKey === key)?.value ?? null)];
+    }),
+  );
+}
+
 export async function loadReview(tenancy: Tenancy, actor: Actor, requestId: string): Promise<ReviewView | null> {
   authorize(actor, "requests.process");
   return tenancy.withTenant(actor.companyId, async (tx) => {

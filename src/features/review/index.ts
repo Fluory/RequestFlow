@@ -3,6 +3,7 @@ export {
   approveRequest,
   correctField,
   correctionHistory,
+  currentFieldValues,
   FIELD_LABELS,
   loadReview,
   REJECTION_REASON_MAX,
