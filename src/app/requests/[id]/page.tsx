@@ -183,7 +183,10 @@ export default async function RequestPage({
                       data-testid={`item-${item.itemIndex}-${field.key}`}
                       className={field.reviewStatus === "unverified" || field.reviewStatus === "uncertain" ? "attention" : undefined}
                     >
-                      <Link href={`/requests/${request.id}?field=${field.key}&item=${item.itemIndex}`} aria-label={`Position ${item.itemIndex + 1}, ${field.label}: prüfen`}>
+                      <Link href={`/requests/${request.id}?field=${field.key}&item=${item.itemIndex}`}>
+                        <span className="visually-hidden">
+                          Position {item.itemIndex + 1}, {field.label}:{" "}
+                        </span>
                         {field.value ?? "–"}
                       </Link>{" "}
                       <StatusBadge status={field.reviewStatus} />

@@ -112,7 +112,9 @@ export async function loadReview(tenancy: Tenancy, actor: Actor, requestId: stri
     const corrections = await currentCorrections(tx, requestId);
     type FieldRow = (typeof extraction.fields)[number];
     const toReviewField = (key: string, itemIndex: number | null, field: FieldRow | undefined): ReviewField => {
-      const correction = corrections.get(correctionKey(key, itemIndex));
+      const stored = corrections.get(correctionKey(key, itemIndex));
+      // Item positions belong to one run: a correction made before a newer run is not mapped onto it.
+      const correction = itemIndex !== null && stored && stored.createdAt < extraction.run.createdAt ? undefined : stored;
       const documentSegments = segments.filter((segment) => segment.documentId === field?.documentId) as Array<StoredSegment & { documentId: string }>;
       const view = field?.segmentId && field.quote ? buildSourceView(documentSegments, { segmentId: field.segmentId, quote: field.quote }) : null;
       const document = documents.find((candidate) => candidate.id === field?.documentId);
