@@ -6,6 +6,8 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
+- Request list (`/requests`): attempts, the last error with its stage (processing or export) and the next
+  retry per request, filters for status and possible duplicates, and "Erneut verarbeiten" for failed requests.
 - Extraction schema v2: e-mail, phone and additional requirements as header fields, plus line items
   (description, quantity, unit, material, dimensions), each with its own status and source quote; German
   number formats, units and dates are normalised, a bare calendar week ("KW 42") stays at most uncertain.
