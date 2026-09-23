@@ -6,6 +6,10 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
+- Export: approved requests are sent to the ERP (a simulated ERP in the pilot, contract
+  `contracts/erp-export.openapi.yaml`) exactly once – retries after errors or lost answers never create a
+  second record; the request page shows the ERP reference, running retries, and a visible error if the
+  export finally fails (reprocess possible). The ERP mock is off unless `ERP_MOCK_ENABLED=true`.
 - Review (`/requests/:id`): staff see each extracted field with its status (found, uncertain,
   missing, not verified) beside the source passage, correct values (every correction is kept with
   who and when), approve the request – which queues it for export – or reject it with a reason.

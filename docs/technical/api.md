@@ -38,6 +38,24 @@ Request (NEW), documents, audit event and the `request-process` job commit in on
 Duplicates: same `Message-ID` (read from `.eml` only – `.msg` Message-ID extraction is a follow-up)
 or the same set of file hashes within the company; checks are serialised per company.
 
+## `POST /api/erp-mock/v1/quote-requests` (ERP mock, only with `ERP_MOCK_ENABLED=true`)
+
+The simulated ERP of the pilot (ADR-0001 D9) – contract `contracts/erp-export.openapi.yaml`. Without the
+flag or without `ERP_TOKEN` the route answers 404. `Authorization: Bearer <ERP_TOKEN>`, header
+`Idempotency-Key: <requestId>` (UUID, must equal `requestId` in the body), JSON body ≤ 64 KiB with a
+`Content-Length` (411/413 otherwise).
+
+| Status | Meaning |
+|---|---|
+| 201 | stored; body `{ erpReference, requestId, receivedAt }` |
+| 200 | replay of a known key with the same body – the **same** `erpReference` |
+| 400 / 401 | invalid key or body / wrong token |
+| 409 | known key, different body – nothing stored |
+| 503 | injected fault (`ERP_MOCK_FAULTS`) or the in-memory store is full (10 000 records) |
+
+Keys live in the web process's memory (decision-needed in #9): a restart forgets them, and only one
+web instance may serve the mock.
+
 ## `GET /api/documents/:id` (session required)
 
 Streams the original as `attachment` with `x-content-type-options: nosniff` and `cache-control: private,

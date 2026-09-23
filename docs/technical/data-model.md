@@ -66,6 +66,19 @@ history is the correction audit. The page shows a corrected value as `korrigiert
 request. Corrected values and rejection reasons are also copied into the append-only `audit_events` – they
 cannot be deleted per request there; this joins the open retention question (ADR-0001 open points).
 
+### `app.request_exports` – one export record per request (#9)
+
+| Column | Type | Notes | Class |
+|---|---|---|---|
+| `id`, `company_id`, `request_id` | uuid | `unique(request_id)`; composite FK `(request_id, company_id)` → `requests` | internal |
+| `idempotency_key` | uuid | always = `request_id` (check constraint); sent as `Idempotency-Key` | internal |
+| `status` | text | `pending` · `succeeded` (check: succeeded ⇒ reference + time) | internal |
+| `erp_reference`, `exported_at` | text, timestamptz | the ERP's reference and when | internal |
+| `attempts`, `last_error` | int, text | ERP calls so far; readable cause of the last failure (no hosts, no payload) | internal |
+
+Forced RLS; `app_rw` may not DELETE/TRUNCATE. The payload itself is not stored – it is rebuilt from the
+reviewed values (frozen after approval). Purpose: exactly-once export and its proof. Retention: with the request.
+
 ### `app.documents` – originals of a request (#5)
 
 | Column | Type | Notes | Class |
@@ -114,5 +127,6 @@ app.requests      1─n app.documents           (request_id, company_id)
 app.requests      0─1 app.requests            (duplicate_of_id, company_id)
 app.requests      1─n app.extraction_runs     (request_id, company_id) 1─n segments / fields
 app.requests      1─n app.field_corrections   (request_id, company_id)
+app.requests      1─1 app.request_exports     (request_id, company_id)
 app.*             1─n app.audit_events        (entity_type, entity_id – no FK, append-only)
 ```
