@@ -37,7 +37,7 @@ function unwrap(locator: Locator): { inner: Locator; attachments: string[]; path
   while (inner.kind === "msg" && inner.part === "attachment" && inner.inner && typeof inner.inner === "object") {
     const ref = (inner.attachment ?? {}) as { index?: unknown; name?: unknown };
     attachments.push(typeof ref.name === "string" && ref.name ? ref.name : `Anhang ${Number(ref.index ?? 0) + 1}`);
-    indexes.push(String(ref.index));
+    indexes.push(typeof ref.index === "number" ? String(ref.index) : "?");
     inner = inner.inner as Locator;
   }
   return { inner, attachments, path: indexes.join("/") };

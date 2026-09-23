@@ -2,7 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { currentActor, getRuntime } from "@/app/_server/runtime";
-import { loadReview, REJECTION_REASON_MAX, type ReviewField, type ReviewStatus } from "@/features/review";
+import { duplicateDecidable, loadReview, REJECTION_REASON_MAX, type ReviewField, type ReviewStatus } from "@/features/review";
 import { requestStatusLabel } from "../status-labels";
 import { DONE_MESSAGES, ERROR_MESSAGES, messageFor } from "./messages";
 import { approveAction, confirmNotDuplicateAction, correctFieldAction, rejectAction, rejectAsDuplicateAction } from "./actions";
@@ -81,7 +81,7 @@ export default async function RequestPage({
       : lineItems.find((item) => item.itemIndex === selectedItem)?.fields.find((field) => field.key === query.field);
   const inReview = request.status === "REVIEW";
   // Decidable before approval and not while a worker holds the request (status machine, #27).
-  const duplicateDecidable = request.status === "NEW" || inReview || (request.status === "ERROR" && request.errorStage === "processing");
+  const canDecideDuplicate = duplicateDecidable(request);
   const done = messageFor(DONE_MESSAGES, query.done);
   const error = messageFor(ERROR_MESSAGES, query.error);
 
@@ -116,7 +116,7 @@ export default async function RequestPage({
             {request.duplicateDecision === "distinct" && " Entscheidung: eigenständige Anfrage."}
             {request.duplicateDecision === "duplicate" && " Entscheidung: als Duplikat abgelehnt."}
           </p>
-          {request.duplicateDecision === null && duplicateDecidable && (
+          {request.duplicateDecision === null && canDecideDuplicate && (
             <>
               <form action={confirmNotDuplicateAction}>
                 <input type="hidden" name="requestId" value={request.id} />
@@ -205,7 +205,11 @@ export default async function RequestPage({
                       data-testid={`item-${item.itemIndex}-${field.key}`}
                       className={field.reviewStatus === "unverified" || field.reviewStatus === "uncertain" ? "attention" : undefined}
                     >
-                      <Link href={`/requests/${request.id}?field=${field.key}&item=${item.itemIndex}`} aria-label={`Position ${item.itemIndex + 1}, ${field.label}: prüfen`}>
+                      {/* The accessible name contains the visible value (WCAG 2.5.3 label in name). */}
+                      <Link
+                        href={`/requests/${request.id}?field=${field.key}&item=${item.itemIndex}`}
+                        aria-label={`Position ${item.itemIndex + 1}, ${field.label}: ${field.value ?? "–"}`}
+                      >
                         {field.value ?? "–"}
                       </Link>{" "}
                       <StatusBadge status={field.reviewStatus} />

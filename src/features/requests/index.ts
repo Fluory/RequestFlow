@@ -8,6 +8,7 @@ export {
   lockDuplicateDetection,
   lockRequest,
   recordDuplicateDecision,
+  recordExportRetry,
   recordProcessingFailure,
   transitionRequest,
   type NewRequest,

@@ -2,6 +2,7 @@
 export {
   approveRequest,
   confirmNotDuplicate,
+  duplicateDecidable,
   rejectAsDuplicate,
   correctField,
   correctionHistory,

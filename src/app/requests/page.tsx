@@ -5,6 +5,7 @@ import { currentActor, getRuntime } from "@/app/_server/runtime";
 import { listExportRecords } from "@/features/export";
 import { listRequests, type RequestFilter } from "@/features/requests";
 import { reprocessAction } from "./actions";
+import { requestRowView } from "./row-view";
 import { REQUEST_STATUS_LABEL, requestStatusLabel } from "./status-labels";
 import { UploadForm } from "./upload-form";
 
@@ -79,12 +80,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
           </thead>
           <tbody>
             {requests.map((request) => {
-              const exportRecord = exports.get(request.id);
-              // While the export retries, the request stays APPROVED; its cause lives on the export record.
-              const exportRetrying = request.status === "APPROVED" && exportRecord?.lastError;
-              const lastError = request.errorMessage ?? (exportRetrying ? exportRecord.lastError : null);
-              const stage = request.errorStage ?? (exportRetrying ? "export" : null);
-              const attempts = exportRetrying ? exportRecord.attempts : request.attempts;
+              const row = requestRowView(request, exports.get(request.id));
               return (
                 <tr key={request.id} data-testid={`request-${request.id}`}>
                   <td>{dateFormat.format(request.createdAt)}</td>
@@ -93,17 +89,28 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                   </td>
                   <td>
                     {requestStatusLabel(request.status)}
-                    {request.status === "ERROR" && stage ? ` (${STAGE_LABEL[stage] ?? stage})` : ""}
+                    {request.status === "ERROR" && row.stage ? ` (${STAGE_LABEL[row.stage]})` : ""}
                   </td>
-                  <td>{attempts > 0 ? attempts : "–"}</td>
-                  <td>{lastError ? `${stage ? `${STAGE_LABEL[stage] ?? stage}: ` : ""}${lastError}` : "–"}</td>
-                  <td>{request.nextRetryAt ? dateFormat.format(request.nextRetryAt) : "–"}</td>
-                  <td>{request.possibleDuplicate ? "Mögliches Duplikat" : ""}</td>
+                  <td>{row.attempts > 0 ? row.attempts : "–"}</td>
+                  {/* The stage appears once: in the status for ERROR, as a prefix while retrying. */}
+                  <td>{row.error ? `${request.status !== "ERROR" && row.stage ? `${STAGE_LABEL[row.stage]}: ` : ""}${row.error}` : "–"}</td>
+                  <td>{row.nextRetryAt ? dateFormat.format(row.nextRetryAt) : "–"}</td>
+                  <td>
+                    {request.possibleDuplicate
+                      ? request.duplicateDecision === "distinct"
+                        ? "Duplikat geprüft: eigenständig"
+                        : request.duplicateDecision === "duplicate"
+                          ? "Als Duplikat abgelehnt"
+                          : "Mögliches Duplikat – Entscheidung offen"
+                      : ""}
+                  </td>
                   <td>
                     {request.status === "ERROR" && (
                       <form action={reprocessAction}>
                         <input type="hidden" name="requestId" value={request.id} />
-                        <button type="submit">Erneut verarbeiten</button>
+                        <button type="submit" aria-label={`Erneut verarbeiten: ${request.subject ?? "(ohne Betreff)"}`}>
+                          Erneut verarbeiten
+                        </button>
                       </form>
                     )}
                   </td>

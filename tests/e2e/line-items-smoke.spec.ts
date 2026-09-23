@@ -38,7 +38,7 @@ test("a clerk reviews a multi-item request, corrects a position and approves it"
 
   await expect(page.getByTestId("item-0-quantity")).toContainText("1250");
   await expect(page.getByTestId("item-1-description")).toContainText("Dichtung DN 100");
-  await page.getByRole("link", { name: "Position 1, Menge: prüfen" }).click();
+  await page.getByRole("link", { name: /^Position 1, Menge:/ }).click();
   await expect(page.locator("mark")).toHaveText("1.250");
 
   await page.getByLabel("Neuer Wert für Position 1, Menge").fill("1300");

@@ -10,7 +10,8 @@ import { createErpClient, exportRequestJob } from "@/features/export";
 import { persistExtractionRun } from "@/features/extraction";
 import { syntheticExtractResponse } from "@/features/extraction/fixtures";
 import { getActor, type Actor } from "@/features/identity";
-import { QUEUES, reprocessRequest, ReprocessRefused } from "@/features/jobs";
+import { processRequestJob, QUEUES, reprocessRequest, ReprocessRefused } from "@/features/jobs";
+import { latestRun } from "@/features/extraction";
 import { createRequest, getRequest, lockRequest, transitionRequest } from "@/features/requests";
 import { approveRequest, confirmNotDuplicate, currentFieldValues, rejectAsDuplicate, ReviewRefused } from "@/features/review";
 import { createTenancy, type Tenancy } from "@/features/tenancy";
@@ -107,6 +108,35 @@ describe("duplicate handling", () => {
 
     expect((await requestOf(clerk, fresh.duplicateId))?.status).toBe("REJECTED");
     expect((await requestOf(clerk, running.duplicateId))?.status).toBe("PROCESSING");
+  });
+
+  it("rejects from ERROR(processing) and clears the stale error; refuses ERROR(export) – that one was approved", async () => {
+    const failed = await duplicatePair(clerk, "PROCESSING");
+    const exported = await duplicatePair(clerk, "REVIEW");
+    await tenancy.withTenant(clerk.companyId, async (tx) => {
+      await transitionRequest(tx, (await lockRequest(tx, failed.duplicateId))!, "processing.failed", { errorStage: "processing", errorMessage: "Der KI-Dienst ist nicht erreichbar." });
+      const approved = await transitionRequest(tx, (await lockRequest(tx, exported.duplicateId))!, "approve");
+      await transitionRequest(tx, approved, "export.failed", { errorStage: "export", errorMessage: "ERP hat den Export abgelehnt (HTTP 409)." });
+    });
+
+    await rejectAsDuplicate(tenancy, clerk, failed.duplicateId, "Doppelt");
+    await expect(rejectAsDuplicate(tenancy, clerk, exported.duplicateId, "Doppelt")).rejects.toBeInstanceOf(ReviewRefused);
+
+    expect(await requestOf(clerk, failed.duplicateId)).toMatchObject({ status: "REJECTED", errorStage: null, errorMessage: null });
+    expect(await requestOf(clerk, exported.duplicateId)).toMatchObject({ status: "ERROR", errorStage: "export" });
+  });
+
+  it("a job queued before the rejection finds REJECTED and skips – no AI call, no extraction run", async () => {
+    const { duplicateId } = await duplicatePair(clerk, "NEW");
+    await rejectAsDuplicate(tenancy, clerk, duplicateId, "Doppelt hochgeladen");
+    let aiCalls = 0;
+    const ai = { extract: async () => ((aiCalls += 1), Promise.reject(new Error("must not be called"))) };
+
+    const outcome = await processRequestJob({ tenancy, ai, storage: { get: async () => new Uint8Array() } } as never, { id: randomUUID(), data: { requestId: duplicateId, companyId: clerk.companyId } });
+
+    expect(outcome).toBe("skipped");
+    expect(aiCalls).toBe(0);
+    expect(await tenancy.withTenant(clerk.companyId, (tx) => latestRun(tx, duplicateId))).toBeNull();
   });
 
   it("refuses decisions on requests that are not flagged, already decided, or of another company; needs a reason", async () => {

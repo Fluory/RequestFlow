@@ -25,6 +25,8 @@ const TRANSITIONS: Record<RequestEvent, Partial<Record<RequestStatus, RequestSta
   reject: { REVIEW: "REJECTED" },
   // A clerk rejects a possible duplicate before approval (#27) – not while a worker holds it
   // (PROCESSING); a queued job for a NEW request then finds REJECTED and skips.
+  // The machine allows ERROR for both stages; the review module (`duplicateDecidable`) narrows it to
+  // ERROR from processing – an export error means the request was already approved.
   "reject.duplicate": { NEW: "REJECTED", REVIEW: "REJECTED", ERROR: "REJECTED" },
   "export.succeeded": { APPROVED: "EXPORTED" },
   "export.failed": { APPROVED: "ERROR" },
