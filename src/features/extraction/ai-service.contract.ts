@@ -85,7 +85,7 @@ export interface components {
              * Code
              * @enum {string}
              */
-            code: "invalid_request" | "unauthorized" | "document_too_large" | "unsupported_media_type" | "document_unparseable" | "busy" | "model_error" | "model_output_invalid" | "internal_error";
+            code: "invalid_request" | "unauthorized" | "length_required" | "document_too_large" | "unsupported_media_type" | "document_unparseable" | "document_too_long" | "busy" | "model_error" | "model_output_invalid" | "internal_error";
             /**
              * Message
              * @description Short, fixed text. Never contains document content.
@@ -163,7 +163,7 @@ export interface components {
         FieldResult: {
             /**
              * Value
-             * @description Extracted value (dates as YYYY-MM-DD). Kept for `unverified` so a human can review the proposal; null for `missing`.
+             * @description Extracted value. For `found` and verified `uncertain` it is normalised: trimmed text, dates as YYYY-MM-DD. Kept as the model sent it for `unverified` (and for `uncertain` without evidence) so a human can review the proposal; null for `missing`.
              */
             value: string | null;
             /**
@@ -181,9 +181,9 @@ export interface components {
             modelStatus: "found" | "uncertain" | "missing";
             /**
              * Reason
-             * @description Why the verifier set `unverified`; null otherwise.
+             * @description Why the verifier set `unverified`, or `ambiguous_quote` when it downgraded `found` to `uncertain` (the quote holds several dates); null otherwise.
              */
-            reason: ("missing_with_value" | "no_value" | "no_evidence" | "unknown_segment" | "empty_quote" | "quote_not_in_segment" | "value_not_in_quote") | null;
+            reason: ("missing_with_value" | "no_value" | "no_evidence" | "unknown_segment" | "empty_quote" | "quote_not_in_segment" | "value_not_in_quote" | "ambiguous_quote") | null;
         };
         /** HealthResponse */
         HealthResponse: {
@@ -324,7 +324,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Missing or invalid bearer token. */
+            /** @description Missing or invalid bearer token (checked before the body is read). */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -333,7 +333,16 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Document larger than AI_MAX_DOCUMENT_BYTES. */
+            /** @description Content-Length header missing or not a number. */
+            411: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Document larger than AI_MAX_DOCUMENT_BYTES (declared Content-Length checked before the body is read, the file size after). */
             413: {
                 headers: {
                     [name: string]: unknown;
@@ -351,7 +360,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description The document could not be parsed. */
+            /** @description The document could not be parsed (`document_unparseable`) or has more pages than AI_MAX_PDF_PAGES (`document_too_long`). */
             422: {
                 headers: {
                     [name: string]: unknown;
