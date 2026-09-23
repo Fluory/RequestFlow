@@ -80,7 +80,10 @@ export function createAuth(db: Database, settings: AuthSettings) {
     plugins: [
       organization({
         allowUserToCreateOrganization: false,
-        creatorRole: "admin",
+        // Better Auth gives the creator role ALL plugin permissions regardless of `roles`. Nobody may hold
+        // it: companies are created by `bootstrapCompany`, and the role hooks below refuse "owner" – so
+        // member and invitation changes can only go through the audited `identity` module (#30).
+        creatorRole: "owner",
         ac: organizationAc,
         roles: organizationRoles,
         disableOrganizationDeletion: true,

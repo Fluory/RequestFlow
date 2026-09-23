@@ -3,15 +3,16 @@ import { adminAc, userAc } from "better-auth/plugins/admin/access";
 import { defaultStatements } from "better-auth/plugins/organization/access";
 
 // Permissions of the Better Auth organization plugin's own HTTP endpoints (/api/auth/organization/*).
-// They mirror `authorize()`: only company admins invite or change members; clerks get nothing.
-// Deleting the organization (= company) is nobody's right in the pilot.
+// Members and invitations are managed ONLY through the `identity` module (#30: audited, last-admin
+// rule), so the plugin endpoints grant nobody member or invitation rights. Deleting the organization
+// (= company) is nobody's right in the pilot.
 export const organizationAc = createAccessControl(defaultStatements);
 
 export const organizationRoles = {
   admin: organizationAc.newRole({
     organization: ["update"],
-    member: ["create", "update", "delete"],
-    invitation: ["create", "cancel"],
+    member: [],
+    invitation: [],
     team: [],
     ac: ["read"],
   }),

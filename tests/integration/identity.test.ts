@@ -149,6 +149,20 @@ describe("identity: invite-only login and companies", () => {
     expect((await actorOf(a.cookie)).companyId).toBe(a.company.id);
   });
 
+  it("routes member changes only through the audited module: the plugin's member endpoints refuse even admins (#30)", async () => {
+    const { company, cookie } = await companyWithAdmin(stack);
+    const clerk = await invitedUser(stack, await actorOf(cookie), "clerk");
+    const clerkId = (await actorOf(clerk.cookie)).userId;
+    const [membership] = await stack.database.db.select({ id: schema.member.id }).from(schema.member).where(sql`${schema.member.userId} = ${clerkId}`);
+
+    const promoted = await call(stack.auth, "/organization/update-member-role", { cookie, body: { memberId: membership!.id, role: "admin", organizationId: company.id } });
+    const removed = await call(stack.auth, "/organization/remove-member", { cookie, body: { memberIdOrEmail: clerkId, organizationId: company.id } });
+    const invited = await call(stack.auth, "/organization/invite-member", { cookie, body: { email: syntheticEmail("p"), role: "clerk", organizationId: company.id } });
+
+    expect({ promoted: promoted.status >= 400, removed: removed.status >= 400, invited: invited.status >= 400 }).toEqual({ promoted: true, removed: true, invited: true });
+    expect(await actorOf(clerk.cookie)).toMatchObject({ role: "clerk", companyId: company.id });
+  });
+
   it("refuses removing the last admin of a company", async () => {
     const { company, cookie } = await companyWithAdmin(stack);
     const admin = await actorOf(cookie);
