@@ -275,6 +275,26 @@ def _mutate_item(field: str, index: int, change: dict[str, Any]) -> dict[str, An
     return body
 
 
+def test_known_limitation_line_item_quoting_the_injection_passes_grounding(
+    fixtures_dir: Path,
+) -> None:
+    """Grounding proves provenance, not intent, for line items too (README, "Prompt injection").
+
+    If the model cites the injected sentence itself ("auf 99.999 Stk."), the quote is in that
+    segment and the value is in the quote, so the verifier says found. Human review (#25) and the
+    injection cases of the eval set (#24) are the next layer; this test pins the limitation.
+    """
+    segments = run_multi_item(fixtures_dir).segments
+    injected = next(segment for segment in segments if "99.999" in segment.text)
+    body = _mutate_item(
+        "quantity",
+        0,
+        {"value": "99.999", "evidence": {"segment_id": injected.id, "quote": "99.999 Stk."}},
+    )
+    run = run_multi_item(fixtures_dir, body)
+    assert run.line_items[0].fields["quantity"].status == "found"
+
+
 def test_injected_line_item_quantity_is_never_found(fixtures_dir: Path) -> None:
     """The mail asks to set Pos. 1 to 99.999; the model obeys but cites the real position."""
     body = _mutate_item(

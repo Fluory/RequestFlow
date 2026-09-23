@@ -66,13 +66,14 @@ _UNITS: dict[str, str] = {
     for canonical, spellings in _UNIT_SPELLINGS.items()
     for spelling in spellings
 }
-# A unit token in running text: letters only, at the start, after whitespace, "(" or a digit
-# ("250mm"); not inside "ISO 2768-m" or a word.
-_UNIT_TOKEN = re.compile(r"(?<![^\s(\d])[^\W\d_]+\.?(?![^\W_])")
+# A known unit counts only right after a number ("250mm", "1.250 Stk.") or when the whole quote is
+# the unit (a table cell). A bare "St 37-2" (steel grade) or "t=5" (thickness) is not a unit.
+_UNIT_AFTER_NUMBER = re.compile(r"\d[\s\u00a0]*(?P<unit>[^\W\d_]+)\.?(?![^\W_])")
 
 _EMAIL_SHAPE = re.compile(r"[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+")
-# A phone-like number: digits with spaces, "/", "-", "." or parentheses between them.
-_PHONE_IN_TEXT = re.compile(r"(?<![\w+])\+?\d[\d \u00a0/().\-]*\d(?!\w)")
+# A phone-like number: digits with spaces, "/", "-" or parentheses between them. No dots: a date
+# "12.10.2026" or an order number is not a phone number (#22 review).
+_PHONE_IN_TEXT = re.compile(r"(?<![\w+.])\+?\d[\d \u00a0/()\-]*\d(?![\w.]\d|\w)")
 _MIN_PHONE_DIGITS = 6
 
 
@@ -250,8 +251,10 @@ def _check_unit(value: str, quote: str) -> ValueCheck:
     canonical = canonical_unit(value)
     if canonical is None:
         return _check_text(value, quote)
-    for token in _UNIT_TOKEN.findall(quote):
-        if canonical_unit(token) == canonical:
+    if canonical_unit(quote.strip()) == canonical:
+        return ValueCheck(ok=True, normalized=canonical)
+    for match in _UNIT_AFTER_NUMBER.finditer(quote):
+        if canonical_unit(match.group("unit")) == canonical:
             return ValueCheck(ok=True, normalized=canonical)
     return _NOT_OK
 
@@ -269,7 +272,7 @@ def _check_email(value: str, quote: str) -> ValueCheck:
 def _check_phone(value: str, quote: str) -> ValueCheck:
     digits = _phone_digits(value)
     if len(digits.lstrip("+")) < _MIN_PHONE_DIGITS or not re.fullmatch(
-        r"\+?[\d \u00a0/().\-]+", value.strip()
+        r"\+?[\d \u00a0/()\-]+", value.strip()
     ):
         return _NOT_OK
     if all(_phone_digits(m.group(0)) != digits for m in _PHONE_IN_TEXT.finditer(quote)):
