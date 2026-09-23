@@ -77,3 +77,11 @@ export async function inviteUser(
     return { invitationId: row.id };
   });
 }
+
+export async function getCompany(db: Database, companyId: string): Promise<Company | null> {
+  const [row] = await db
+    .select({ id: schema.organization.id, name: schema.organization.name, slug: schema.organization.slug })
+    .from(schema.organization)
+    .where(eq(schema.organization.id, companyId));
+  return row ?? null;
+}
