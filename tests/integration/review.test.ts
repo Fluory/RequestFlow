@@ -128,6 +128,35 @@ describe("review: fields beside their source, corrections, approve or reject", (
     await stack.database.pool.query("delete from pgboss.job where name = $1 and singleton_key = $2", [QUEUES.exportRequest, requestId]);
   });
 
+  it("keeps failed attachments and skipped OCR pages per document for the review (#23)", async () => {
+    const requestId = randomUUID();
+    const documentId = randomUUID();
+    await tenancy.withTenant(clerk.companyId, async (tx) => {
+      await createRequest(tx, { id: requestId, createdBy: clerk.userId });
+      await insertDocuments(tx, [
+        { id: documentId, requestId, filename: "anfrage.msg", contentType: "application/vnd.ms-outlook", kind: "msg", sizeBytes: 10, sha256: "x".repeat(64), storageKey: `${clerk.companyId}/${requestId}/${documentId}` },
+      ]);
+      const row = await transitionRequest(tx, (await lockRequest(tx, requestId))!, "processing.started", { attempts: 1 });
+      const response = {
+        ...syntheticExtractResponse(documentId),
+        documentKind: "msg" as const,
+        warnings: ["attachment_failed" as const, "ocr_pages_skipped" as const],
+        attachments: [
+          { path: [0], name: "positionen.xlsx", documentKind: "xlsx" as const, status: "parsed" as const, error: null, segmentCount: 4 },
+          { path: [1], name: "kaputt.pdf", documentKind: null, status: "failed" as const, error: "document_unparseable" as const, segmentCount: 0 },
+        ],
+      };
+      await persistExtractionRun(tx, { requestId, jobId: randomUUID(), outcomes: [{ documentId, response }] });
+      await transitionRequest(tx, row, "processing.succeeded");
+    });
+
+    const view = await loadReview(tenancy, clerk, requestId);
+
+    expect(view?.documentNotes).toEqual([
+      { documentId, failedAttachments: [{ name: "kaputt.pdf", error: "document_unparseable" }], warnings: ["attachment_failed", "ocr_pages_skipped"] },
+    ]);
+  });
+
   it("approve: APPROVED and the export job in one transaction, audited", async () => {
     const { requestId } = await requestInReview(clerk);
 

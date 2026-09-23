@@ -209,7 +209,7 @@ describe("processing: worker, AI service, retries and visible errors", () => {
     expect((await requestOf(admin, requestId))?.errorMessage).toMatch(/abgelehnt/);
   });
 
-  it("processes the other documents when one is rejected, and skips formats the service does not read yet", async () => {
+  it("processes the other documents when one is rejected; XLSX is sent to the service like PDF and e-mail (#23)", async () => {
     reply = (documentId, body) => (body.includes("%PDF") ? { status: 422 } : { status: 200, body: syntheticExtractResponse(documentId) });
     const { requestId } = await newRequest(admin, [
       { name: "a.eml", kind: "eml", bytes: MAIL },
@@ -220,10 +220,11 @@ describe("processing: worker, AI service, retries and visible errors", () => {
     await drainUntil(async () => (await requestOf(admin, requestId))?.status === "REVIEW");
 
     const documents = (await runOf(admin, requestId))?.run.documents as Array<{ skipped?: string }>;
-    expect(documents.map((document) => document.skipped ?? "processed").sort()).toEqual(["processed", "rejected_422", "unsupported_kind"]);
+    expect(documents.map((document) => document.skipped ?? "processed").sort()).toEqual(["processed", "processed", "rejected_422"]);
   });
 
   it("goes to ERROR when no document can be processed at all", async () => {
+    reply = () => ({ status: 422 });
     const { requestId } = await newRequest(admin, [{ name: "liste.xlsx", kind: "xlsx", bytes: enc("PK") }]);
 
     await drainUntil(async () => (await requestOf(admin, requestId))?.status === "ERROR");
