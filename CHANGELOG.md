@@ -6,6 +6,10 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
+- Review (`/requests/:id`): staff see each extracted field with its status (found, uncertain,
+  missing, not verified) beside the source passage, correct values (every correction is kept with
+  who and when), approve the request – which queues it for export – or reject it with a reason.
+- `pnpm verify:full` runs a browser smoke flow (upload → processing → review → correction → approval).
 - Background processing: the worker sends each document to the AI service, stores the extracted
   fields with their evidence and moves the request to review; failures retry with backoff and end
   in a visible error with attempts and cause; failed requests can be reprocessed.

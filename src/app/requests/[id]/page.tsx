@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { currentActor, getRuntime } from "@/app/_server/runtime";
 import { loadReview, type FieldStatus, type ReviewField } from "@/features/review";
+import { requestStatusLabel } from "../status-labels";
 import { approveAction, correctFieldAction, rejectAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -14,15 +15,6 @@ const STATUS_LABEL: Record<FieldStatus, string> = {
   uncertain: "unsicher",
   missing: "fehlt",
   unverified: "nicht bestätigt",
-};
-const REQUEST_STATUS: Record<string, string> = {
-  NEW: "Neu",
-  PROCESSING: "In Verarbeitung",
-  REVIEW: "Zur Prüfung",
-  APPROVED: "Freigegeben",
-  EXPORTED: "Exportiert",
-  REJECTED: "Abgelehnt",
-  ERROR: "Fehler",
 };
 
 function StatusBadge({ status }: { status: FieldStatus }) {
@@ -83,7 +75,7 @@ export default async function RequestPage({
       </p>
       <h1>{request.subject ?? "(ohne Betreff)"}</h1>
       <p>
-        Status: <strong data-testid="request-status">{REQUEST_STATUS[request.status] ?? request.status}</strong>
+        Status: <strong data-testid="request-status">{requestStatusLabel(request.status)}</strong>
       </p>
       {query.done && <p role="status">{query.done}</p>}
       {query.error && <p role="alert">{query.error}</p>}

@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { currentActor, getRuntime } from "@/app/_server/runtime";
 import { listRequests } from "@/features/requests";
+import { requestStatusLabel } from "./status-labels";
 import { UploadForm } from "./upload-form";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +37,7 @@ export default async function RequestsPage() {
                 <td>
                   <Link href={`/requests/${request.id}`}>{request.subject ?? "(ohne Betreff)"}</Link>
                 </td>
-                <td>{request.status}</td>
+                <td>{requestStatusLabel(request.status)}</td>
                 <td>{request.possibleDuplicate ? "Mögliches Duplikat" : ""}</td>
               </tr>
             ))}
