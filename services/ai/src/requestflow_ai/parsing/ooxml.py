@@ -5,6 +5,9 @@ huge uncompressed) or carry thousands of entries. ``open_package`` reads only th
 directory and rejects the package when
 
 * it has more than ``MAX_ENTRIES`` entries,
+* a single entry declares more than ``MAX_PART_BYTES`` uncompressed (any entry: python-docx and
+  openpyxl pick the XML parser by content type, not by file name, so every part may be parsed;
+  a 16 MiB XML tree already costs a few hundred MB of memory),
 * the declared uncompressed sizes add up to more than ``MAX_UNCOMPRESSED_BYTES``, or
 * an entry larger than ``RATIO_CHECK_MIN_BYTES`` is compressed more than ``MAX_RATIO`` : 1.
 
@@ -17,21 +20,30 @@ from __future__ import annotations
 
 import zipfile
 from io import BytesIO
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-from requestflow_ai.parsing.errors import DocumentParseError, UnsupportedMediaTypeError
+from requestflow_ai.parsing.errors import (
+    DocumentParseError,
+    DocumentTooLongError,
+    UnsupportedMediaTypeError,
+)
 
 MAX_ENTRIES = 2_000
 # Parsed XML trees cost several times the XML size in memory, per concurrent extraction slot.
 MAX_UNCOMPRESSED_BYTES = 64 * 1024 * 1024
+MAX_PART_BYTES = 16 * 1024 * 1024
 MAX_RATIO = 100
 RATIO_CHECK_MIN_BYTES = 1024 * 1024
+
+if TYPE_CHECKING:
+    from requestflow_ai.parsing.budget import ParseBudget
 
 OoxmlKind = Literal["xlsx", "docx"]
 _MAIN_PARTS: dict[str, OoxmlKind] = {"xl/workbook.xml": "xlsx", "word/document.xml": "docx"}
 
 
-def open_package(data: bytes) -> zipfile.ZipFile:
+def open_package(data: bytes, budget: ParseBudget | None = None) -> zipfile.ZipFile:
+    """Open the package after the zip limits; charge its unzipped size to ``budget`` if given."""
     try:
         package = zipfile.ZipFile(BytesIO(data))
         entries = package.infolist()
@@ -42,12 +54,16 @@ def open_package(data: bytes) -> zipfile.ZipFile:
     total = 0
     for entry in entries:
         total += entry.file_size
+        if entry.file_size > MAX_PART_BYTES:
+            raise DocumentTooLongError("package part is too large when uncompressed")
         if entry.file_size > RATIO_CHECK_MIN_BYTES and entry.file_size > MAX_RATIO * max(
             entry.compress_size, 1
         ):
             raise DocumentParseError("package entry is compressed suspiciously well")
     if total > MAX_UNCOMPRESSED_BYTES:
         raise DocumentParseError("package is too large when uncompressed")
+    if budget is not None:
+        budget.take_unzipped_bytes(total)
     return package
 
 

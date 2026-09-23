@@ -84,7 +84,7 @@ export interface components {
              * Error
              * @description Why the attachment was not parsed; null when parsed. The message and its other attachments are still processed.
              */
-            error: ("unsupported_media_type" | "document_unparseable" | "document_too_long" | "nesting_too_deep" | "too_many_attachments" | "not_attached_by_value") | null;
+            error: ("unsupported_media_type" | "document_unparseable" | "document_too_long" | "nesting_too_deep" | "too_many_attachments" | "not_attached_by_value" | "budget_exceeded") | null;
             /**
              * Segmentcount
              * @description Segments this attachment contributed.
@@ -237,9 +237,9 @@ export interface components {
             run: components["schemas"]["RunMetadata"];
             /**
              * Warnings
-             * @description `no_text`: the document has no text (e.g. a scan without OCR); no model call made. `attachment_failed`: at least one attachment of a `.msg` could not be parsed (see `attachments`); the rest was processed.
+             * @description `no_text`: the document has no text (e.g. a scan without OCR); no model call made. `attachment_failed`: at least one attachment of a `.msg` could not be parsed (see `attachments`); the rest was processed. `ocr_pages_skipped`: more PDF pages without text than the OCR page cap (10 per document, `.msg` attachments together); the first ones were OCR'd, the rest stayed empty.
              */
-            warnings: ("no_text" | "attachment_failed")[];
+            warnings: ("no_text" | "attachment_failed" | "ocr_pages_skipped")[];
             /**
              * Attachments
              * @description Attachments of an Outlook `.msg`, flattened in document order (nested ones after their parent); empty for other kinds.

@@ -26,6 +26,7 @@ from typing import Any
 from openpyxl import load_workbook
 from openpyxl.utils.cell import get_column_letter
 
+from requestflow_ai.parsing.budget import ParseBudget
 from requestflow_ai.parsing.errors import DocumentParseError, DocumentTooLongError
 from requestflow_ai.parsing.ooxml import open_package
 from requestflow_ai.parsing.segments import Segment, XlsxLocator
@@ -51,8 +52,8 @@ def _cell_text(value: Any) -> str:
     return " ".join(str(value).split())
 
 
-def parse_xlsx(data: bytes) -> list[Segment]:
-    open_package(data).close()
+def parse_xlsx(data: bytes, budget: ParseBudget | None = None) -> list[Segment]:
+    open_package(data, budget).close()
     try:
         workbook = load_workbook(BytesIO(data), read_only=True, data_only=True, keep_links=False)
     except Exception as exc:
