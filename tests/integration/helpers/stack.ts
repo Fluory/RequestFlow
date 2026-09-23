@@ -27,8 +27,10 @@ export const PASSWORD = "synthetic-password-123";
  * across test files too. Random /64 prefixes in the IPv6 documentation range (Better Auth collapses
  * IPv6 to /64 before keying).
  */
-const group = () => Math.floor(Math.random() * 0x10000).toString(16);
+const group = () => Math.floor(Math.random() * 0x10000).toString(16).padStart(4, "0");
 export const freshIp = () => `2001:db8:${group()}:${group()}::1`;
+/** How Better Auth keys an IPv6 client in `auth.rate_limit` (expanded /64 prefix). */
+export const rateLimitKeyPrefix = (ip: string) => `2001:0db8:${ip.split(":")[2]}:${ip.split(":")[3]}:`;
 
 export async function call(
   auth: Auth,
