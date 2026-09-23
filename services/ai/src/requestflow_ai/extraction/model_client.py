@@ -125,6 +125,12 @@ def build_model_client(
         httpx_client=httpx_client,
     )
 
+    if settings.ai_allow_gemini_api_dev and settings.vertex_project:
+        # Ambiguous configuration: a deployment must never silently run on the free tier.
+        raise ModelClientInitError(
+            "AI_ALLOW_GEMINI_API_DEV=true and VERTEX_PROJECT are both set; refusing to start"
+        )
+
     if settings.ai_allow_gemini_api_dev:
         key = settings.gemini_api_key.get_secret_value() if settings.gemini_api_key else ""
         if not key:
