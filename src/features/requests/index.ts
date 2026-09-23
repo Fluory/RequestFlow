@@ -7,6 +7,7 @@ export {
   type RequestFilter,
   lockDuplicateDetection,
   lockRequest,
+  recordExportRetry,
   recordProcessingFailure,
   transitionRequest,
   type NewRequest,

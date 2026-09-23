@@ -94,6 +94,12 @@ export async function transitionRequest(tx: TenantTx, row: RequestRow, event: Re
 }
 
 /** Keeps the last failure visible while a retry is pending (status unchanged). */
+/** Next export attempt of an APPROVED request (#26 list); a request that moved on is left alone. */
+export async function recordExportRetry(tx: TenantTx, id: string, nextRetryAt: Date | null): Promise<void> {
+  tenantOf(tx);
+  await tx.update(requests).set({ nextRetryAt }).where(and(eq(requests.id, id), eq(requests.status, "APPROVED")));
+}
+
 export async function recordProcessingFailure(tx: TenantTx, id: string, failure: { message: string; nextRetryAt: Date | null }): Promise<void> {
   tenantOf(tx);
   // Only while processing: a late failure of a redelivered attempt must not stamp a request that
