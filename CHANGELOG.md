@@ -6,6 +6,11 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
+- Visual design for the pilot UI: a shared header with navigation, company and role on every page;
+  request and field status as labelled pills; cards, distinct primary and destructive actions, and tables
+  that scroll inside their container on narrow screens. Colours are design tokens in `globals.css`
+  (WCAG AA), system fonts only (no third-party requests). Login and upload errors are now announced as
+  alerts.
 - Observability: structured JSON logs (pino) with IDs and codes only, correlated by the request id from web
   through worker to the AI service; `/api/health` also shows whether the AI service is reachable and how
   many jobs are waiting.

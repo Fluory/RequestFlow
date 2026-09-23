@@ -331,8 +331,11 @@ main {
 .callout-warn h2 {
   font-size: 1.05rem;
 }
-.callout-warn input {
-  min-width: min(20rem, 100%);
+.callout-warn .inline-form input {
+  /* Fixed width: a percentage max-width inside the inline-flex label resolves cyclically and lets
+     the field overlap the button next to it. */
+  width: min(20rem, 55vw);
+  max-width: none;
 }
 .callout-warn a {
   color: var(--warn-text);
