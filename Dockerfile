@@ -1,7 +1,7 @@
 # TS app image (ADR-0001 D11): one image, two commands.
 #   web    – Next.js standalone server (default CMD)
-#   worker – `node /ops/node_modules/.bin/tsx src/worker.ts` (working dir /ops)
-#   setup  – `node /ops/node_modules/.bin/tsx src/setup.ts` (migrations + bucket, explicit deploy step)
+#   worker – `node /ops/node_modules/tsx/dist/cli.mjs src/worker.ts` (working dir /ops)
+#   setup  – `node /ops/node_modules/tsx/dist/cli.mjs src/setup.ts` (migrations + bucket, explicit deploy step)
 FROM node:24-slim AS base
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH NEXT_TELEMETRY_DISABLED=1 COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable

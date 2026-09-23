@@ -44,7 +44,7 @@ services:
     build: .
     image: requestflow-app:local
     working_dir: /ops
-    command: ["node", "node_modules/.bin/tsx", "src/setup.ts"]
+    command: ["node", "node_modules/tsx/dist/cli.mjs", "src/setup.ts"]
     environment: &app-env
       DATABASE_URL: postgres://app_rw:${APP_RW_PASSWORD:-rw-local-dev}@postgres:5432/requestflow
       MIGRATION_DATABASE_URL: postgres://app_owner:${APP_OWNER_PASSWORD:-owner-local-dev}@postgres:5432/requestflow
@@ -77,7 +77,7 @@ services:
     build: .
     image: requestflow-app:local
     working_dir: /ops
-    command: ["node", "node_modules/.bin/tsx", "src/worker.ts"]
+    command: ["node", "node_modules/tsx/dist/cli.mjs", "src/worker.ts"]
     environment:
       <<: *app-env
       MIGRATION_DATABASE_URL: ""
