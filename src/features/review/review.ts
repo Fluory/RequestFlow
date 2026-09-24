@@ -108,6 +108,27 @@ export async function currentFieldValues(tx: TenantTx, requestId: string): Promi
   );
 }
 
+/**
+ * The reviewed positions in document order (#46): per item field the latest correction made on the
+ * current run, else the extracted value. Like the review view, a position correction made before a
+ * newer run is not mapped onto it. Runs in the caller's tenant transaction (export under the row lock).
+ */
+export async function currentLineItemValues(tx: TenantTx, requestId: string): Promise<Array<Record<string, string | null>>> {
+  const extraction = await latestRun(tx, requestId);
+  if (!extraction) return [];
+  const corrections = await currentCorrections(tx, requestId);
+  return extraction.lineItems.map((item) => {
+    const extracted = new Map(item.fields.map((field) => [field.fieldKey, field.value]));
+    return Object.fromEntries(
+      ITEM_FIELDS.map((key) => {
+        const correction = corrections.get(correctionKey(key, item.itemIndex));
+        const current = correction && correction.createdAt >= extraction.run.createdAt ? correction : undefined;
+        return [key, current ? current.newValue : (extracted.get(key) ?? null)];
+      }),
+    );
+  });
+}
+
 export async function loadReview(tenancy: Tenancy, actor: Actor, requestId: string): Promise<ReviewView | null> {
   authorize(actor, "requests.process");
   return tenancy.withTenant(actor.companyId, async (tx) => {
@@ -210,7 +231,9 @@ export async function approveRequest(deps: { tenancy: Tenancy; boss: JobSender }
     // A possible duplicate is approved only after a clerk decided it is not one (#27) – nothing is
     // exported twice by accident.
     if (request.possibleDuplicate && request.duplicateDecision !== "distinct") throw new ReviewRefused("duplicate_undecided");
-    if (exportLimitViolations(request.subject, await currentFieldValues(tx, requestId)).length > 0) throw new ReviewRefused("value_too_long");
+    if (exportLimitViolations(request.subject, await currentFieldValues(tx, requestId), await currentLineItemValues(tx, requestId)).length > 0) {
+      throw new ReviewRefused("value_too_long");
+    }
     await transitionRequest(tx, request, "approve");
     await enqueueRequestExport(deps.boss, tx, requestId);
     await recordAudit(tx, { actorUserId: actor.userId, action: "request.approved", entityType: "request", entityId: requestId });

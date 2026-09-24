@@ -156,10 +156,10 @@ describe("export: approved requests reach the ERP exactly once", () => {
   });
 
   it("refuses the approval while a position value would break the ERP contract (#46)", async () => {
-    const tooLong = [{ ...POSITIONS[0]!, description: found("Musterbau Beispiel GmbH", "s2") }];
-    await expect(
-      approved(clerk, tooLong, (id) => correctField(tenancy, clerk, id, "description", "x".repeat(501), 0)),
-    ).rejects.toThrow(ReviewRefused);
+    // Corrections are capped at 500 characters, so an overlong position value can only come from the
+    // extraction; the approval must refuse it while the clerk can still correct it.
+    const tooLong = [{ ...POSITIONS[0]!, description: { ...found("Musterbau Beispiel GmbH", "s2"), value: "x".repeat(501) } }];
+    await expect(approved(clerk, tooLong)).rejects.toThrow(ReviewRefused);
   });
 
   it("duplicate delivery of the same job: the row lock lets one export, the other sees EXPORTED and never calls the ERP", async () => {
@@ -181,7 +181,7 @@ describe("export: approved requests reach the ERP exactly once", () => {
     const { requestId, job } = await approved(clerk);
     const values = await tenancy.withTenant(clerk.companyId, async (tx) => {
       const { buildQuoteRequest } = await import("@/features/export");
-      return buildQuoteRequest(tx, (await getRequest(tx, requestId))!, currentFieldValues);
+      return buildQuoteRequest(tx, (await getRequest(tx, requestId))!, currentFieldValues, currentLineItemValues);
     });
     const first = await deps.erp.submit(values);
 

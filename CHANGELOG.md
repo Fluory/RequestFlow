@@ -6,6 +6,9 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
+- ERP export sends the reviewed positions (description, quantity, unit, material, dimensions) with each
+  approved request – ERP contract 1.1.0, additive and optional. A position value the ERP would refuse
+  blocks the approval so the clerk can still correct it.
 - Observability: structured JSON logs (pino) with IDs and codes only, correlated by the request id from web
   through worker to the AI service; `/api/health` also shows whether the AI service is reachable and how
   many jobs are waiting.
