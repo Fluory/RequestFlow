@@ -7,6 +7,7 @@ export {
   correctField,
   correctionHistory,
   currentFieldValues,
+  currentLineItemValues,
   FIELD_LABELS,
   loadReview,
   REJECTION_REASON_MAX,

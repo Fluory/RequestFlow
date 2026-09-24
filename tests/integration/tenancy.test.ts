@@ -29,8 +29,8 @@ describe("tenancy: withTenant and forced RLS", () => {
   });
 
   it("returns only the own company's requests through the repository", async () => {
-    const rowsA = await tenancy.withTenant(companyA, (tx) => listRequests(tx));
-    const rowsB = await tenancy.withTenant(companyB, (tx) => listRequests(tx));
+    const { rows: rowsA } = await tenancy.withTenant(companyA, (tx) => listRequests(tx));
+    const { rows: rowsB } = await tenancy.withTenant(companyB, (tx) => listRequests(tx));
 
     expect(rowsA.length).toBeGreaterThan(0);
     expect(rowsA.every((row) => row.companyId === companyA)).toBe(true);

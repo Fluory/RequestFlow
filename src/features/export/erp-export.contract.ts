@@ -36,6 +36,19 @@ export interface components {
                 /** @description ISO date (YYYY-MM-DD) when the value is a date, else the reviewed text. */
                 requestedDeliveryDate: string | null;
             };
+            /** @description Reviewed positions in document order (1.1.0). Omitted when the request has none. */
+            lineItems?: components["schemas"]["LineItem"][];
+        };
+        LineItem: {
+            /** @description 1-based position in the document order. */
+            position: number;
+            description: string | null;
+            /** @description Plain decimal with a dot, no grouping ("1250", "2.5"), else the reviewed text. */
+            quantity: string | null;
+            /** @description mm, cm, m, kg, t or pcs when known, else the unit as written. */
+            unit: string | null;
+            material: string | null;
+            dimensions: string | null;
         };
         QuoteRequestReceipt: {
             erpReference: string;
