@@ -67,3 +67,5 @@ This file records what changes **in the product** – process and session state 
 ### Changed
 - The request list reads each page from an index in its sort order instead of sorting all of the
   company's requests (#61).
+- The Better Auth tables live in the schema `identity` instead of `auth`, which Supabase reserves for
+  its own Auth service (#60); migration 0018 renames the schema in place.
