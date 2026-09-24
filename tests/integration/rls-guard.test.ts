@@ -42,7 +42,7 @@ describe("tenant isolation guard: every app table", () => {
     }
   });
 
-  it("keeps data in known schemas only: app (guarded) plus the registered exceptions auth, pgboss, drizzle", async () => {
+  it("keeps data in known schemas only: app (guarded) plus the registered exceptions identity, pgboss, drizzle", async () => {
     const { rows } = await owner.query<{ schema: string }>(
       `select distinct n.nspname as schema from pg_class c join pg_namespace n on n.oid = c.relnamespace
        where c.relkind in ('r', 'p', 'm', 'f', 'v') and n.nspname not in ('pg_catalog', 'information_schema') and n.nspname not like 'pg\\_toast%'
@@ -51,7 +51,7 @@ describe("tenant isolation guard: every app table", () => {
 
     // A new schema (or a table in public) must be added here consciously – with a register entry
     // in docs/technical/architecture.md if it holds company data without RLS.
-    expect(rows.map((row) => row.schema)).toEqual(["app", "auth", "drizzle", "pgboss"]);
+    expect(rows.map((row) => row.schema)).toEqual(["app", "drizzle", "identity", "pgboss"]);
   });
 
   it("fails for a deliberately unprotected table (proof that the guard bites)", async () => {

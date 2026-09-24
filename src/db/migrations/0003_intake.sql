@@ -32,8 +32,8 @@ ALTER TABLE "app"."requests" ADD COLUMN "message_id" text;--> statement-breakpoi
 ALTER TABLE "app"."requests" ADD COLUMN "fingerprint" text;--> statement-breakpoint
 ALTER TABLE "app"."requests" ADD COLUMN "possible_duplicate" boolean DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE "app"."requests" ADD COLUMN "duplicate_of_id" uuid;--> statement-breakpoint
-ALTER TABLE "app"."audit_events" ADD CONSTRAINT "audit_events_company_id_organization_id_fk" FOREIGN KEY ("company_id") REFERENCES "auth"."organization"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "app"."documents" ADD CONSTRAINT "documents_company_id_organization_id_fk" FOREIGN KEY ("company_id") REFERENCES "auth"."organization"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "app"."audit_events" ADD CONSTRAINT "audit_events_company_id_organization_id_fk" FOREIGN KEY ("company_id") REFERENCES "identity"."organization"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "app"."documents" ADD CONSTRAINT "documents_company_id_organization_id_fk" FOREIGN KEY ("company_id") REFERENCES "identity"."organization"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "app"."documents" ADD CONSTRAINT "documents_request_id_requests_id_fk" FOREIGN KEY ("request_id") REFERENCES "app"."requests"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "audit_events_entity_idx" ON "app"."audit_events" USING btree ("company_id","entity_type","entity_id");--> statement-breakpoint
 CREATE INDEX "documents_company_id_idx" ON "app"."documents" USING btree ("company_id");--> statement-breakpoint

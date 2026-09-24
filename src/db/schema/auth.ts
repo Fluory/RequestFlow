@@ -13,7 +13,7 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 
-export const authSchema = pgSchema("auth");
+export const authSchema = pgSchema("identity");
 
 export const user = authSchema.table("user", {
   id: uuid("id")

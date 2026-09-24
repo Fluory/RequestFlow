@@ -115,7 +115,7 @@ the secret manager), before the first `setup` run; the first migration refuses t
 ## Login rate limit and client IP
 
 Better Auth limits `/api/auth/*` per client IP (5 sign-ins/sign-ups per minute, counters in
-`auth.rate_limit`). The IP comes from `AUTH_IP_HEADERS`; that header is only trustworthy when a
+`identity.rate_limit`). The IP comes from `AUTH_IP_HEADERS`; that header is only trustworthy when a
 reverse proxy sets it and clients cannot reach the web container directly. Any deployment beyond the
 local machine puts a proxy in front and lists it in `AUTH_TRUSTED_PROXIES`. A per-account limit is a
 follow-up (not in the pilot).

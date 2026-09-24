@@ -76,6 +76,9 @@ This file records what changes **in the product** – process and session state 
 - AI service logs use the web/worker format: `time` (ISO 8601, `Z`) instead of `ts`, lower-case pino level labels (`warn`, not `WARNING`), `logger` only on library records.
 - The request list reads each page from an index in its sort order instead of sorting all of the
   company's requests (#61).
+- The Better Auth tables live in the schema `identity` instead of `auth`, which Supabase reserves for
+  its own Auth service (#60): a fresh database creates `identity` directly; migration 0018 renames an
+  existing `auth` schema only when the app owns it.
 
 ### Fixed
 - AI verifier: a unit quoted together with the neighbouring table cell (e.g. `60    | Stk.`) is now

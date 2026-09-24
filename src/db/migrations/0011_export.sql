@@ -15,6 +15,6 @@ CREATE TABLE "app"."request_exports" (
 );
 --> statement-breakpoint
 ALTER TABLE "app"."request_exports" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
-ALTER TABLE "app"."request_exports" ADD CONSTRAINT "request_exports_company_id_organization_id_fk" FOREIGN KEY ("company_id") REFERENCES "auth"."organization"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "app"."request_exports" ADD CONSTRAINT "request_exports_company_id_organization_id_fk" FOREIGN KEY ("company_id") REFERENCES "identity"."organization"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "app"."request_exports" ADD CONSTRAINT "request_exports_request_same_company_fk" FOREIGN KEY ("request_id","company_id") REFERENCES "app"."requests"("id","company_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE POLICY "request_exports_tenant_isolation" ON "app"."request_exports" AS PERMISSIVE FOR ALL TO public USING (company_id = nullif(current_setting('app.company_id', true), '')::uuid) WITH CHECK (company_id = nullif(current_setting('app.company_id', true), '')::uuid);

@@ -48,7 +48,7 @@ Deliberately accepted risks – without an entry here a deviation counts as a de
 
 | Exception | Why accepted | Owner | Expires |
 |---|---|---|---|
-| No RLS on the `auth` and `pgboss` schemas | Not company-owned business data; reachable only by server code (ADR-0001 D7) | Fluory | 2026-12-31 (review at M3) |
+| No RLS on the `identity` (Better Auth) and `pgboss` schemas | Not company-owned business data; reachable only by server code (ADR-0001 D7) | Fluory | 2026-12-31 (review at M3) |
 | Showcase without unattended retries (Vercel Hobby cron once/day) | Showcase only; production runs a worker (D2) | Fluory | when a production-like demo is needed |
 | Better Auth admin plugin mounted without any holder of its admin role | ADR-0001 D6 names the plugin; decided in #30: kept – its `banned` field implements deactivation (sign-in blocked by the plugin). Nobody holds `platform-admin`, so `/api/auth/admin/*` rejects every caller (tested); user management runs through `identity` | Fluory | 2026-12-31 (review at M3) |
 | Upload endpoint without a per-user rate limit | Authenticated staff only; body bounded by `Content-Length` + `UPLOAD_MAX_REQUEST_BYTES` before reading | Fluory | before any public deployment (#19) |
