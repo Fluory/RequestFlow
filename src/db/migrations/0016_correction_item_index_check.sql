@@ -1,0 +1,1 @@
+ALTER TABLE "app"."field_corrections" ADD CONSTRAINT "field_corrections_item_index_check" CHECK (item_index is null or item_index >= 0);

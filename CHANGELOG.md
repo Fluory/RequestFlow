@@ -77,3 +77,5 @@ This file records what changes **in the product** – process and session state 
 - AI verifier: a unit quoted together with the neighbouring table cell (e.g. `60    | Stk.`) is now
   confirmed as `found` when one cell of the quote is exactly the unit; quotes that differ from the
   source in real characters are still rejected (#50).
+- The database refuses a line-item correction with a negative position, like it already does for
+  extracted values – defence in depth below the review check (#47).
