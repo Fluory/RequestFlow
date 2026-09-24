@@ -33,12 +33,12 @@ Every new file belongs to one of these modules – otherwise add the module here
 | `identity` | `src/features/identity/` | Better Auth, users, companies, roles | public login route | personal (staff) | rate limit, invite-only | built: Better Auth (invite-only, organization + admin plugins), `authorize()`, audited invite, user management (`/users`: roles, deactivate/reactivate, last-admin rule), seed |
 | `tenancy` | `src/features/tenancy/` | `withTenant()`, RLS policies | internal | – | forced RLS, `app_rw` without BYPASSRLS | built: `withTenant()`, forced RLS on `app.*`, guard test (every `app` table: `company_id`, forced RLS, only company policies; allow-list empty) |
 | `audit` | `src/features/audit/` | append-only audit events | internal | personal (staff) | INSERT/SELECT only | partial: `recordAudit()` (append-only enforced by grants) |
-| `jobs` | `src/features/jobs/`, entrypoint `src/worker.ts` | pg-boss, job handlers, `drain()`, worker entrypoint | internal | IDs only | transactional enqueue | built: queues, transactional enqueue, handler, `drain()`, dead letter → ERROR, reprocess, worker loop |
+| `jobs` | `src/features/jobs/`, entrypoint `src/worker.ts`, shared wiring `src/job-drain.ts` | pg-boss, job handlers, `drain()`, worker entrypoint, one drain round (processing + export) for worker and serverless | internal | IDs only | transactional enqueue | built: queues, transactional enqueue, handler, `drain()`, dead letter → ERROR, reprocess, worker loop, serverless drain (#59) |
 | `storage` | `src/features/storage/` | `BlobStore` port + S3 adapter | internal | confidential | private bucket, access via app routes | built: S3 adapter (put/get/delete, bucket setup, ping) |
 | `observability` | `src/features/observability/` | logger, health, request-list ops data | `/api/health` | IDs only | no PII in logs | built: pino JSON logs with a fixed key set (IDs + codes only, tested on a full run), health (database, storage; informational AI-service reachability and queue backlog) |
 | `db` | `src/db/`, deploy step `src/setup.ts` | Drizzle schema, migrations, DB roles | internal | – | migrations as owner role | built: roles check, schema `app`, default grants for `app_rw` |
-| `config` | `src/config/` | typed runtime configuration, validated at start (zod) | internal | secrets (in memory only) | errors name variables, never values | built |
-| `app` | `src/app/` | Next.js routes and pages; composition root `src/app/_server/` (pool, storage client) | `/`, `/login`, `/signup`, `/invite`, `/requests`, `/requests/:id`, `/api/requests`, `/api/documents/:id`, `/api/auth/*`, `/api/health`, `/api/erp-mock/v1/quote-requests` (flag) | – | calls module APIs only (dependency-cruiser) | partial: login, sign-up, invite, home, requests, review page, ERP mock route |
+| `config` | `src/config/` | typed runtime configuration, validated at start (zod); serverless drain budget | internal | secrets (in memory only) | errors name variables, never values | built |
+| `app` | `src/app/` | Next.js routes and pages; composition root `src/app/_server/` (pool, storage client, serverless drain) | `/`, `/login`, `/signup`, `/invite`, `/requests`, `/requests/:id`, `/api/requests`, `/api/documents/:id`, `/api/auth/*`, `/api/health`, `/api/erp-mock/v1/quote-requests` (flag), `/api/jobs/drain` (`CRON_SECRET`) | – | calls module APIs only (dependency-cruiser); drain route: bearer secret, constant-time | partial: login, sign-up, invite, home, requests, review page, ERP mock route |
 | AI service | `services/ai/` | docling parsing, extraction, grounding, evals | internal HTTP | confidential + personal (transient) | bearer token, stateless, no DB/storage access | built: eval runner + 15 weighted synthetic cases + replay gate in CI (#24);  `POST /v1/extract` – EML, MSG (recursive attachments), PDF (text layer; scans via OCR with `AI_PDF_OCR=auto`), XLSX (rows), DOCX (paragraphs, table cells) → segments with stable locators, bounded OOXML/MSG parsing, 6 header fields + line items (schema v2, prompt `extract_v2`), normalisers (German numbers, units, dates, calendar weeks → at most `uncertain`), grounding verifier, bearer auth; Vertex adapter with recorded responses (live call unverified) |
 | Contracts | `contracts/` | OpenAPI: AI service, ERP export | – | – | contract tests | built: `ai-service.openapi.yaml` (generated from the service), `erp-export.openapi.yaml` (hand-written); TS types + drift tests |
 
@@ -49,7 +49,7 @@ Deliberately accepted risks – without an entry here a deviation counts as a de
 | Exception | Why accepted | Owner | Expires |
 |---|---|---|---|
 | No RLS on the `auth` and `pgboss` schemas | Not company-owned business data; reachable only by server code (ADR-0001 D7) | Fluory | 2026-12-31 (review at M3) |
-| Showcase without unattended retries (Vercel Hobby cron once/day) | Showcase only; production runs a worker (D2) | Fluory | when a production-like demo is needed |
+| Showcase without unattended retries (Vercel Hobby cron once/day) | Showcase only; production runs a worker (D2). Jobs run via `after()` on upload/approval/reprocess and `/api/jobs/drain` (#59) | Fluory | when a production-like demo is needed |
 | Better Auth admin plugin mounted without any holder of its admin role | ADR-0001 D6 names the plugin; decided in #30: kept – its `banned` field implements deactivation (sign-in blocked by the plugin). Nobody holds `platform-admin`, so `/api/auth/admin/*` rejects every caller (tested); user management runs through `identity` | Fluory | 2026-12-31 (review at M3) |
 | Upload endpoint without a per-user rate limit | Authenticated staff only; body bounded by `Content-Length` + `UPLOAD_MAX_REQUEST_BYTES` before reading | Fluory | before any public deployment (#19) |
 | `.msg` uploads checked by OLE signature only | Structure check of Outlook messages needs a CFB parser; files are served only as attachments with `nosniff` and parsed later by the stateless AI service | Fluory | with #23 (MSG parsing) |
@@ -63,6 +63,7 @@ worker ─► jobs.drain ─► extraction ─► AI service (bytes in, segments
        ─► requests(REVIEW) + fields + audit              ── one transaction
 review ─► corrections + approve ─► requests(APPROVED) + export job + audit
 worker ─► export ─► ERP (Idempotency-Key) ─► requests(EXPORTED)
+showcase (no worker): after() / cron ─► /api/jobs/drain ─► the same drain round (src/job-drain.ts)
 failure at any step ─► retry with backoff ─► dead letter ─► requests(ERROR, visible cause)
 ```
 
@@ -70,8 +71,9 @@ failure at any step ─► retry with backoff ─► dead letter ─► requests
 
 | Service | Purpose | Environments |
 |---|---|---|
-| PostgreSQL 17 | all state incl. queue and auth | local container · showcase Neon (aws-eu-central-1) |
-| S3-compatible storage | original mails and attachments | local SeaweedFS · showcase Cloudflare R2 (EU jurisdiction) |
+| PostgreSQL 17 | all state incl. queue and auth | local container · showcase Supabase Postgres (eu-central-1, Supavisor transaction pooler) |
+| S3-compatible storage | original mails and attachments | local SeaweedFS · showcase Supabase Storage (S3 API, private bucket) |
+| Vercel (Hobby) | showcase runtime of the TS app, daily cron | showcase only – runbook [deployment-vercel.md](deployment-vercel.md) (ADR-0001 D11 amendment 2026-09-24) |
 | Vertex AI (`eu` endpoint, gemini-3.5-flash) | extraction | showcase + customer; local dev may use the Gemini free tier with synthetic data |
 | ERP | export target | pilot: `erp-mock`; contract `contracts/erp-export.openapi.yaml` |
 
@@ -81,7 +83,7 @@ No secrets in this document; every variable is documented in `.env.example`.
 
 | Role | Created by | Used by | Properties |
 |---|---|---|---|
-| `app_owner` | `docker/postgres/init/01-roles.sh` (password from env) | migrations (`src/setup.ts`, `MIGRATION_DATABASE_URL`) | owns schema `app`; no superuser, NOBYPASSRLS |
+| `app_owner` | `docker/postgres/init/01-roles.sh` (password from env); Supabase: `scripts/supabase-bootstrap.sql` | migrations (`src/setup.ts`, `MIGRATION_DATABASE_URL`) | owns schema `app`; no superuser, NOBYPASSRLS |
 | `app_rw` | same | web + worker (`DATABASE_URL`) | USAGE on `app`, no CREATE; DML via default privileges; no superuser, NOBYPASSRLS – RLS always applies |
 
 The first migration refuses to run if either role is missing or could bypass RLS.

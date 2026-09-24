@@ -66,3 +66,6 @@ This file records what changes **in the product** – process and session state 
 - Database roles `app_owner` (migrations) and `app_rw` (runtime, no RLS bypass); schema `app`.
 - Verify commands `pnpm verify:changed`, `pnpm verify`, `pnpm verify:full`; CI runs integration
   tests against real PostgreSQL + SeaweedFS.
+- Showcase preparation (Vercel + Supabase): without a worker, jobs run right after upload, approval and
+  reprocess and via a protected drain route (daily cron); `DEMO_MODE` shows „Demo – nur synthetische
+  Daten" on every page; runbook `docs/technical/deployment-vercel.md` and a role bootstrap script.
