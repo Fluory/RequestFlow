@@ -52,6 +52,7 @@ export async function correctFieldAction(formData: FormData): Promise<void> {
 }
 
 export async function approveAction(formData: FormData): Promise<void> {
+  const invokedAt = Date.now();
   const actor = await actorOrLogin();
   const requestId = requestIdOf(formData);
   const boss = await getJobClient();
@@ -59,7 +60,7 @@ export async function approveAction(formData: FormData): Promise<void> {
     requestId,
     async () => {
       await approveRequest({ tenancy: getRuntime().tenancy, boss }, actor, requestId);
-      drainAfterResponse(); // serverless runtimes only (JOB_DRAIN_INLINE=true): export right away
+      drainAfterResponse(invokedAt); // serverless runtimes only (JOB_DRAIN_INLINE=true): export right away
     },
     "approved",
   );

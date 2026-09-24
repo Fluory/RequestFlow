@@ -1,7 +1,7 @@
 import { SERVERLESS_DRAIN } from "@/config/env";
 import { buildJobDeps, drainRound, handledJobs, type DrainRoundResult, type JobDeps } from "@/job-drain";
 import { logEvent } from "@/features/observability";
-import { scheduleAfterResponse } from "./drain-request";
+import { processBudgetMs, scheduleAfterResponse } from "./drain-request";
 import { getJobClient, getRuntime } from "./runtime";
 
 // Serverless drain of the web process (#59, ADR-0001 D2): the showcase has no worker, so the route
@@ -22,11 +22,14 @@ function jobDeps(): Promise<JobDeps> {
   return deps;
 }
 
-/** One bounded round incl. pg-boss maintenance (no supervising worker here). */
-export async function drainNow(): Promise<DrainRoundResult> {
+/**
+ * One bounded round incl. pg-boss maintenance (no supervising worker here). `invokedAt`: start of the
+ * function invocation – time already spent there (e.g. the upload) shortens the processing window.
+ */
+export async function drainNow(invokedAt: number = Date.now()): Promise<DrainRoundResult> {
   const started = Date.now();
   const result = await drainRound(await jobDeps(), {
-    processMs: SERVERLESS_DRAIN.processMs,
+    processMs: processBudgetMs(SERVERLESS_DRAIN.processMs, invokedAt),
     exportMs: SERVERLESS_DRAIN.exportMs,
     maintenance: true,
   });
@@ -34,7 +37,10 @@ export async function drainNow(): Promise<DrainRoundResult> {
   return result;
 }
 
-/** After upload, approval or reprocess: drain once after the response – only with JOB_DRAIN_INLINE=true. */
-export function drainAfterResponse(): void {
-  scheduleAfterResponse(getRuntime().config.jobs.drainInline, drainNow);
+/**
+ * After upload, approval or reprocess: drain once after the response – only with JOB_DRAIN_INLINE=true.
+ * `invokedAt` is taken at the start of the handler, so the drain accounts for the handler's own time.
+ */
+export function drainAfterResponse(invokedAt: number): void {
+  scheduleAfterResponse(getRuntime().config.jobs.drainInline, () => drainNow(invokedAt));
 }

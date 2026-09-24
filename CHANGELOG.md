@@ -69,3 +69,5 @@ This file records what changes **in the product** – process and session state 
 - Showcase preparation (Vercel + Supabase): without a worker, jobs run right after upload, approval and
   reprocess and via a protected drain route (daily cron); `DEMO_MODE` shows „Demo – nur synthetische
   Daten" on every page; runbook `docs/technical/deployment-vercel.md` and a role bootstrap script.
+- Upload cap per person and hour (`UPLOAD_MAX_PER_HOUR`, required on the showcase): the upload answers
+  429 before anything is stored.

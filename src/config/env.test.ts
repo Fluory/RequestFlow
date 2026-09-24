@@ -99,6 +99,15 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ ...valid, APP_ENV: "showcase", BETTER_AUTH_SECRET: "s".repeat(40), ERP_TOKEN: placeholder })).toThrow(/ERP_TOKEN/);
   });
 
+  it("caps uploads per hour only when set, and requires the cap on the showcase (#59 review)", () => {
+    expect(loadConfig(valid).upload.maxPerHour).toBeUndefined();
+    expect(loadConfig({ ...valid, UPLOAD_MAX_PER_HOUR: "20" }).upload.maxPerHour).toBe(20);
+    expect(() => loadConfig({ ...valid, UPLOAD_MAX_PER_HOUR: "0" })).toThrow(/UPLOAD_MAX_PER_HOUR/);
+    const showcase = { ...valid, APP_ENV: "showcase", BETTER_AUTH_SECRET: "s".repeat(40), ERP_TOKEN: "e".repeat(32) };
+    expect(() => loadConfig(showcase)).toThrow(/UPLOAD_MAX_PER_HOUR/);
+    expect(loadConfig({ ...showcase, UPLOAD_MAX_PER_HOUR: "20" }).upload.maxPerHour).toBe(20);
+  });
+
   describe("serverless job drain and demo mode (#59)", () => {
     // Values that fit one processing job into the drain function (60 s × 3 files).
     const fits = { AI_SERVICE_TIMEOUT_MS: "60000", UPLOAD_MAX_FILES: "3" };

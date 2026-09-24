@@ -1,7 +1,7 @@
 import { drainAfterResponse } from "@/app/_server/drain";
 import { currentActor, getJobClient, getRuntime } from "@/app/_server/runtime";
 import { AuthorizationError } from "@/features/identity";
-import { submitUpload, UploadRejected } from "@/features/intake";
+import { submitUpload, UploadRateLimited, UploadRejected } from "@/features/intake";
 import { logEvent } from "@/features/observability";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +13,7 @@ const problem = (status: number, title: string) => Response.json({ error: { titl
 // POST /api/requests – multipart upload of one request (field `files`, 1..n files).
 // Company and user come from the session, never from the form (ADR-0001 D7).
 export async function POST(request: Request): Promise<Response> {
+  const invokedAt = Date.now();
   const actor = await currentActor(request.headers);
   if (!actor) return problem(401, "Nicht angemeldet.");
   const { config, tenancy, storage } = getRuntime();
@@ -39,9 +40,10 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const boss = await getJobClient();
     const result = await submitUpload({ tenancy, storage, boss, limits: config.upload }, actor, files);
-    drainAfterResponse(); // serverless runtimes only (JOB_DRAIN_INLINE=true): process right away
+    drainAfterResponse(invokedAt); // serverless runtimes only (JOB_DRAIN_INLINE=true): process right away
     return Response.json(result, { status: 201 });
   } catch (error) {
+    if (error instanceof UploadRateLimited) return problem(429, error.message);
     if (error instanceof UploadRejected) return problem(422, error.message);
     if (error instanceof AuthorizationError) return problem(403, "Keine Berechtigung.");
     const kind = error instanceof Error ? error.name : "unknown";

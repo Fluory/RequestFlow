@@ -51,7 +51,7 @@ Deliberately accepted risks – without an entry here a deviation counts as a de
 | No RLS on the `auth` and `pgboss` schemas | Not company-owned business data; reachable only by server code (ADR-0001 D7) | Fluory | 2026-12-31 (review at M3) |
 | Showcase without unattended retries (Vercel Hobby cron once/day) | Showcase only; production runs a worker (D2). Jobs run via `after()` on upload/approval/reprocess and `/api/jobs/drain` (#59) | Fluory | when a production-like demo is needed |
 | Better Auth admin plugin mounted without any holder of its admin role | ADR-0001 D6 names the plugin; decided in #30: kept – its `banned` field implements deactivation (sign-in blocked by the plugin). Nobody holds `platform-admin`, so `/api/auth/admin/*` rejects every caller (tested); user management runs through `identity` | Fluory | 2026-12-31 (review at M3) |
-| Upload endpoint without a per-user rate limit | Authenticated staff only; body bounded by `Content-Length` + `UPLOAD_MAX_REQUEST_BYTES` before reading | Fluory | before any public deployment (#19) |
+| Upload cap per person only where configured | Local and CI run without `UPLOAD_MAX_PER_HOUR`; the showcase refuses to start without it (#59); concurrent uploads may pass the check together – a cost cap, not an exact quota | Fluory | 2026-12-31 (review at M3) |
 | `.msg` uploads checked by OLE signature only | Structure check of Outlook messages needs a CFB parser; files are served only as attachments with `nosniff` and parsed later by the stateless AI service | Fluory | with #23 (MSG parsing) |
 | Gemini API free tier for local development | Synthetic data only; never showcase or customer data (D8) | Fluory | when a Vertex development budget exists |
 

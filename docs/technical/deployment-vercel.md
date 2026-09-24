@@ -8,7 +8,7 @@
 
 | Blocker | Why |
 |---|---|
-| #60 merged (Better Auth schema `auth` → `identity`) | Supabase reserves the schema `auth`; the migrations fail on Supabase until then |
+| #60 merged (PR #63: Better Auth schema `auth` → `identity`) | Supabase reserves the schema `auth`; the migrations fail on Supabase until then. The bootstrap script creates no schema, so it is not affected |
 | AI service host chosen and running | The drain calls it; recommendation: **Google Cloud Run in the EU** (same GCP project as Vertex `eu`, existing image `services/ai`, no 300 s / package limits) |
 
 What runs where: Vercel (Hobby) runs the Next.js app, the drain route and the ERP mock
@@ -19,8 +19,8 @@ There is **no worker process** – jobs run through `/api/jobs/drain` (see step 
 
 1. Create a project in region **eu-central-1 (Frankfurt)**. Store the generated `postgres` password in
    the password manager – the app never uses it.
-2. **Data API:** Project Settings → Data API: keep the exposed schemas at `public` (or turn the Data API
-   off). Never add `app`, `pgboss` or `identity` – the app does not use the Data API.
+2. **Data API:** Project Settings → Data API: keep the exposed schemas at the defaults `public` and
+   `graphql_public` (or turn the Data API off). Never add `app`, `pgboss` or `identity` – the app does not use the Data API.
 3. **Storage:** create a **private** bucket `requestflow-documents` (no public access, no RLS policies
    for `anon`/`authenticated`). Storage → S3 connection: enable the S3 protocol and create an **S3 access
    key** (access key id + secret). Note the endpoint `https://<project-ref>.storage.supabase.co/storage/v1/s3`.
@@ -33,10 +33,12 @@ There is **no worker process** – jobs run through `/api/jobs/drain` (see step 
 Generate two strong passwords, then as the `postgres` user over the **session pooler**:
 
 ```bash
-read -rs APP_OWNER_PASSWORD; read -rs APP_RW_PASSWORD
 psql "postgresql://postgres.<project-ref>@<pooler-host>:5432/postgres" -v ON_ERROR_STOP=1 \
-  -v owner_pw="$APP_OWNER_PASSWORD" -v rw_pw="$APP_RW_PASSWORD" -f scripts/supabase-bootstrap.sql
+  -f scripts/supabase-bootstrap.sql
 ```
+
+psql asks for both passwords without echoing them; they never appear on the command line or in the
+process list.
 
 The last output lists `app_owner` and `app_rw` with `f | f | f` (no superuser, no RLS bypass, no role
 creation). The script is all-or-nothing; running it twice fails on "role already exists" – that is fine.
@@ -73,6 +75,7 @@ separate Supabase project.
 | `CRON_SECRET` | `openssl rand -base64 32` – Vercel Cron sends it as `Authorization: Bearer …` |
 | `JOB_DRAIN_INLINE` | `true` |
 | `DEMO_MODE` | `true` |
+| `UPLOAD_MAX_PER_HOUR` | e.g. `20` – uploads per person and hour (every upload starts paid AI calls); **required** with `APP_ENV=showcase` |
 
 `.env.example` documents every variable. `MIGRATION_DATABASE_URL` and `SEED_PASSWORD` are **not** set on
 Vercel – they are only used from the operator's shell (steps 5 and 6).
@@ -95,12 +98,14 @@ accounts out only to people who may see the demo.
 
 - `after()`: with `JOB_DRAIN_INLINE=true`, upload, approval and "Erneut verarbeiten" drain once after the
   response – the normal path needs nothing else.
-- Cron: `vercel.json` calls `GET /api/jobs/drain` **once a day** (05:00 UTC) – the Hobby maximum. It picks
+- Cron: `vercel.json` calls `GET /api/jobs/drain` **once a day** (some time within 05:00–05:59 UTC – Hobby
+  crons are not minute-exact) – the Hobby maximum. It picks
   up retries with backoff that no user action triggered. Faster unattended retries need a paid plan or a
   worker (exceptions register).
 - Manual: `curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://<domain>/api/jobs/drain` (GET or
   POST) returns counts only. Without the right secret → 401; without `CRON_SECRET` → 404.
 - One run stops taking new jobs after 50 s (processing) + 20 s (export); a job in hand always finishes.
+  An `after()` drain subtracts the time its request already used (e.g. the upload itself) from the 50 s.
   If the platform still kills a run, the job becomes visible again after its pg-boss expiry (1 h).
 
 ## 8. Smoke check
@@ -111,7 +116,8 @@ accounts out only to people who may see the demo.
 4. Sign in as the seeded admin, upload a synthetic `.eml` (like the one in `tests/e2e/review-smoke.spec.ts`)
    → the request reaches *Zur Prüfung* within about a minute; approve it → *Exportiert* with an ERP reference.
 5. Vercel function logs show `jobs.drain_run` lines (IDs and counts only). Confirm the client IP header
-   (rate limit) and that the pool's `statement_timeout` is accepted by Supavisor.
+   (rate limit). `SHOW statement_timeout` as `app_rw` reads `30s` (set on the role by the bootstrap
+   script, so it holds even if Supavisor drops the pool's startup parameter).
 
 ## 9. Switch off and roll back
 

@@ -28,6 +28,9 @@ const schema = z.object({
   APP_ENV: z.enum(["local", "showcase", "production"]),
   UPLOAD_MAX_FILE_BYTES: z.coerce.number().int().positive().default(20 * 1024 * 1024),
   UPLOAD_MAX_FILES: z.coerce.number().int().positive().max(50).default(10),
+  // Uploads per person and hour (#59): unset = no cap; required on the showcase, where every upload
+  // starts paid AI calls.
+  UPLOAD_MAX_PER_HOUR: optional(z.coerce.number().int().positive()),
   AI_SERVICE_URL: z.url().default("http://127.0.0.1:8000"),
   AI_SERVICE_TOKEN: z.string().min(24).optional(),
   AI_SERVICE_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
@@ -80,6 +83,8 @@ export interface AppConfig {
     maxFileBytes: number;
     maxFiles: number;
     maxRequestBytes: number;
+    /** Uploads per person and hour; undefined = no cap. */
+    maxPerHour: number | undefined;
   };
   erp: {
     baseUrl: string;
@@ -112,6 +117,10 @@ export function loadConfig(source: Record<string, string | undefined> = process.
   if (env.APP_ENV !== "local" && env.ERP_TOKEN && LOCAL_PLACEHOLDER_ERP_TOKENS.has(env.ERP_TOKEN)) {
     throw new Error("Invalid or missing configuration: ERP_TOKEN");
   }
+  // The showcase is public: without an upload cap an invited account could run up AI cost (#59 review).
+  if (env.APP_ENV === "showcase" && env.UPLOAD_MAX_PER_HOUR === undefined) {
+    throw new Error("Invalid or missing configuration: UPLOAD_MAX_PER_HOUR");
+  }
   // A serverless drain cannot outlive its function: the worst-case processing job (every document hits
   // the AI timeout) plus the export and loop windows must fit, or the platform kills the job mid-run.
   if (env.CRON_SECRET !== undefined || env.JOB_DRAIN_INLINE === "true") {
@@ -138,7 +147,7 @@ export function loadConfig(source: Record<string, string | undefined> = process.
       trustedProxies: list(env.AUTH_TRUSTED_PROXIES),
     },
     aiService: { baseUrl: env.AI_SERVICE_URL, token: env.AI_SERVICE_TOKEN, timeoutMs: env.AI_SERVICE_TIMEOUT_MS },
-    upload: { maxFileBytes: env.UPLOAD_MAX_FILE_BYTES, maxFiles: env.UPLOAD_MAX_FILES, maxRequestBytes: env.UPLOAD_MAX_REQUEST_BYTES },
+    upload: { maxFileBytes: env.UPLOAD_MAX_FILE_BYTES, maxFiles: env.UPLOAD_MAX_FILES, maxRequestBytes: env.UPLOAD_MAX_REQUEST_BYTES, maxPerHour: env.UPLOAD_MAX_PER_HOUR },
     erp: {
       baseUrl: env.ERP_BASE_URL,
       token: env.ERP_TOKEN,

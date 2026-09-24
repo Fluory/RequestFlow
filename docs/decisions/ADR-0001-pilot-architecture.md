@@ -624,10 +624,12 @@ enters the code: the app still talks plain PostgreSQL (Drizzle, pg-boss) and the
 **Consequences.**
 - **Connections.** At runtime `app_rw` connects through the **Supavisor transaction pooler (port
   6543)** – serverless functions open many short connections. This is pooler-safe: `withTenant()`
-  sets the tenant with `set_config('app.company_id', …, true)`, i.e. transaction-local, and pg-boss
-  polls (no LISTEN/NOTIFY, D4). Migrations (`pnpm setup:deploy`, `app_owner`) use the **session
+  sets the tenant with `set_config('app.company_id', …, true)`, i.e. transaction-local; node-postgres
+  and Drizzle use unnamed prepared statements; pg-boss polls (no LISTEN/NOTIFY, D4) and its maintenance
+  takes transaction-scoped advisory locks. `statement_timeout` is also set on the role `app_rw`
+  (bootstrap script), so it holds even if the pooler drops the client's startup parameter. Migrations (`pnpm setup:deploy`, `app_owner`) use the **session
   pooler** (port 5432) or the direct connection – DDL and the pg-boss installer need a session.
-  *To verify at the first deploy:* the pool's `statement_timeout` startup parameter through Supavisor.
+  The smoke check (runbook step 8) reads `SHOW statement_timeout` as `app_rw`.
 - **Roles.** `app_owner`/`app_rw` are created once by the operator with `scripts/supabase-bootstrap.sql`
   (mirrors `docker/postgres/init/01-roles.sh`; `app_rw` NOBYPASSRLS); the first migration still
   refuses unsafe roles. The Supabase `postgres`/`service_role` credentials are never given to the app.

@@ -17,8 +17,17 @@ const json = (status: number, body: unknown, headers: Record<string, string> = {
 const digest = (value: string) => createHash("sha256").update(value, "utf8").digest();
 
 export function isAuthorized(authorization: string | null, secret: string): boolean {
-  const presented = authorization?.startsWith("Bearer ") ? authorization.slice("Bearer ".length) : "";
+  // The auth scheme is case-insensitive (RFC 7235); the credential is compared exactly.
+  const presented = authorization && /^bearer /i.test(authorization) ? authorization.slice("Bearer ".length) : "";
   return timingSafeEqual(digest(presented), digest(secret)) && presented.length > 0;
+}
+
+/**
+ * Processing budget left for a drain that shares its function invocation with other work (the upload
+ * itself before an `after()` drain): the whole run must still fit into the function limit (#59 review).
+ */
+export function processBudgetMs(budgetMs: number, invokedAt: number, now: number = Date.now()): number {
+  return Math.max(0, budgetMs - (now - invokedAt));
 }
 
 /**

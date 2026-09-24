@@ -1,7 +1,7 @@
 import { after } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { captureLogs } from "@/features/observability";
-import { handleDrainRequest, scheduleAfterResponse } from "./drain-request";
+import { handleDrainRequest, isAuthorized, processBudgetMs, scheduleAfterResponse } from "./drain-request";
 
 // `after()` is the Next.js runtime boundary (it needs a request scope): replaced by a recorder.
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: vi.fn() }));
@@ -125,5 +125,23 @@ describe("scheduleAfterResponse (JOB_DRAIN_INLINE)", () => {
 
     expect(lines.join("\n")).not.toMatch(/password|app_rw/);
     expect(lines.map((line) => JSON.parse(line))).toContainEqual(expect.objectContaining({ event: "jobs.drain_failed", code: "DatabaseError" }));
+  });
+});
+
+describe("isAuthorized (#59 review)", () => {
+  it("accepts the Bearer scheme case-insensitively (RFC 7235) and nothing else", () => {
+    expect(isAuthorized(`Bearer ${SECRET}`, SECRET)).toBe(true);
+    expect(isAuthorized(`bearer ${SECRET}`, SECRET)).toBe(true);
+    expect(isAuthorized(`Basic ${SECRET}`, SECRET)).toBe(false);
+    expect(isAuthorized("Bearer ", SECRET)).toBe(false);
+    expect(isAuthorized(null, SECRET)).toBe(false);
+  });
+});
+
+describe("processBudgetMs (#59 review)", () => {
+  it("subtracts the time the invocation already spent (e.g. the upload itself) and never goes below zero", () => {
+    expect(processBudgetMs(50_000, 1_000, 1_000)).toBe(50_000);
+    expect(processBudgetMs(50_000, 1_000, 21_000)).toBe(30_000);
+    expect(processBudgetMs(50_000, 1_000, 90_000)).toBe(0);
   });
 });
