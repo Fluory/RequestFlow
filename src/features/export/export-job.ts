@@ -4,7 +4,7 @@ import { logEvent } from "@/features/observability";
 import { canTransition, lockRequest, recordExportRetry, transitionRequest } from "@/features/requests";
 import type { Tenancy } from "@/features/tenancy";
 import { ErpExportError, type ErpExporter } from "./erp-client";
-import { buildQuoteRequest, ExportNotPossible, type FieldValues } from "./payload";
+import { buildQuoteRequest, ExportNotPossible, type FieldValues, type LineItemValues } from "./payload";
 import { ensureExportRecord, markExportSucceeded, recordExportAttemptFailure } from "./repository";
 
 // Export handler (ADR-0001 D9). Exactly once from three guards together:
@@ -17,6 +17,8 @@ export interface ExportDeps {
   tenancy: Tenancy;
   erp: ErpExporter;
   fieldValues: FieldValues;
+  /** Reviewed positions (#46) – required, so no caller drops them silently. */
+  lineItemValues: LineItemValues;
 }
 
 export interface ExportDrainDeps extends ExportDeps {
@@ -48,7 +50,7 @@ export async function exportRequestJob(deps: ExportDeps, job: Job): Promise<"exp
       return "skipped";
     }
     await ensureExportRecord(tx, requestId);
-    const payload = await buildQuoteRequest(tx, request, deps.fieldValues);
+    const payload = await buildQuoteRequest(tx, request, deps.fieldValues, deps.lineItemValues);
     const { receipt, replay } = await deps.erp.submit(payload);
     await markExportSucceeded(tx, requestId, receipt.erpReference);
     await transitionRequest(tx, request, "export.succeeded", { errorStage: null, errorMessage: null, nextRetryAt: null });

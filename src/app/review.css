@@ -1,0 +1,297 @@
+/* Pilot design system (#52), part 3: the review page – two columns (fields, positions, documents |
+ * sticky source panel and decision), collapsing to one column on narrow screens. */
+
+.review-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.review-meta {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--muted);
+}
+.review-meta .erp {
+  color: var(--text);
+}
+.review-meta .erp strong {
+  font-family: var(--mono);
+  font-weight: 500;
+}
+.attention-tag {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  border: 1px solid var(--warn-line);
+  border-radius: 2px;
+  padding: 1px 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Duplicate banner */
+.duplicate {
+  background: var(--attention);
+  border: 1px solid var(--warn-line);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.duplicate h2 {
+  color: var(--warn-text);
+}
+.duplicate-actions {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.duplicate-actions form {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.duplicate-actions .sep {
+  width: 1px;
+  align-self: stretch;
+  background: #e2cf9f;
+}
+.duplicate-actions .field {
+  min-width: min(260px, 100%);
+  max-width: 420px;
+  flex: 1;
+}
+.duplicate-actions input {
+  font-size: 13px;
+}
+.duplicate-hint {
+  font-size: 12.5px;
+  color: var(--warn-text);
+}
+
+/* Layout */
+.review-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.review-main {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+.review-aside {
+  position: sticky;
+  top: 78px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Header fields */
+.fields-table td,
+.fields-table th {
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
+.fields-table thead th {
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+.fields-table tr.attention {
+  background: var(--attention);
+}
+.fields-table tr.selected {
+  background: var(--selected);
+}
+.value-link {
+  color: var(--text);
+  text-decoration: none;
+  text-wrap: pretty;
+}
+.value-link:hover {
+  color: var(--brand);
+  text-decoration: underline;
+}
+.fields-table .correct input {
+  font-size: 13px;
+  padding: 6px 8px;
+  width: 11rem;
+}
+.fields-table .source-col {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* Positions */
+.items-table {
+  min-width: 640px;
+}
+.items-table td {
+  padding: 4px;
+}
+.items-table td:first-child {
+  padding: 10px 8px 10px 20px;
+  color: var(--muted);
+  width: 36px;
+}
+.item-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 13.5px;
+}
+.item-cell:hover {
+  color: var(--text);
+  background: var(--bg);
+}
+td.attention .item-cell {
+  background: var(--attention);
+}
+.item-cell[aria-current="true"] {
+  background: var(--selected);
+  box-shadow: inset 0 0 0 1.5px var(--brand);
+}
+
+/* Documents */
+.doc-row {
+  padding: 11px 20px;
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.doc-row:last-child {
+  border-bottom: 0;
+}
+.doc-row > div {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+}
+.doc-row a {
+  font-weight: 500;
+}
+.doc-note,
+.doc-note[role="note"] {
+  font-size: 12.5px;
+  color: var(--warn-text);
+  background: none;
+  padding: 0;
+}
+.panel-source {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.panel-source a {
+  font-size: 13px;
+}
+
+/* Aside: selected value, correction, source */
+.panel {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.panel h2.big {
+  font-size: 17px;
+}
+.panel-value {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.panel-value strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+.correction-row {
+  display: flex;
+  gap: 8px;
+}
+.correction-row input {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+}
+.source-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.source-head strong {
+  font-weight: 600;
+  font-size: 13.5px;
+  word-break: break-word;
+}
+.source-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--bg);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.source-lines li {
+  display: flex;
+  gap: 8px;
+  padding: 6px 10px;
+}
+.source-lines li + li {
+  border-top: 1px solid var(--rule);
+}
+.source-lines li.cited {
+  background: var(--cited);
+  font-weight: 500;
+}
+.line-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  min-width: 52px;
+  flex-shrink: 0;
+  padding-top: 1px;
+}
+.line-text {
+  word-break: break-word;
+}
+mark {
+  background: var(--mark);
+  color: var(--text);
+  padding: 0 2px;
+  border-radius: 2px;
+}
+.decision form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.decision input {
+  font-size: 13px;
+}
+
+@media (max-width: 960px) {
+  .review-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .review-aside {
+    position: static;
+  }
+}
