@@ -7,10 +7,10 @@ import { createErpMock, MemoryMockStore } from "@/features/erp-mock";
 import { createErpClient, drainExports, listExportRecords } from "@/features/export";
 import { persistExtractionRun } from "@/features/extraction";
 import { syntheticExtractResponse } from "@/features/extraction/fixtures";
-import { approveRequest, currentFieldValues } from "@/features/review";
+import { approveRequest, currentFieldValues, currentLineItemValues } from "@/features/review";
 import { getActor, type Actor } from "@/features/identity";
 import { QUEUES } from "@/features/jobs";
-import { createRequest, getRequest, listRequests, lockRequest, transitionRequest } from "@/features/requests";
+import { countRequestsByStatus, createRequest, getRequest, listRequests, lockRequest, REQUEST_PAGE_SIZE, transitionRequest, type RequestFilter } from "@/features/requests";
 import { requestRowView } from "@/app/requests/row-view";
 import { createTenancy, type Tenancy } from "@/features/tenancy";
 import { companyWithAdmin, createStack, invitedUser, type Stack } from "./helpers/stack";
@@ -89,7 +89,7 @@ describe("request list: errors, retries, filters and reprocessing (#26)", () => 
     const failed = await seeded(clerk, "ERROR_EXPORT");
     const foreign = await seeded(other, "ERROR_PROCESSING");
 
-    const rows = await tenancy.withTenant(clerk.companyId, (tx) => listRequests(tx));
+    const { rows } = await tenancy.withTenant(clerk.companyId, (tx) => listRequests(tx));
     const byId = new Map(rows.map((row) => [row.id, row]));
 
     expect(byId.get(retrying)).toMatchObject({ status: "PROCESSING", attempts: 2, errorMessage: "Der KI-Dienst ist nicht erreichbar.", nextRetryAt: expect.any(Date) });
@@ -118,7 +118,7 @@ describe("request list: errors, retries, filters and reprocessing (#26)", () => 
     const mock = createErpMock({ token: "e".repeat(24), store: new MemoryMockStore(), faults: ["503"] });
     const erp = createErpClient({ baseUrl: "http://erp", token: "e".repeat(24), timeoutMs: 1_000, fetch: async (input, init) => mock.handle(new Request(input, init)) });
 
-    await drainExports({ tenancy, erp, boss, fieldValues: currentFieldValues }, { maxMs: 2_000, queues });
+    await drainExports({ tenancy, erp, boss, fieldValues: currentFieldValues, lineItemValues: currentLineItemValues }, { maxMs: 2_000, queues });
 
     const request = (await tenancy.withTenant(clerk.companyId, (tx) => getRequest(tx, id)))!;
     const record = (await tenancy.withTenant(clerk.companyId, (tx) => listExportRecords(tx, [id]))).get(id);
@@ -132,8 +132,8 @@ describe("request list: errors, retries, filters and reprocessing (#26)", () => 
     const duplicate = await seeded(clerk, "DUPLICATE");
     const failed = await seeded(clerk, "ERROR_PROCESSING");
 
-    const errors = await tenancy.withTenant(clerk.companyId, (tx) => listRequests(tx, { status: "ERROR" }));
-    const duplicates = await tenancy.withTenant(clerk.companyId, (tx) => listRequests(tx, { possibleDuplicate: true }));
+    const { rows: errors } = await tenancy.withTenant(clerk.companyId, (tx) => listRequests(tx, { status: "ERROR" }));
+    const { rows: duplicates } = await tenancy.withTenant(clerk.companyId, (tx) => listRequests(tx, { possibleDuplicate: true }));
 
     expect(errors.every((row) => row.status === "ERROR")).toBe(true);
     expect(errors.map((row) => row.id)).toContain(failed);
@@ -176,5 +176,130 @@ describe("request list: errors, retries, filters and reprocessing (#26)", () => 
     expect(await statusOf(fresh)).toBe("NEW");
     expect(await jobsFor(QUEUES.processRequest, fresh)).toBe(0);
     expect((await tenancy.withTenant(other.companyId, (tx) => getRequest(tx, foreign)))?.status).toBe("ERROR");
+  });
+});
+
+describe("request list: keyset paging (#48)", () => {
+  let stack: Stack;
+  let tenancy: Tenancy;
+
+  const actorOf = async () => (await getActor(stack.auth, stack.database.db, new Headers({ cookie: (await companyWithAdmin(stack)).cookie })))!;
+  /** Creates `count` requests in ONE transaction – they share created_at (now() is the transaction start), so ties are real. */
+  async function seedBatch(actor: Actor, count: number, input: { possibleDuplicate?: boolean } = {}): Promise<string[]> {
+    return tenancy.withTenant(actor.companyId, async (tx) => {
+      const ids: string[] = [];
+      for (let i = 0; i < count; i++) ids.push((await createRequest(tx, { createdBy: actor.userId, subject: `Seite ${i}`, ...input })).id);
+      return ids;
+    });
+  }
+  const page = (actor: Actor, filter: RequestFilter = {}, after?: string) => tenancy.withTenant(actor.companyId, (tx) => listRequests(tx, filter, { after }));
+  const newestFirst = (a: { createdAt: Date; id: string }, b: { createdAt: Date; id: string }) =>
+    b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0);
+
+  beforeAll(() => {
+    stack = createStack();
+    tenancy = createTenancy(stack.database.db);
+  });
+  afterAll(async () => {
+    await stack.close();
+  });
+
+  it("page 1 holds the 50 newest, the cursor yields the rest – no overlap, no gap, ties broken by id", async () => {
+    const actor = await actorOf();
+    const older = await seedBatch(actor, 30);
+    const newer = await seedBatch(actor, 30);
+
+    const first = await page(actor);
+    expect(first.rows).toHaveLength(REQUEST_PAGE_SIZE);
+    expect(first.nextCursor).toBe(first.rows.at(-1)!.id);
+    // All 30 of the newer batch come first, then 20 of the older batch (same created_at, id desc).
+    expect(first.rows.slice(0, 30).map((row) => row.id).sort()).toEqual([...newer].sort());
+    expect(first.rows[29]!.createdAt).toEqual(first.rows[0]!.createdAt);
+    expect(first.rows[30]!.createdAt.getTime()).toBeLessThan(first.rows[29]!.createdAt.getTime());
+
+    const second = await page(actor, {}, first.nextCursor!);
+    expect(second.rows).toHaveLength(10);
+    expect(second.nextCursor).toBeNull();
+    expect([first.firstPage, second.firstPage]).toEqual([true, false]);
+
+    const all = [...first.rows, ...second.rows];
+    expect(new Set(all.map((row) => row.id)).size).toBe(60);
+    expect(all.map((row) => row.id).sort()).toEqual([...older, ...newer].sort());
+    expect(all).toEqual([...all].sort(newestFirst));
+  });
+
+  it("stays stable when new requests arrive between two page views", async () => {
+    const actor = await actorOf();
+    const seeded = [...(await seedBatch(actor, 26)), ...(await seedBatch(actor, 26))];
+    const first = await page(actor);
+
+    const arrived = await seedBatch(actor, 3);
+    const second = await page(actor, {}, first.nextCursor!);
+
+    expect(second.rows).toHaveLength(2);
+    expect([...first.rows, ...second.rows].map((row) => row.id).sort()).toEqual([...seeded].sort());
+    expect(second.rows.some((row) => arrived.includes(row.id))).toBe(false);
+  });
+
+  it("keeps the filter across pages", async () => {
+    const actor = await actorOf();
+    const plainOld = await seedBatch(actor, 5);
+    const duplicates = [...(await seedBatch(actor, 30, { possibleDuplicate: true })), ...(await seedBatch(actor, 22, { possibleDuplicate: true }))];
+    const plainNew = await seedBatch(actor, 5);
+
+    const first = await page(actor, { possibleDuplicate: true });
+    const second = await page(actor, { possibleDuplicate: true }, first.nextCursor!);
+
+    expect(first.rows).toHaveLength(50);
+    expect(second.rows).toHaveLength(2);
+    expect(second.nextCursor).toBeNull();
+    const ids = [...first.rows, ...second.rows].map((row) => row.id);
+    expect(ids.sort()).toEqual([...duplicates].sort());
+    expect(ids.some((id) => plainOld.includes(id) || plainNew.includes(id))).toBe(false);
+  });
+
+  it("never shows another company's requests – not even with that company's id as cursor", async () => {
+    const actor = await actorOf();
+    const other = await actorOf();
+    const own = await seedBatch(actor, 55);
+    const foreign = await seedBatch(other, 55);
+
+    const first = await page(actor);
+    const second = await page(actor, {}, first.nextCursor!);
+    const ids = [...first.rows, ...second.rows].map((row) => row.id);
+    expect(ids.sort()).toEqual([...own].sort());
+    expect(ids.some((id) => foreign.includes(id))).toBe(false);
+
+    // A foreign row as cursor is unknown inside this tenant → first page, nothing foreign leaks.
+    const probed = await page(actor, {}, foreign[0]);
+    expect(probed.rows.map((row) => row.id)).toEqual(first.rows.map((row) => row.id));
+  });
+
+  it("counts the company's requests per status beyond one page (start page) – own company only", async () => {
+    const actor = await actorOf();
+    const other = await actorOf();
+    await seedBatch(actor, 53);
+    await seedBatch(other, 4);
+    await tenancy.withTenant(actor.companyId, async (tx) => {
+      const id = (await createRequest(tx, { createdBy: actor.userId })).id;
+      await transitionRequest(tx, (await lockRequest(tx, id))!, "processing.started");
+    });
+
+    const counts = await tenancy.withTenant(actor.companyId, (tx) => countRequestsByStatus(tx));
+
+    expect(counts).toEqual({ NEW: 53, PROCESSING: 1 });
+  });
+
+  it("falls back to the first page for a malformed or unknown cursor", async () => {
+    const actor = await actorOf();
+    await seedBatch(actor, 3);
+    const first = await page(actor);
+
+    for (const cursor of ["nonsense", "", "' or 1=1 --", randomUUID()]) {
+      const result = await page(actor, {}, cursor);
+      expect(result.rows.map((row) => row.id)).toEqual(first.rows.map((row) => row.id));
+      expect(result.nextCursor).toBeNull();
+      expect(result.firstPage).toBe(true);
+    }
   });
 });

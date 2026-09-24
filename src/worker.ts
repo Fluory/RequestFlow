@@ -9,7 +9,7 @@ import { createErpClient, drainExports } from "@/features/export";
 import { createAiServiceClient } from "@/features/extraction";
 import { assertProcessingBudget, drain } from "@/features/jobs";
 import { logEvent } from "@/features/observability";
-import { currentFieldValues } from "@/features/review";
+import { currentFieldValues, currentLineItemValues } from "@/features/review";
 import { S3BlobStore } from "@/features/storage";
 import { createTenancy } from "@/features/tenancy";
 
@@ -27,7 +27,7 @@ async function main(): Promise<void> {
   const tenancy = createTenancy(database.db);
   const deps = { tenancy, storage, ai, boss };
   // The export reads the reviewed values through the review module (injected – no module cycle).
-  const exportDeps = { tenancy, erp, boss, fieldValues: currentFieldValues };
+  const exportDeps = { tenancy, erp, boss, fieldValues: currentFieldValues, lineItemValues: currentLineItemValues };
 
   let running = true;
   const stop = (signal: string) => {
