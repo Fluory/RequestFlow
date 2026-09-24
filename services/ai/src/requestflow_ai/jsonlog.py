@@ -3,6 +3,9 @@
 Each record carries a constant event name (the log message template, never formatted with its
 arguments), the request and document IDs from context variables, and only allow-listed extras.
 Exceptions are reduced to their type name: tracebacks and messages can contain document data.
+The line shape matches the web/worker pino logs (`level`, `time`, `event`, `requestId`, ...), see
+docs/technical/operations.md "Logs and correlation". The service never learns `jobId` or `companyId`
+(it only gets `X-Request-Id`), so those keys appear in web/worker lines only.
 """
 
 from __future__ import annotations
@@ -52,12 +55,25 @@ _QUIET_LOGGERS = (
 )
 
 
+# Same labels as pino in the web/worker logs (src/features/observability/log.ts).
+_LEVEL_LABELS = {
+    "DEBUG": "debug",
+    "INFO": "info",
+    "WARNING": "warn",
+    "ERROR": "error",
+    "CRITICAL": "fatal",
+}
+
+
 class JsonFormatter(logging.Formatter):
+    """One line per record with the web/worker key set: `level`, `time`, `event` plus IDs."""
+
     def format(self, record: logging.LogRecord) -> str:
+        created = datetime.fromtimestamp(record.created, UTC)
         payload: dict[str, Any] = {
-            "ts": datetime.fromtimestamp(record.created, UTC).isoformat(timespec="milliseconds"),
-            "level": record.levelname,
-            "logger": record.name,
+            "level": _LEVEL_LABELS.get(record.levelname, record.levelname.lower()),
+            # pino's isoTime (`Date.toISOString()`): UTC, milliseconds, `Z` suffix.
+            "time": created.isoformat(timespec="milliseconds").replace("+00:00", "Z"),
             "event": record.msg if isinstance(record.msg, str) else type(record.msg).__name__,
         }
         request_id = request_id_var.get()

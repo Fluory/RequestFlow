@@ -79,13 +79,21 @@
 
 ## Logs and correlation
 
-- Web and worker write one JSON line per event (pino, stdout): `level`, `time`, `event` plus IDs and codes
-  only (`requestId`, `jobId`, `companyId`, `documentId`, `attempt`, `code`, `status`, `durationMs`,
-  `count`). The key set is fixed in code; a test runs a full synthetic request (upload → export) and
-  fails if a log line contains document content or personal data.
-- Correlation: the request id. The worker sends it to the AI service as `X-Request-Id`; the AI service
-  logs it as `requestId` (JSON logging, `services/ai/src/requestflow_ai/jsonlog.py`). Follow one request with
-  `docker compose logs web worker ai | grep <requestId>`.
+### Shared log format (web, worker, AI service)
+
+All three write one JSON line per event to stdout with the same keys: `level` (lower-case pino label:
+`debug`, `info`, `warn`, `error`, `fatal`), `time` (UTC ISO 8601 with milliseconds, `Z`), `event` (a
+constant name, never free text) plus allow-listed IDs and codes only. Correlation keys: `requestId`
+everywhere, `documentId`; `jobId`, `companyId` and `attempt` only in web/worker lines (the AI service
+receives just `X-Request-Id`). Web/worker (pino, `src/features/observability/log.ts`) add `code`,
+`status`, `durationMs`, `count`; the AI service (`services/ai/src/requestflow_ai/jsonlog.py`) keeps its
+own whitelist (`status`, `latencyMs`, `errorCode`, token counts, …). Example:
+`{"level":"info","time":"2026-09-24T10:00:00.123Z","event":"request_completed","requestId":"req-0001","status":200}`
+
+- Both key sets are fixed in code; a test runs a full synthetic request (upload → export) and fails if a
+  log line contains document content or personal data.
+- Correlation: the request id. The worker sends it to the AI service as `X-Request-Id`. Follow one request
+  with `docker compose logs web worker ai | grep <requestId>`.
 - `/api/health` also reports `dependencies.aiService` (reachable or not) and `backlog` (waiting jobs per
   queue). Both are informational and never turn the status into 503 – the AI service is an optional
   compose profile.
