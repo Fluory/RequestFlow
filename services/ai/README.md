@@ -373,7 +373,7 @@ the legitimate value (`tests/test_evals_run.py`). The verbatim-quote limitation 
 grounding proves provenance, not intent. The eval gate catches it instead – a test replays a model
 that quotes the injected sentence and asserts the gate fails at any threshold.
 
-**Baseline** (`evals/baseline.json`, replay of the hand-written responses, 2026-09-23):
+**Baseline** (`evals/baseline.json`, replay of the hand-written responses, 2026-09-23, `line_items.unit` updated 2026-09-24 in #50):
 
 | Key field | acc | miss P | miss R | grounding | false-found |
 |---|---|---|---|---|---|
