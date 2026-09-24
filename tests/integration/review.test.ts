@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { sql } from "drizzle-orm";
 import type { PgBoss } from "pg-boss";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadConfig } from "@/config/env";
@@ -165,6 +166,16 @@ describe("review: fields beside their source, corrections, approve or reject", (
     await expect(correctField(tenancy, clerk, requestId, "quantity", "5", 7)).rejects.toMatchObject({ code: "unknown_field" });
     await expect(correctField(tenancy, clerk, requestId, "company", "x", 0)).rejects.toMatchObject({ code: "unknown_field" });
     await expect(correctField(tenancy, clerk, requestId, "quantity", "5")).rejects.toMatchObject({ code: "unknown_field" });
+
+    // #47: the database itself refuses a negative position, like extracted_fields does (defence in
+    // depth below correctField). Runs as the runtime role app_rw inside the tenant transaction.
+    const insertCorrection = (itemIndex: number) =>
+      tenancy.withTenant(clerk.companyId, (tx) =>
+        tx.execute(sql`insert into app.field_corrections (company_id, request_id, field_key, item_index, new_value, corrected_by)
+          values (${clerk.companyId}, ${requestId}, 'quantity', ${itemIndex}, '1', ${clerk.userId})`),
+      );
+    await expect(insertCorrection(-1)).rejects.toMatchObject({ cause: { code: "23514", constraint: "field_corrections_item_index_check" } });
+    await expect(insertCorrection(1)).resolves.toBeDefined();
   });
 
   it("keeps failed attachments and skipped OCR pages per document for the review (#23)", async () => {

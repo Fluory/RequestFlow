@@ -6,6 +6,9 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
+- ERP export sends the reviewed positions (description, quantity, unit, material, dimensions) with each
+  approved request – ERP contract 1.1.0, additive and optional. A position value the ERP would refuse
+  blocks the approval so the clerk can still correct it.
 - Visual design for the pilot UI, implemented from the Claude Design prototype "RequestFlow A": warm
   neutral palette with one blue accent, IBM Plex Sans/Mono (self-hosted via `@fontsource`, no
   third-party requests), a header with company, name and role, a start page with open work, and a
@@ -68,3 +71,13 @@ This file records what changes **in the product** – process and session state 
   tests against real PostgreSQL + SeaweedFS.
 - Request list pages by 50 (keyset on creation time and id, stable while new requests arrive):
   "Ältere Anfragen" / "Zurück zum Anfang" keep the filters; an invalid page parameter shows page 1.
+
+### Changed
+- AI service logs use the web/worker format: `time` (ISO 8601, `Z`) instead of `ts`, lower-case pino level labels (`warn`, not `WARNING`), `logger` only on library records.
+
+### Fixed
+- AI verifier: a unit quoted together with the neighbouring table cell (e.g. `60    | Stk.`) is now
+  confirmed as `found` when one cell of the quote is exactly the unit; quotes that differ from the
+  source in real characters are still rejected (#50).
+- The database refuses a line-item correction with a negative position, like it already does for
+  extracted values – defence in depth below the review check (#47).

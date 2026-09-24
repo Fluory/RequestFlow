@@ -373,7 +373,7 @@ the legitimate value (`tests/test_evals_run.py`). The verbatim-quote limitation 
 grounding proves provenance, not intent. The eval gate catches it instead – a test replays a model
 that quotes the injected sentence and asserts the gate fails at any threshold.
 
-**Baseline** (`evals/baseline.json`, replay of the hand-written responses, 2026-09-23):
+**Baseline** (`evals/baseline.json`, replay of the hand-written responses, 2026-09-23, `line_items.unit` updated 2026-09-24 in #50):
 
 | Key field | acc | miss P | miss R | grounding | false-found |
 |---|---|---|---|---|---|
@@ -385,13 +385,18 @@ that quotes the injected sentence and asserts the gate fails at any threshold.
 | additional_requirements | 100 | 100 | 87.5 | 100 | 0 |
 | line_items.description | 96.55 | 0 | – | 100 | 0 |
 | line_items.quantity | 89.66 | 0 | – | 92.86 | 0 |
-| line_items.unit | 86.21 | 0 | – | 89.29 | 0 |
+| line_items.unit | 96.55 | 0 | – | 100 | 0 |
 | line_items.material | 89.29 | 0 | 0 | 96.43 | 3.85 |
 | line_items.dimensions | 92.86 | 50 | 100 | 96.3 | 0 |
 
-These numbers describe the hand-written responses, not real model quality. Finding from `t03`: a
-quote that spans a pipe-table cell border (`60    | Stk.`) fails the unit check, because a unit
-counts only directly after a number; the verifier is unchanged here (open point).
+These numbers describe the hand-written responses, not real model quality. Finding from `t03`
+(fixed in #50, baseline updated 2026-09-24): a quote that spans a pipe-table cell border
+(`60    | Stk.`) failed the unit check, because a unit counted only directly after a number or as
+the whole quote. A known unit now also counts when one cell of the quote (split on `|` and tabs) is
+exactly the unit and no other cell names a different unit (a whole row like `60 | Stk. | 12 | kg`
+proves neither); the quote-in-segment check is unchanged. Known limit: the verifier does not know
+table columns, so a quote of only the wrong column's cell (`12 | kg`) still passes – as a bare `kg`
+quote always did.
 
 ## Verified facts (2026-09-22, in this environment)
 
