@@ -33,14 +33,15 @@ export default async function RequestPage({
   if (!view) notFound();
   const { request, fields, lineItems, documents, skippedDocuments, documentNotes, exportRecord } = view;
   const query = await searchParams;
-  // `?field=<key>` selects a header field, `?field=<key>&item=<n>` a line-item field (#25). Without a
-  // selection the panel shows the first value that needs attention, else the first field.
+  // `?field=<key>` selects a header field, `?field=<key>&item=<n>` a line-item field (#25). Without a (valid)
+  // selection the panel shows the first value that needs attention – header fields first, then positions –
+  // else the first header field.
   const selectedItem = query.item !== undefined && /^\d{1,4}$/.test(query.item) ? Number(query.item) : null;
   const requested: ReviewField | undefined =
     selectedItem === null
       ? fields.find((field) => field.key === query.field)
       : lineItems.find((item) => item.itemIndex === selectedItem)?.fields.find((field) => field.key === query.field);
-  const selected = requested ?? fields.find(needsAttention) ?? fields[0];
+  const selected = requested ?? fields.find(needsAttention) ?? lineItems.flatMap((item) => item.fields).find(needsAttention) ?? fields[0];
   const isSelected = (field: ReviewField) => selected !== undefined && selected.key === field.key && selected.itemIndex === field.itemIndex;
   const inReview = request.status === "REVIEW";
   // Decidable before approval and not while a worker holds the request (status machine, #27).
@@ -48,8 +49,11 @@ export default async function RequestPage({
   const done = messageFor(DONE_MESSAGES, query.done);
   const error = messageFor(ERROR_MESSAGES, query.error);
   const openItems = lineItems.reduce((count, item) => count + item.fields.filter(needsAttention).length, fields.filter(needsAttention).length);
+  // The anchor brings the panel into view on narrow screens, where it sits below the tables.
   const fieldHref = (field: ReviewField) =>
-    field.itemIndex === null ? `/requests/${request.id}?field=${field.key}` : `/requests/${request.id}?field=${field.key}&item=${field.itemIndex}`;
+    field.itemIndex === null
+      ? `/requests/${request.id}?field=${field.key}#selected-heading`
+      : `/requests/${request.id}?field=${field.key}&item=${field.itemIndex}#selected-heading`;
 
   return (
     <main>
@@ -147,11 +151,14 @@ export default async function RequestPage({
                         <tr key={field.key} className={isSelected(field) ? "selected" : needsAttention(field) ? "attention" : undefined}>
                           <th scope="row">{field.label}</th>
                           <td data-testid={`value-${field.key}`}>
-                            {field.value === null ? <span className="muted">–</span> : <Link href={fieldHref(field)} className="value-link">{field.value}</Link>}
+                            {field.value === null ? <span className="muted">–</span> : <Link href={fieldHref(field)} className="value-link" aria-current={isSelected(field) ? "true" : undefined}>
+                                {field.value}
+                              </Link>}
                             {field.corrected && <div className="field-hint">erkannt: {field.extractedValue ?? "–"}</div>}
                           </td>
                           <td className="nowrap">
                             <StatusBadge status={field.reviewStatus} />
+                            {field.corrected && <div className="field-hint">erkannt: {STATUS_LABEL[field.status]}</div>}
                           </td>
                           <td className="source-col">{field.source ? <Link href={fieldHref(field)}>Quelle anzeigen</Link> : <span className="muted">–</span>}</td>
                           {inReview && (

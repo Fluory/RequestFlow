@@ -69,9 +69,14 @@ export function AuthForm({ mode, invitationId }: { mode: "sign-in" | "sign-up"; 
           required
           minLength={12}
           autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
+          aria-describedby={mode === "sign-up" ? "password-hint" : undefined}
         />
-        {mode === "sign-up" && <span className="field-hint">Mindestens 12 Zeichen</span>}
       </label>
+      {mode === "sign-up" && (
+        <span id="password-hint" className="field-hint">
+          Mindestens 12 Zeichen
+        </span>
+      )}
       <button type="submit" className="btn-primary btn-large" disabled={busy}>
         {mode === "sign-in" ? "Anmelden" : "Konto anlegen"}
       </button>

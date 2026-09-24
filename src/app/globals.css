@@ -3,7 +3,8 @@
  * Implements the Claude Design prototype "RequestFlow A": warm neutrals, one blue accent, IBM Plex
  * (self-hosted via @fontsource – no third-party requests), 3 px radii.
  * Rules that are not style: status is never shown by colour alone, the focus outline stays visible,
- * every text/background pair meets WCAG AA (≥ 4.5:1), form field borders ≥ 3:1.
+ * every text/background pair meets WCAG AA (≥ 4.5:1), form field borders ≥ 3:1 (button borders are
+ * decorative – their text identifies them).
  */
 :root {
   --bg: #f6f5f1;

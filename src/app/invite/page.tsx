@@ -1,17 +1,17 @@
 import Link from "next/link";
-import { CopyButton } from "@/app/_components/copy-button";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
-import { currentActor, getRuntime } from "@/app/_server/runtime";
+import { CopyButton } from "@/app/_components/copy-button";
+import { currentActor, getRuntime, requestActor } from "@/app/_server/runtime";
 import { authorize, AuthorizationError, inviteUser, COMPANY_ROLES, type Actor } from "@/features/identity";
 
 export const dynamic = "force-dynamic";
 
 const inviteInput = z.object({ email: z.email().max(254), role: z.enum(COMPANY_ROLES) });
 
-async function adminOrNotFound(): Promise<Actor> {
-  const actor = await currentActor(await headers());
+// The page passes the per-request cached actor (shared with the app header); the action reads its own.
+async function adminOrNotFound(actor: Actor | null): Promise<Actor> {
   if (!actor) redirect("/login");
   try {
     authorize(actor, "users.invite");
@@ -26,7 +26,7 @@ async function adminOrNotFound(): Promise<Actor> {
 // server-side on render AND in the action. The admin hands the link over to the invited person.
 async function invite(formData: FormData) {
   "use server";
-  const actor = await adminOrNotFound();
+  const actor = await adminOrNotFound(await currentActor(await headers()));
   const input = inviteInput.safeParse({ email: formData.get("email"), role: formData.get("role") });
   if (!input.success) redirect("/invite?error=input");
   const { invitationId } = await inviteUser(getRuntime().database.db, actor, input.data);
@@ -34,7 +34,7 @@ async function invite(formData: FormData) {
 }
 
 export default async function InvitePage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  await adminOrNotFound();
+  await adminOrNotFound(await requestActor());
   const params = await searchParams;
   const link = params.invitation ? `${getRuntime().config.auth.baseURL}/signup?invitation=${encodeURIComponent(params.invitation)}` : null;
   return (
