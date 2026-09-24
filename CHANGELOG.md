@@ -9,6 +9,13 @@ This file records what changes **in the product** – process and session state 
 - ERP export sends the reviewed positions (description, quantity, unit, material, dimensions) with each
   approved request – ERP contract 1.1.0, additive and optional. A position value the ERP would refuse
   blocks the approval so the clerk can still correct it.
+- Visual design for the pilot UI, implemented from the Claude Design prototype "RequestFlow A": warm
+  neutral palette with one blue accent, IBM Plex Sans/Mono (self-hosted via `@fontsource`, no
+  third-party requests), a header with company, name and role, a start page with open work, and a
+  two-column review page – fields, positions and documents on the left, the selected value with its
+  source and the decision in a sticky panel on the right. Status is always labelled (⚠ for values that
+  need attention); colours are design tokens (WCAG AA). Login and upload errors are announced as alerts;
+  after an upload the message links to the new request; invitation links can be copied.
 - Observability: structured JSON logs (pino) with IDs and codes only, correlated by the request id from web
   through worker to the AI service; `/api/health` also shows whether the AI service is reachable and how
   many jobs are waiting.
