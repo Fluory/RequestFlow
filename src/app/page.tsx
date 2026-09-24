@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Brand } from "@/app/_components/app-header";
 import { getRuntime, requestActor } from "@/app/_server/runtime";
-import { listRequests } from "@/features/requests";
+import { countRequestsByStatus } from "@/features/requests";
 
 export const dynamic = "force-dynamic";
 
@@ -25,10 +25,10 @@ export default async function HomePage() {
       </main>
     );
   }
-  // Pilot volumes (20–50 requests a day): counting the tenant's list in memory is enough.
-  const requests = await getRuntime().tenancy.withTenant(actor.companyId, (tx) => listRequests(tx, {}));
-  const count = (status: string) => requests.filter((request) => request.status === status).length;
-  const stats = requests.length ? `${count("REVIEW")} zur Prüfung · ${count("ERROR")} mit Fehler · ${requests.length} insgesamt` : "Noch keine Anfragen";
+  // Counted in the database per status – the request list itself is paged (#48).
+  const counts = await getRuntime().tenancy.withTenant(actor.companyId, (tx) => countRequestsByStatus(tx));
+  const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
+  const stats = total ? `${counts.REVIEW ?? 0} zur Prüfung · ${counts.ERROR ?? 0} mit Fehler · ${total} insgesamt` : "Noch keine Anfragen";
   return (
     <main>
       <h1>Start</h1>

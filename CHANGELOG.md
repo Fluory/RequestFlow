@@ -69,6 +69,8 @@ This file records what changes **in the product** – process and session state 
 - Database roles `app_owner` (migrations) and `app_rw` (runtime, no RLS bypass); schema `app`.
 - Verify commands `pnpm verify:changed`, `pnpm verify`, `pnpm verify:full`; CI runs integration
   tests against real PostgreSQL + SeaweedFS.
+- Request list pages by 50 (keyset on creation time and id, stable while new requests arrive):
+  "Ältere Anfragen" / "Zurück zum Anfang" keep the filters; an invalid page parameter shows page 1.
 
 ### Changed
 - AI service logs use the web/worker format: `time` (ISO 8601, `Z`) instead of `ts`, lower-case pino level labels (`warn`, not `WARNING`), `logger` only on library records.
