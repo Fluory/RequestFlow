@@ -58,7 +58,11 @@ describe("drain route and inline drain wiring", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual(summary);
     expect(drainRound).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(drainRound).mock.calls[0]![1]).toEqual({ processMs: SERVERLESS_DRAIN.processMs, exportMs: SERVERLESS_DRAIN.exportMs, maintenance: true });
+    // The processing window is the serverless budget minus the time this invocation already spent.
+    const options = vi.mocked(drainRound).mock.calls[0]![1];
+    expect(options).toMatchObject({ exportMs: SERVERLESS_DRAIN.exportMs, maintenance: true });
+    expect(options.processMs).toBeLessThanOrEqual(SERVERLESS_DRAIN.processMs);
+    expect(options.processMs).toBeGreaterThan(SERVERLESS_DRAIN.processMs - 5_000);
   });
 
   it("an accepted upload schedules one drain after the response (JOB_DRAIN_INLINE=true)", async () => {

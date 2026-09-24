@@ -11,6 +11,7 @@ export const maxDuration = 300;
 // processing and export jobs for runtimes without a worker (#59). `Authorization: Bearer <CRON_SECRET>`;
 // 404 while CRON_SECRET is unset. No request body is read.
 async function handle(request: Request): Promise<Response> {
+  const invokedAt = Date.now();
   let cronSecret: string | undefined;
   try {
     cronSecret = getRuntime().config.jobs.cronSecret;
@@ -20,7 +21,7 @@ async function handle(request: Request): Promise<Response> {
     logEvent("error", "jobs.drain_config_invalid", {}, { code: "config", names });
     return Response.json({ error: { title: "Verarbeitung derzeit nicht möglich." } }, { status: 503, headers: { "cache-control": "no-store" } });
   }
-  return handleDrainRequest(request, { cronSecret, run: drainNow });
+  return handleDrainRequest(request, { cronSecret, run: () => drainNow(invokedAt) });
 }
 
 export const GET = handle;
