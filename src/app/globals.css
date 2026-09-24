@@ -108,6 +108,16 @@ code {
 
 /* ---------- App shell ---------- */
 
+/* Showcase notice (DEMO_MODE) – above the sticky header, text 8.8:1 on --warn-bg */
+.demo-banner {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  border-bottom: 1px solid var(--warn-line);
+  padding: 6px 28px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+}
 .app-header {
   background: var(--header);
   border-bottom: 1px solid var(--border);
