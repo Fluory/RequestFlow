@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, or, sql, type SQL } from "drizzle-orm";
 import { requests, type RequestStatus } from "@/db/schema";
 import { tenantOf, type TenantTx } from "@/features/tenancy";
+import { parseCursor, REQUEST_PAGE_SIZE } from "./cursor";
 import { nextStatus, type RequestEvent } from "./status";
 
 export type RequestRow = typeof requests.$inferSelect;
@@ -23,14 +24,46 @@ export interface RequestFilter {
   possibleDuplicate?: boolean;
 }
 
-/** The company's requests, newest first, optionally filtered (#26). */
-export async function listRequests(tx: TenantTx, filter: RequestFilter = {}): Promise<RequestRow[]> {
+export interface RequestPage {
+  rows: RequestRow[];
+  /** Cursor of the next (older) page, or null on the last page. */
+  nextCursor: string | null;
+}
+
+/**
+ * One page of the company's requests, newest first, optionally filtered (#26, #48). Keyset paging on
+ * (created_at desc, id desc): `after` is the id of the last row of the previous page; its position is
+ * read inside this tenant transaction, so a malformed, unknown or foreign id yields the first page.
+ */
+export async function listRequests(tx: TenantTx, filter: RequestFilter = {}, page: { after?: string | null } = {}): Promise<RequestPage> {
   tenantOf(tx);
+  const cursor = parseCursor(page.after);
+  const anchor = cursor ? (await tx.select({ id: requests.id }).from(requests).where(eq(requests.id, cursor)))[0] : undefined;
   const conditions = [
     filter.status ? eq(requests.status, filter.status) : undefined,
     filter.possibleDuplicate === undefined ? undefined : eq(requests.possibleDuplicate, filter.possibleDuplicate),
+    // The anchor's created_at is compared in SQL at full (microsecond) precision; RLS scopes the subquery too.
+    anchor ? sql`(${requests.createdAt}, ${requests.id}) < (select r.created_at, r.id from app.requests r where r.id = ${anchor.id})` : undefined,
   ].filter((condition) => condition !== undefined);
-  return tx.select().from(requests).where(and(...conditions)).orderBy(desc(requests.createdAt));
+  const rows = await tx
+    .select()
+    .from(requests)
+    .where(and(...conditions))
+    .orderBy(desc(requests.createdAt), desc(requests.id))
+    .limit(REQUEST_PAGE_SIZE + 1);
+  const hasMore = rows.length > REQUEST_PAGE_SIZE;
+  const visible = hasMore ? rows.slice(0, REQUEST_PAGE_SIZE) : rows;
+  return { rows: visible, nextCursor: hasMore ? visible.at(-1)!.id : null };
+}
+
+/** Number of the company's requests per status (start page); statuses without requests are absent. */
+export async function countRequestsByStatus(tx: TenantTx): Promise<Partial<Record<RequestStatus, number>>> {
+  tenantOf(tx);
+  const rows = await tx
+    .select({ status: requests.status, count: sql<number>`count(*)::int` })
+    .from(requests)
+    .groupBy(requests.status);
+  return Object.fromEntries(rows.map((row) => [row.status, row.count]));
 }
 
 export async function getRequest(tx: TenantTx, id: string): Promise<RequestRow | null> {

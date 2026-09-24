@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getRuntime, requestActor } from "@/app/_server/runtime";
 import { listExportRecords } from "@/features/export";
-import { listRequests, type RequestFilter } from "@/features/requests";
+import { listRequests, parseCursor, type RequestFilter } from "@/features/requests";
 import { reprocessAction } from "./actions";
 import { requestRowView } from "./row-view";
 import { REQUEST_STATUS_LABEL } from "./status-labels";
@@ -26,16 +26,29 @@ function filterOf(query: Record<string, string | undefined>): RequestFilter {
   return { status, possibleDuplicate };
 }
 
+/** Link to a page of the list with the current filters (paging never drops them, #48). */
+function pageHref(filter: RequestFilter, after?: string): string {
+  const params = new URLSearchParams();
+  if (filter.status) params.set("status", filter.status);
+  if (filter.possibleDuplicate) params.set("duplicate", "1");
+  if (after) params.set("after", after);
+  const query = params.toString();
+  return query ? `/requests?${query}` : "/requests";
+}
+
 // Request list (#26): status, attempts, last error with its stage, next retry; reprocess for ERROR.
 export default async function RequestsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const actor = await requestActor();
   if (!actor) redirect("/login");
   const query = await searchParams;
   const filter = filterOf(query);
-  const { requests, exports } = await getRuntime().tenancy.withTenant(actor.companyId, async (tx) => {
-    const rows = await listRequests(tx, filter);
-    return { requests: rows, exports: await listExportRecords(tx, rows.map((row) => row.id)) };
+  const after = parseCursor(query.after) ?? undefined;
+  // One page (#48); export records only for the rows of this page.
+  const { requests, nextCursor, exports } = await getRuntime().tenancy.withTenant(actor.companyId, async (tx) => {
+    const { rows, nextCursor } = await listRequests(tx, filter, { after });
+    return { requests: rows, nextCursor, exports: await listExportRecords(tx, rows.map((row) => row.id)) };
   });
+  const paged = after !== undefined || nextCursor !== null;
   const done = query.done === "reprocessed" ? pick("reprocessed") : undefined;
   const error = query.error === "refused" ? pick("refused") : undefined;
 
@@ -65,7 +78,10 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
             nur mögliche Duplikate
           </label>
           <button type="submit">Filtern</button>
-          <span className="count">{requests.length === 1 ? "1 Anfrage" : `${requests.length} Anfragen`}</span>
+          <span className="count">
+            {requests.length === 1 ? "1 Anfrage" : `${requests.length} Anfragen`}
+            {paged && " auf dieser Seite"}
+          </span>
         </form>
         {requests.length === 0 ? (
           <p className="empty">
@@ -139,6 +155,12 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
               </tbody>
             </table>
           </div>
+        )}
+        {paged && (
+          <nav aria-label="Seiten" className="toolbar">
+            {after !== undefined && <Link href={pageHref(filter)}>Zurück zum Anfang</Link>}
+            {nextCursor && <Link href={pageHref(filter, nextCursor)}>Ältere Anfragen</Link>}
+          </nav>
         )}
       </section>
     </main>
