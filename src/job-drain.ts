@@ -6,7 +6,7 @@ import type { AppConfig } from "@/config/env";
 import { createErpClient, drainExports, type ExportDrainDeps, type ExportDrainResult } from "@/features/export";
 import { createAiServiceClient } from "@/features/extraction";
 import { drain, QUEUES, type DrainDeps, type DrainResult, type JobRunner } from "@/features/jobs";
-import { currentFieldValues } from "@/features/review";
+import { currentFieldValues, currentLineItemValues } from "@/features/review";
 import type { S3BlobStore } from "@/features/storage";
 import type { Tenancy } from "@/features/tenancy";
 
@@ -37,7 +37,7 @@ export function buildJobDeps(config: AppConfig, parts: { tenancy: Tenancy; stora
   return {
     processing: { tenancy, storage, boss, ai: createAiServiceClient(config.aiService) },
     // The export reads the reviewed values through the review module (injected – no module cycle).
-    exports: { tenancy, boss, erp: createErpClient(config.erp), fieldValues: currentFieldValues },
+    exports: { tenancy, boss, erp: createErpClient(config.erp), fieldValues: currentFieldValues, lineItemValues: currentLineItemValues },
   };
 }
 

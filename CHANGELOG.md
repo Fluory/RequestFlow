@@ -6,6 +6,9 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
+- ERP export sends the reviewed positions (description, quantity, unit, material, dimensions) with each
+  approved request – ERP contract 1.1.0, additive and optional. A position value the ERP would refuse
+  blocks the approval so the clerk can still correct it.
 - Visual design for the pilot UI, implemented from the Claude Design prototype "RequestFlow A": warm
   neutral palette with one blue accent, IBM Plex Sans/Mono (self-hosted via `@fontsource`, no
   third-party requests), a header with company, name and role, a start page with open work, and a
@@ -71,3 +74,11 @@ This file records what changes **in the product** – process and session state 
   Daten" on every page; runbook `docs/technical/deployment-vercel.md` and a role bootstrap script.
 - Upload cap per person and hour (`UPLOAD_MAX_PER_HOUR`, required on the showcase): the upload answers
   429 before anything is stored.
+
+### Changed
+- AI service logs use the web/worker format: `time` (ISO 8601, `Z`) instead of `ts`, lower-case pino level labels (`warn`, not `WARNING`), `logger` only on library records.
+
+### Fixed
+- AI verifier: a unit quoted together with the neighbouring table cell (e.g. `60    | Stk.`) is now
+  confirmed as `found` when one cell of the quote is exactly the unit; quotes that differ from the
+  source in real characters are still rejected (#50).

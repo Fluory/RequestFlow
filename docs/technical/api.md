@@ -65,6 +65,12 @@ flag or without `ERP_TOKEN` the route answers 404. `Authorization: Bearer <ERP_T
 `Idempotency-Key: <requestId>` (UUID, must equal `requestId` in the body), JSON body ≤ 64 KiB with a
 `Content-Length` (411/413 otherwise).
 
+Contract 1.1.0 (#46) adds the optional `lineItems` array (1–200 positions: `position` ≥ 1 plus
+`description`, `quantity`, `unit`, `material`, `dimensions`, each `string | null` ≤ 500 characters). It is
+sent only when the request has positions, so a 1.0.0 receiver sees an unchanged body for requests without
+positions. Values that would break these limits (or push the body over 64 KiB) block the approval, where
+the clerk can still correct them – nothing is cut silently.
+
 | Status | Meaning |
 |---|---|
 | 201 | stored; body `{ erpReference, requestId, receivedAt }` |
