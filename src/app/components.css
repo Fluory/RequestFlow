@@ -1,0 +1,292 @@
+/* Pilot design system (#52), part 2: status tags, tables, request list, users, invitations,
+ * responsive rules. Tokens live in globals.css; the review page has its own review.css. */
+
+/* ---------- Status tags (always with text – colour only supports it) ---------- */
+
+.badge,
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+}
+/* Field status */
+.badge-found {
+  background: var(--ok-bg);
+  color: var(--ok-text);
+}
+.badge-missing {
+  background: var(--grey-bg);
+  color: var(--grey-text);
+}
+.badge-corrected {
+  background: var(--blue-bg);
+  color: var(--blue-text);
+}
+.badge-uncertain,
+.badge-unverified {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  box-shadow: inset 0 0 0 1px var(--warn-line);
+}
+/* Request and user status */
+.pill-neutral {
+  background: var(--grey-bg);
+  color: var(--grey-text);
+}
+.pill-info {
+  background: var(--blue-bg);
+  color: var(--blue-text);
+}
+.pill-warn {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  box-shadow: inset 0 0 0 1px var(--warn-line);
+}
+.pill-success {
+  background: var(--ok-bg);
+  color: var(--ok-text);
+}
+.pill-danger {
+  background: var(--err-bg);
+  color: var(--err-text);
+}
+
+/* ---------- Tables ---------- */
+
+.table-wrap {
+  overflow-x: auto;
+  /* Containing block for the absolutely positioned .visually-hidden labels inside cells – without
+     it they escape the scroll container and widen the page on narrow screens. */
+  position: relative;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+th,
+td {
+  text-align: left;
+  vertical-align: top;
+  padding: 12px;
+  border-bottom: 1px solid var(--rule);
+}
+thead th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+th:first-child,
+td:first-child {
+  padding-left: 20px;
+}
+th:last-child,
+td:last-child {
+  padding-right: 20px;
+}
+tbody th {
+  font-weight: 500;
+}
+.num {
+  text-align: right;
+}
+.nowrap {
+  white-space: nowrap;
+}
+.empty {
+  padding: 48px 20px;
+  text-align: center;
+  color: var(--muted);
+}
+
+/* ---------- Request list ---------- */
+
+.upload {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.upload-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.dropzone {
+  flex: 1;
+  min-width: min(280px, 100%);
+  border: 1px dashed var(--control-border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  background: var(--bg);
+}
+.dropzone label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.upload [role="status"],
+.upload [role="alert"] {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.toolbar select {
+  font-size: 13px;
+  padding: 7px 10px;
+  min-width: 180px;
+}
+.toolbar .check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  padding-bottom: 8px;
+  cursor: pointer;
+}
+.toolbar .count {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--muted);
+  padding-bottom: 7px;
+}
+.requests-table {
+  min-width: 1080px;
+}
+.requests-table td {
+  font-size: 13px;
+}
+.requests-table .subject {
+  font-size: 14px;
+}
+.requests-table .subject a {
+  font-weight: 500;
+}
+.requests-table .error-text {
+  max-width: 300px;
+  text-wrap: pretty;
+  color: var(--text-2);
+}
+.requests-table .mono {
+  color: var(--text-2);
+  white-space: nowrap;
+}
+tr.row-error {
+  background: var(--error-row);
+}
+.status-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+.stage {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---------- Users and invitations ---------- */
+
+.users-table {
+  min-width: 860px;
+}
+.users-table td,
+.users-table th {
+  vertical-align: middle;
+}
+.users-table select {
+  font-size: 13px;
+  padding: 6px 8px;
+}
+.inline-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.invite-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  padding: 11px 20px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13.5px;
+}
+.invite-row:last-child {
+  border-bottom: 0;
+}
+.invite-form {
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.invite-form .card-pad {
+  padding: 22px;
+  gap: 16px;
+}
+.invite-done {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid #b9d6bc;
+  padding: 18px 20px;
+}
+.copy-row {
+  display: flex;
+  gap: 8px;
+}
+.copy-row code {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid #b9d6bc;
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  color: var(--text);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 720px) {
+  .app-header-inner {
+    padding: 0 16px;
+    gap: 0 20px;
+  }
+  .app-nav a {
+    min-height: 44px;
+  }
+  .account {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
+    padding-bottom: 10px;
+  }
+  .account-who {
+    text-align: left;
+  }
+  main {
+    padding: 20px 16px 48px;
+  }
+  .toolbar .count {
+    margin-left: 0;
+  }
+}
