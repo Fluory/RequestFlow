@@ -385,13 +385,15 @@ that quotes the injected sentence and asserts the gate fails at any threshold.
 | additional_requirements | 100 | 100 | 87.5 | 100 | 0 |
 | line_items.description | 96.55 | 0 | – | 100 | 0 |
 | line_items.quantity | 89.66 | 0 | – | 92.86 | 0 |
-| line_items.unit | 86.21 | 0 | – | 89.29 | 0 |
+| line_items.unit | 96.55 | 0 | – | 100 | 0 |
 | line_items.material | 89.29 | 0 | 0 | 96.43 | 3.85 |
 | line_items.dimensions | 92.86 | 50 | 100 | 96.3 | 0 |
 
-These numbers describe the hand-written responses, not real model quality. Finding from `t03`: a
-quote that spans a pipe-table cell border (`60    | Stk.`) fails the unit check, because a unit
-counts only directly after a number; the verifier is unchanged here (open point).
+These numbers describe the hand-written responses, not real model quality. Finding from `t03`
+(fixed in #50, baseline updated 2026-09-24): a quote that spans a pipe-table cell border
+(`60    | Stk.`) failed the unit check, because a unit counted only directly after a number or as
+the whole quote. A known unit now also counts when one cell of the quote (split on `|` and tabs) is
+exactly the unit; the quote-in-segment check is unchanged.
 
 ## Verified facts (2026-09-22, in this environment)
 

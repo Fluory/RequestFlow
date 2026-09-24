@@ -233,6 +233,10 @@ def test_unknown_unit_has_no_canonical_form(raw: str) -> None:
         # A table cell holding only the unit.
         ("Stk.", "Stk.", "pcs"),
         ("kg", " kg ", "kg"),
+        # A quote across a table cell border: one cell of it holds only the unit (#50).
+        ("Stk.", "60    | Stk.", "pcs"),
+        ("Stk.", "Stk. | Kugelhahn", "pcs"),
+        ("kg", "kg\tStahlblech", "kg"),
     ],
 )
 def test_unit_value_is_checked_and_canonicalised(value: str, quote: str, normalized: str) -> None:
@@ -257,6 +261,10 @@ def test_unit_value_is_checked_and_canonicalised(value: str, quote: str, normali
         ("Stk.", "Werkstoff St 52"),
         ("t", "Blech t=5"),
         ("t", "t 5 mm"),
+        # Across a cell border only a cell that is exactly the unit counts (#50).
+        ("pcs", "1 | St 37-2"),
+        ("Stk.", "60 | Stückliste"),
+        ("t", "5 | t=5"),
     ],
 )
 def test_unit_not_in_quote_is_not_ok(value: str, quote: str) -> None:

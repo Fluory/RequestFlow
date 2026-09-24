@@ -8,7 +8,8 @@ Dates: ``DD.MM.YYYY``, ``D.M.YY`` (two-digit years are 20YY) and ISO ``YYYY-MM-D
 only accepted as a week value (returned as ``KW 42`` / ``KW 42/2026``) and flagged, so the verifier
 caps it at ``uncertain``. A date computed from a week is not in the quote and is rejected.
 Units: a small canonical set (``mm``, ``cm``, ``m``, ``kg``, ``t``, ``pcs``) with German and
-English spellings (``Stk.``, ``Stück``, ``Meter``, ...); unknown units are checked as text and
+English spellings (``Stk.``, ``Stück``, ``Meter``, ...); a known unit must follow a number or fill a
+whole table cell of the quote (cells split on ``|`` and tabs); unknown units are checked as text and
 returned trimmed.
 E-mail: case-insensitive match on address boundaries; returned lowercased.
 Phone: the digits (with a leading ``+``) must equal one phone-like number in the quote; returned
@@ -66,9 +67,11 @@ _UNITS: dict[str, str] = {
     for canonical, spellings in _UNIT_SPELLINGS.items()
     for spelling in spellings
 }
-# A known unit counts only right after a number ("250mm", "1.250 Stk.") or when the whole quote is
-# the unit (a table cell). A bare "St 37-2" (steel grade) or "t=5" (thickness) is not a unit.
+# A known unit counts only right after a number ("250mm", "1.250 Stk.") or when a whole table cell
+# of the quote is the unit ("Stk.", "60    | Stk.", "Stk.\tKugelhahn"; cells split on "|" and tabs,
+# #50). A bare "St 37-2" (steel grade) or "t=5" (thickness) is not a unit.
 _UNIT_AFTER_NUMBER = re.compile(r"\d[\s\u00a0]*(?P<unit>[^\W\d_]+)\.?(?![^\W_])")
+_CELL_BORDER = re.compile(r"[|\t]")
 
 _EMAIL_SHAPE = re.compile(r"[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+")
 # A phone-like number: digits with spaces, "/", "-" or parentheses between them. No dots: a date
@@ -251,7 +254,8 @@ def _check_unit(value: str, quote: str) -> ValueCheck:
     canonical = canonical_unit(value)
     if canonical is None:
         return _check_text(value, quote)
-    if canonical_unit(quote.strip()) == canonical:
+    # Exact match per cell (the whole quote is one cell when it has no border): no fuzziness.
+    if any(canonical_unit(cell) == canonical for cell in _CELL_BORDER.split(quote)):
         return ValueCheck(ok=True, normalized=canonical)
     for match in _UNIT_AFTER_NUMBER.finditer(quote):
         if canonical_unit(match.group("unit")) == canonical:
