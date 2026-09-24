@@ -458,6 +458,59 @@ def test_line_item_quantity_is_never_promoted_from_uncertain() -> None:
     assert result.fields["quantity"].value == "1250"
 
 
+TABLE_ROW_SEGMENTS: dict[str, Segment] = {
+    s.id: s
+    for s in [
+        body_segment(
+            "eml-l7", "| 1   | 60    | Stk.    | Kugelhahn      | 1.4408    | DN80      |"
+        ),
+        body_segment(
+            "eml-l8", "| 2   | 25    | Stck.   | Rueckschlagventil | 1.0619  | DN50      |"
+        ),
+    ]
+}
+
+
+def test_unit_quoted_across_a_table_cell_border_is_found() -> None:
+    # Issue #50 (eval t03): the model quotes quantity and unit cell together.
+    extraction = extraction_with_items(
+        item(
+            quantity=field("60", "found", "eml-l7", "| 60    | Stk."),
+            unit=field("Stk.", "found", "eml-l7", "60    | Stk."),
+        ),
+    )
+    (result,) = verify_line_items(extraction, list(TABLE_ROW_SEGMENTS.values()))
+    assert result.fields["quantity"].status == "found"
+    assert result.fields["unit"].status == "found"
+    assert result.fields["unit"].value == "pcs"
+
+
+@pytest.mark.parametrize(
+    "quote",
+    [
+        # Real characters dropped ("Stck." -> "Stk."): not a separator difference.
+        "25    | Stk.",
+        # Cell border dropped as well as padding: still not the segment text.
+        "25 Stk.",
+    ],
+)
+def test_cross_cell_quote_that_drops_real_characters_is_unverified(quote: str) -> None:
+    extraction = extraction_with_items(item(unit=field("Stk.", "found", "eml-l8", quote)))
+    (result,) = verify_line_items(extraction, list(TABLE_ROW_SEGMENTS.values()))
+    assert result.fields["unit"].status == "unverified"
+    assert result.fields["unit"].reason == "quote_not_in_segment"
+
+
+def test_cross_cell_quote_whose_unit_cell_is_not_a_unit_is_unverified() -> None:
+    # The quote is in the segment, but no cell of it is the unit: "Kugelhahn" proves no "Stk.".
+    extraction = extraction_with_items(
+        item(unit=field("Stk.", "found", "eml-l7", "Kugelhahn      | 1.4408"))
+    )
+    (result,) = verify_line_items(extraction, list(TABLE_ROW_SEGMENTS.values()))
+    assert result.fields["unit"].status == "unverified"
+    assert result.fields["unit"].reason == "value_not_in_quote"
+
+
 def test_no_line_items_is_an_empty_list() -> None:
     assert verify_line_items(extraction_with_items(), list(V2_SEGMENTS.values())) == []
 

@@ -69,3 +69,8 @@ This file records what changes **in the product** – process and session state 
 - Database roles `app_owner` (migrations) and `app_rw` (runtime, no RLS bypass); schema `app`.
 - Verify commands `pnpm verify:changed`, `pnpm verify`, `pnpm verify:full`; CI runs integration
   tests against real PostgreSQL + SeaweedFS.
+
+### Fixed
+- AI verifier: a unit quoted together with the neighbouring table cell (e.g. `60    | Stk.`) is now
+  confirmed as `found` when one cell of the quote is exactly the unit; quotes that differ from the
+  source in real characters are still rejected (#50).
