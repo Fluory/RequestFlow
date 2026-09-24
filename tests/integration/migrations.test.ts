@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -58,5 +58,16 @@ describe("first migration", () => {
     expect(guard).toContain("DO $$");
 
     await expect(rw.query(guard)).rejects.toThrow(/migrations must run as app_owner, not app_rw/);
+  });
+
+  it("never creates or uses a schema named auth – Supabase reserves it (#60)", () => {
+    const folder = new URL("../../src/db/migrations/", import.meta.url);
+    const files = readdirSync(folder).filter((name) => name.endsWith(".sql"));
+    const usesAuth = /"auth"\s*\.|\bSCHEMA\s+"?auth"?\b|\bauth\.[a-z_]+/i;
+    const offenders = files.filter((name) => !name.startsWith("0018_") && usesAuth.test(readFileSync(new URL(name, folder), "utf8")));
+    expect(offenders).toEqual([]);
+    // The one rename for databases migrated before #60 touches only a schema the migrating role owns.
+    const rename = readFileSync(new URL(files.find((name) => name.startsWith("0018_"))!, folder), "utf8");
+    expect(rename).toMatch(/pg_get_userbyid\(nspowner\) = current_user/);
   });
 });

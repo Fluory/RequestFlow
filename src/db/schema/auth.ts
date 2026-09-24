@@ -1,4 +1,4 @@
-// Better Auth tables (schema `auth`), generated with `pnpm dlx auth@1.7.5 generate` (Better Auth CLI)
+// Better Auth tables (schema `identity`, named `auth` until #60), generated with `pnpm dlx auth@1.7.5 generate` (Better Auth CLI)
 // and adapted: timestamps with time zone. Not company-owned business data → no RLS; reachable only
 // by server code (ADR-0001 D7, exceptions register). Regenerate on a Better Auth upgrade.
 import { relations, sql } from "drizzle-orm";
@@ -13,7 +13,7 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 
-export const authSchema = pgSchema("auth");
+export const authSchema = pgSchema("identity");
 
 export const user = authSchema.table("user", {
   id: uuid("id")

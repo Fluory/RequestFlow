@@ -637,8 +637,8 @@ enters the code: the app still talks plain PostgreSQL (Drizzle, pg-boss) and the
   schemas of the Supabase Data API (PostgREST/GraphQL); the app never uses the Data API, and `anon`/
   `authenticated` get no grants on our schemas.
 - **Schema `auth`.** Supabase reserves the schema `auth` for its own Auth service – our Better Auth
-  schema of the same name cannot be deployed there. It is renamed to `identity` in a separate issue
-  (#60); the showcase deploy waits for it.
+  schema of the same name cannot be deployed there. It is renamed to `identity` (#60, PR #63): a fresh
+  database creates `identity` directly, an existing one renames its own `auth` schema only.
 - **Storage.** A **private** bucket; S3 access keys from the Storage settings (server-side only),
   endpoint `https://<project-ref>.storage.supabase.co/storage/v1/s3`, path-style URLs. The R2
   "EU jurisdiction on the free plan" open point is obsolete.

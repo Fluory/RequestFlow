@@ -9,7 +9,7 @@
 | Schema | Owner | Runtime access (`app_rw`) | Tenant isolation |
 |---|---|---|---|
 | `app` | `app_owner` | DML via default privileges, no CREATE | every table: `company_id` + RLS **enabled and forced**, policy `<table>_tenant_isolation` |
-| `auth` | `app_owner` | DML on all tables, no CREATE | none – Better Auth data, server code only (exceptions register) |
+| `identity` (until #60: `auth`) | `app_owner` | DML on all tables, no CREATE | none – Better Auth data, server code only (exceptions register) |
 | `pgboss` | `app_owner` (deploy step installs schema + queues) | DML only | none – job queue, IDs only (exceptions register) |
 | `drizzle` | `app_owner` | none | migration journal |
 
@@ -24,7 +24,7 @@ query sees zero rows and every write fails.
 | Column | Type | Notes | Class |
 |---|---|---|---|
 | `id` | uuid PK | `gen_random_uuid()` | internal |
-| `company_id` | uuid FK → `auth.organization.id` | tenant key, `ON DELETE RESTRICT` | internal |
+| `company_id` | uuid FK → `identity.organization.id` | tenant key, `ON DELETE RESTRICT` | internal |
 | `status` | text | `NEW · PROCESSING · REVIEW · APPROVED · EXPORTED · REJECTED · ERROR` (check constraint) | internal |
 | `created_at` | timestamptz | | internal |
 | `source` | text | `upload` (mailbox later) | internal |
@@ -39,7 +39,8 @@ query sees zero rows and every write fails.
 | `rejection_reason` | text | free-text reason of a rejection, max 1000 chars (refused above, not cut – review module); also in the `request.rejected` audit event | confidential |
 
 Unique `(id, company_id)` so child tables can pin the company with composite foreign keys (FK checks
-bypass RLS). Purpose: one quote request per row. Retention: open question for the customer (ADR-0001 open points).
+bypass RLS). Index `(company_id, created_at desc, id desc)` serves the paged request list (#48, #61) and
+every lookup by company. Purpose: one quote request per row. Retention: open question for the customer (ADR-0001 open points).
 
 ### `app.extraction_runs`, `app.extraction_segments`, `app.extracted_fields` – processing results (#7)
 
@@ -57,9 +58,9 @@ All three: `company_id`, forced RLS, composite FKs to the run and request of the
 | Column | Type | Notes | Class |
 |---|---|---|---|
 | `id`, `company_id`, `request_id` | uuid | composite FK `(request_id, company_id)` → `requests` | internal |
-| `field_key`, `item_index` | text, int | header field key (six, schema v2), or a line-item field key with its position (`item_index`, #25; null for header fields) | internal |
+| `field_key`, `item_index` | text, int | header field key (six, schema v2), or a line-item field key with its position (`item_index`, #25; null for header fields; check `item_index is null or item_index >= 0`, #47) | internal |
 | `old_value`, `new_value` | text | value before / after; the newest row is the current value | confidential + personal |
-| `corrected_by`, `created_at` | uuid, timestamptz | who and when; no FK to `auth.user` (like `audit_events.actor_user_id`) – the history must survive a user's removal | personal (staff) |
+| `corrected_by`, `created_at` | uuid, timestamptz | who and when; no FK to `identity.user` (like `audit_events.actor_user_id`) – the history must survive a user's removal | personal (staff) |
 
 Append-only: forced RLS, `app_rw` has INSERT/SELECT only (UPDATE/DELETE/TRUNCATE revoked) – the
 history is the correction audit. The page shows a corrected value as `korrigiert`, never as `found`
@@ -102,7 +103,7 @@ The bytes (confidential + personal) live only in object storage; served via `GET
 `app_rw` has INSERT and SELECT only (UPDATE/DELETE/TRUNCATE revoked). Written in the same transaction
 as the change.
 
-### `auth.*` – Better Auth 1.7.5 (generated with the Better Auth CLI, timestamps with time zone)
+### `identity.*` – Better Auth 1.7.5 (generated with the Better Auth CLI, timestamps with time zone)
 
 | Table | Content | Class | Purpose |
 |---|---|---|---|
@@ -121,9 +122,9 @@ company's first admin; it can never obtain a session.
 ## Relations
 
 ```text
-auth.organization 1─n auth.member n─1 auth.user 1─n auth.session / auth.account
-auth.organization 1─n auth.invitation
-auth.organization 1─n app.requests            (company_id)
+identity.organization 1─n identity.member n─1 identity.user 1─n identity.session / identity.account
+identity.organization 1─n identity.invitation
+identity.organization 1─n app.requests            (company_id)
 app.requests      1─n app.documents           (request_id, company_id)
 app.requests      0─1 app.requests            (duplicate_of_id, company_id)
 app.requests      1─n app.extraction_runs     (request_id, company_id) 1─n segments / fields

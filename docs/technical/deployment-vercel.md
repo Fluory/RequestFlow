@@ -8,7 +8,6 @@
 
 | Blocker | Why |
 |---|---|
-| #60 merged (PR #63: Better Auth schema `auth` → `identity`) | Supabase reserves the schema `auth`; the migrations fail on Supabase until then. The bootstrap script creates no schema, so it is not affected |
 | AI service host chosen and running | The drain calls it; recommendation: **Google Cloud Run in the EU** (same GCP project as Vertex `eu`, existing image `services/ai`, no 300 s / package limits) |
 
 What runs where: Vercel (Hobby) runs the Next.js app, the drain route and the ERP mock

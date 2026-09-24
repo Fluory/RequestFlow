@@ -51,7 +51,7 @@ ALTER TABLE "app"."requests" ADD COLUMN "error_message" text;--> statement-break
 ALTER TABLE "app"."requests" ADD COLUMN "attempts" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
 ALTER TABLE "app"."requests" ADD COLUMN "next_retry_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "app"."extracted_fields" ADD CONSTRAINT "extracted_fields_run_same_company_fk" FOREIGN KEY ("run_id","company_id") REFERENCES "app"."extraction_runs"("id","company_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "app"."extraction_runs" ADD CONSTRAINT "extraction_runs_company_id_organization_id_fk" FOREIGN KEY ("company_id") REFERENCES "auth"."organization"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "app"."extraction_runs" ADD CONSTRAINT "extraction_runs_company_id_organization_id_fk" FOREIGN KEY ("company_id") REFERENCES "identity"."organization"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "app"."extraction_runs" ADD CONSTRAINT "extraction_runs_request_same_company_fk" FOREIGN KEY ("request_id","company_id") REFERENCES "app"."requests"("id","company_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "app"."extraction_segments" ADD CONSTRAINT "extraction_segments_run_same_company_fk" FOREIGN KEY ("run_id","company_id") REFERENCES "app"."extraction_runs"("id","company_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "extracted_fields_request_idx" ON "app"."extracted_fields" USING btree ("company_id","request_id");--> statement-breakpoint

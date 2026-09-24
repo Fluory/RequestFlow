@@ -55,7 +55,9 @@ export const requests = appSchema
       duplicateDecision: text("duplicate_decision", { enum: ["distinct", "duplicate"] }),
     },
     (table) => [
-      index("requests_company_id_idx").on(table.companyId),
+      // Request list keyset paging (#48, #61): one company, newest first, ties by id. Its leading
+      // column also serves every lookup by company_id alone.
+      index("requests_company_created_idx").on(table.companyId, table.createdAt.desc().nullsFirst(), table.id.desc().nullsFirst()),
       index("requests_company_message_id_idx").on(table.companyId, table.messageId),
       index("requests_company_fingerprint_idx").on(table.companyId, table.fingerprint),
       // FK checks bypass RLS: child rows pin company_id through composite keys.
@@ -261,6 +263,7 @@ export const fieldCorrections = appSchema
         columns: [table.requestId, table.companyId],
         foreignColumns: [requests.id, requests.companyId],
       }).onDelete("cascade"),
+      check("field_corrections_item_index_check", sql`item_index is null or item_index >= 0`),
       tenantPolicy("field_corrections"),
     ],
   )
