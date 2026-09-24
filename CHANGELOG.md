@@ -74,6 +74,8 @@ This file records what changes **in the product** – process and session state 
 
 ### Changed
 - AI service logs use the web/worker format: `time` (ISO 8601, `Z`) instead of `ts`, lower-case pino level labels (`warn`, not `WARNING`), `logger` only on library records.
+- The request list reads each page from an index in its sort order instead of sorting all of the
+  company's requests (#61).
 
 ### Fixed
 - AI verifier: a unit quoted together with the neighbouring table cell (e.g. `60    | Stk.`) is now
