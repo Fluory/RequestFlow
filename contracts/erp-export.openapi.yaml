@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: RequestFlow ERP export
-  version: 1.0.0
+  version: 1.1.0
   description: |
     Port between RequestFlow and the customer's ERP (ADR-0001 D9). In the pilot the ERP mock
     (`/api/erp-mock`, active only with `ERP_MOCK_ENABLED=true`) implements it.
@@ -9,6 +9,9 @@ info:
     Idempotency: `Idempotency-Key` is the RequestFlow request id. A repeated call with the same key
     and the same body returns the SAME `erpReference` (status 200 instead of 201) – never a second
     record. The same key with a different body is refused with 409.
+
+    1.1.0 (#46): optional `lineItems` – the reviewed positions in document order. Additive and backwards
+    compatible: a request without positions sends exactly the 1.0.0 body (the field is omitted).
 servers:
   - url: /api/erp-mock
 paths:
@@ -114,6 +117,39 @@ components:
               description: ISO date (YYYY-MM-DD) when the value is a date, else the reviewed text.
               type: [string, "null"]
               maxLength: 500
+        lineItems:
+          description: Reviewed positions in document order (1.1.0). Omitted when the request has none.
+          type: array
+          minItems: 1
+          maxItems: 200
+          items:
+            $ref: "#/components/schemas/LineItem"
+    LineItem:
+      type: object
+      additionalProperties: false
+      required: [position, description, quantity, unit, material, dimensions]
+      properties:
+        position:
+          description: 1-based position in the document order.
+          type: integer
+          minimum: 1
+        description:
+          type: [string, "null"]
+          maxLength: 500
+        quantity:
+          description: Plain decimal with a dot, no grouping ("1250", "2.5"), else the reviewed text.
+          type: [string, "null"]
+          maxLength: 500
+        unit:
+          description: mm, cm, m, kg, t or pcs when known, else the unit as written.
+          type: [string, "null"]
+          maxLength: 500
+        material:
+          type: [string, "null"]
+          maxLength: 500
+        dimensions:
+          type: [string, "null"]
+          maxLength: 500
     QuoteRequestReceipt:
       type: object
       additionalProperties: false

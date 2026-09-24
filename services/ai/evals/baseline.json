@@ -75,10 +75,10 @@
       "false_found_rate": 0.0
     },
     "line_items.unit": {
-      "found_accuracy": 86.21,
+      "found_accuracy": 96.55,
       "missing_precision": 0.0,
       "missing_recall": null,
-      "grounding_pass_rate": 89.29,
+      "grounding_pass_rate": 100.0,
       "false_found_rate": 0.0
     },
     "line_items.material": {

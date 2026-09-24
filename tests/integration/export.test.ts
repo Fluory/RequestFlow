@@ -5,7 +5,7 @@ import { loadConfig } from "@/config/env";
 import { sendInTransaction } from "@/db/job-queue";
 import { createJobQueue, installJobQueues } from "@/db/job-queue-client";
 import { listAuditEvents } from "@/features/audit";
-import { insertDocuments } from "@/features/documents";
+import { insertDocuments, listDocuments } from "@/features/documents";
 import { createErpMock, MemoryMockStore, type ErpMock, type MockFault } from "@/features/erp-mock";
 import { createErpClient, drainExports, exportRequestJob, getExportRecord, type ExportDrainDeps } from "@/features/export";
 import { persistExtractionRun } from "@/features/extraction";
@@ -13,7 +13,7 @@ import { syntheticExtractResponse } from "@/features/extraction/fixtures";
 import { getActor, type Actor } from "@/features/identity";
 import { QUEUES, reprocessRequest } from "@/features/jobs";
 import { createRequest, getRequest, lockRequest, transitionRequest } from "@/features/requests";
-import { approveRequest, correctField, currentFieldValues } from "@/features/review";
+import { approveRequest, correctField, currentFieldValues, currentLineItemValues, loadReview, ReviewRefused } from "@/features/review";
 import { createTenancy, type Tenancy } from "@/features/tenancy";
 import { companyWithAdmin, createStack, invitedUser, type Stack } from "./helpers/stack";
 
@@ -43,11 +43,19 @@ describe("export: approved requests reach the ERP exactly once", () => {
       if (request.signal.aborted) throw request.signal.reason;
       return response;
     };
-    return { tenancy, boss, erp: createErpClient({ baseUrl: "http://web/api/erp-mock", token: TOKEN, timeoutMs, fetch: fetchImpl }), fieldValues: currentFieldValues };
+    return { tenancy, boss, erp: createErpClient({ baseUrl: "http://web/api/erp-mock", token: TOKEN, timeoutMs, fetch: fetchImpl }), fieldValues: currentFieldValues, lineItemValues: currentLineItemValues };
   }
 
+  const found = (value: string, segmentId: string) => ({ value, status: "found", evidence: { segmentId, quote: value }, modelStatus: "found", reason: null }) as const;
+  const missingValue = { value: null, status: "missing", evidence: null, modelStatus: "missing", reason: null } as const;
+  /** Two synthetic positions whose quotes sit in the fixture's segments. */
+  const POSITIONS = [
+    { index: 0, description: found("Musterbau Beispiel GmbH", "s2"), quantity: found("15.10.2026", "s4"), unit: { ...missingValue }, material: { ...missingValue }, dimensions: { ...missingValue } },
+    { index: 1, description: found("Erika Beispiel", "s3"), quantity: { ...missingValue }, unit: { ...missingValue }, material: { ...missingValue }, dimensions: { ...missingValue } },
+  ];
+
   /** A request approved through the review module, with its export job moved to the test queue. */
-  async function approved(actor: Actor) {
+  async function approved(actor: Actor, lineItems: typeof POSITIONS = [], beforeApproval: (requestId: string) => Promise<void> = async () => {}) {
     const requestId = randomUUID();
     const documentId = randomUUID();
     await tenancy.withTenant(actor.companyId, async (tx) => {
@@ -56,10 +64,11 @@ describe("export: approved requests reach the ERP exactly once", () => {
         { id: documentId, requestId, filename: "anfrage.eml", contentType: "message/rfc822", kind: "eml", sizeBytes: 10, sha256: "x".repeat(64), storageKey: `${actor.companyId}/${requestId}/${documentId}` },
       ]);
       const row = await transitionRequest(tx, (await lockRequest(tx, requestId))!, "processing.started", { attempts: 1 });
-      await persistExtractionRun(tx, { requestId, jobId: randomUUID(), outcomes: [{ documentId, response: syntheticExtractResponse(documentId) }] });
+      await persistExtractionRun(tx, { requestId, jobId: randomUUID(), outcomes: [{ documentId, response: syntheticExtractResponse(documentId, {}, lineItems) }] });
       await transitionRequest(tx, row, "processing.succeeded");
     });
     await correctField(tenancy, actor, requestId, "company", "Musterbau Beispiel GmbH & Co. KG");
+    await beforeApproval(requestId);
     await approveRequest({ tenancy, boss }, actor, requestId);
     await stack.database.pool.query("delete from pgboss.job where name = $1 and singleton_key = $2", [QUEUES.exportRequest, requestId]);
     const data = { requestId, companyId: actor.companyId };
@@ -127,6 +136,56 @@ describe("export: approved requests reach the ERP exactly once", () => {
 
     expect(sent).toMatchObject({ requestId, subject: "Anfrage Flansche DN 100", fields: { company: "Musterbau Beispiel GmbH & Co. KG", contactPerson: "Erika Beispiel" } });
     expect(Date.parse((sent as { approvedAt: string }).approvedAt)).not.toBeNaN();
+    // Without positions the body stays exactly what contract v1.0 sent (#46: the field is optional).
+    expect(sent).not.toHaveProperty("lineItems");
+  });
+
+  it("sends the reviewed positions in document order: an item correction wins over the extraction (#46)", async () => {
+    const deps = depsWith();
+    const { requestId, job } = await approved(clerk, POSITIONS, (id) => correctField(tenancy, clerk, id, "quantity", "1300", 0));
+    let sent: unknown;
+    const erp = deps.erp;
+    await exportRequestJob({ ...deps, erp: { submit: (body) => ((sent = body), erp.submit(body)) } }, job);
+
+    expect((sent as { lineItems: unknown }).lineItems).toEqual([
+      { position: 1, description: "Musterbau Beispiel GmbH", quantity: "1300", unit: null, material: null, dimensions: null },
+      { position: 2, description: "Erika Beispiel", quantity: null, unit: null, material: null, dimensions: null },
+    ]);
+    expect((await requestOf(clerk, requestId))?.status).toBe("EXPORTED");
+    expect(mock.created()).toBe(1);
+  });
+
+  it("refuses the approval while a position value would break the ERP contract (#46)", async () => {
+    // Corrections are capped at 500 characters, so an overlong position value can only come from the
+    // extraction; the approval must refuse it while the clerk can still correct it.
+    const tooLong = [{ ...POSITIONS[0]!, description: { ...found("Musterbau Beispiel GmbH", "s2"), value: "x".repeat(501) } }];
+    await expect(approved(clerk, tooLong)).rejects.toMatchObject({ code: "value_too_long" });
+  });
+
+  it("refuses more positions than the ERP accepts with its own code – a correction cannot fix that (#46 review)", async () => {
+    const tooMany = Array.from({ length: 201 }, (_, index) => ({ ...POSITIONS[1]!, index }));
+    const refusal = approved(clerk, tooMany);
+    await expect(refusal).rejects.toBeInstanceOf(ReviewRefused);
+    await expect(refusal).rejects.toMatchObject({ code: "export_too_large" });
+  });
+
+  it("exports exactly the positions the review shows: an item correction older than the latest run is ignored (#46 review)", async () => {
+    const deps = depsWith();
+    const { requestId, job } = await approved(clerk, POSITIONS, async (id) => {
+      await correctField(tenancy, clerk, id, "quantity", "1300", 0);
+      // A newer run (as after reprocessing) makes the correction stale – positions may have shifted.
+      await tenancy.withTenant(clerk.companyId, async (tx) => {
+        const documentId = (await listDocuments(tx, id))[0]!.id;
+        await persistExtractionRun(tx, { requestId: id, jobId: randomUUID(), outcomes: [{ documentId, response: syntheticExtractResponse(documentId, {}, POSITIONS) }] });
+      });
+    });
+    let sent: { lineItems?: Array<Record<string, unknown>> } | undefined;
+    const erp = deps.erp;
+    await exportRequestJob({ ...deps, erp: { submit: (body) => ((sent = body), erp.submit(body)) } }, job);
+
+    expect(sent?.lineItems?.[0]).toMatchObject({ position: 1, quantity: "15.10.2026" });
+    const shown = (await loadReview(tenancy, clerk, requestId))!.lineItems.map((item) => Object.fromEntries(item.fields.map((field) => [field.key, field.value])));
+    expect(sent?.lineItems?.map(({ position: _position, ...values }) => values)).toEqual(shown);
   });
 
   it("duplicate delivery of the same job: the row lock lets one export, the other sees EXPORTED and never calls the ERP", async () => {
@@ -148,7 +207,7 @@ describe("export: approved requests reach the ERP exactly once", () => {
     const { requestId, job } = await approved(clerk);
     const values = await tenancy.withTenant(clerk.companyId, async (tx) => {
       const { buildQuoteRequest } = await import("@/features/export");
-      return buildQuoteRequest(tx, (await getRequest(tx, requestId))!, currentFieldValues);
+      return buildQuoteRequest(tx, (await getRequest(tx, requestId))!, currentFieldValues, currentLineItemValues);
     });
     const first = await deps.erp.submit(values);
 

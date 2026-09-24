@@ -8,12 +8,14 @@ import { useState, type FormEvent } from "react";
 export function AuthForm({ mode, invitationId }: { mode: "sign-in" | "sign-up"; invitationId?: string }) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     setMessage(null);
+    setFailed(false);
     const form = new FormData(event.currentTarget);
     const body = {
       email: String(form.get("email") ?? ""),
@@ -30,12 +32,14 @@ export function AuthForm({ mode, invitationId }: { mode: "sign-in" | "sign-up"; 
       if (response.ok) {
         router.push("/");
         router.refresh();
+        return;
       }
-      else if (response.status === 429) setMessage("Zu viele Versuche – bitte später erneut versuchen.");
-      else setMessage("Anmeldung fehlgeschlagen. Bitte E-Mail und Passwort prüfen.");
+      setFailed(true);
+      setMessage(response.status === 429 ? "Zu viele Versuche – bitte später erneut versuchen." : "Anmeldung fehlgeschlagen. Bitte E-Mail und Passwort prüfen.");
       return;
     }
     // Same answer for invited and uninvited addresses (no enumeration).
+    setFailed(!response.ok);
     setMessage(
       response.ok
         ? "Falls für diese Adresse eine Einladung vorliegt, ist das Konto jetzt angelegt. Bitte anmelden."
@@ -44,22 +48,20 @@ export function AuthForm({ mode, invitationId }: { mode: "sign-in" | "sign-up"; 
   }
 
   return (
-    <form onSubmit={submit} aria-busy={busy}>
+    <form onSubmit={submit} aria-busy={busy} className="auth-form">
+      {message && <div role={failed ? "alert" : "status"}>{message}</div>}
       {mode === "sign-up" && (
-        <p>
-          <label htmlFor="name">Name</label>
-          <br />
+        <label className="field" htmlFor="name">
+          <span>Name</span>
           <input id="name" name="name" required autoComplete="name" />
-        </p>
+        </label>
       )}
-      <p>
-        <label htmlFor="email">E-Mail</label>
-        <br />
+      <label className="field" htmlFor="email">
+        <span>E-Mail</span>
         <input id="email" name="email" type="email" required autoComplete="email" />
-      </p>
-      <p>
-        <label htmlFor="password">Passwort</label>
-        <br />
+      </label>
+      <label className="field" htmlFor="password">
+        <span>Passwort</span>
         <input
           id="password"
           name="password"
@@ -67,12 +69,17 @@ export function AuthForm({ mode, invitationId }: { mode: "sign-in" | "sign-up"; 
           required
           minLength={12}
           autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
+          aria-describedby={mode === "sign-up" ? "password-hint" : undefined}
         />
-      </p>
-      <button type="submit" disabled={busy}>
+      </label>
+      {mode === "sign-up" && (
+        <span id="password-hint" className="field-hint">
+          Mindestens 12 Zeichen
+        </span>
+      )}
+      <button type="submit" className="btn-primary btn-large" disabled={busy}>
         {mode === "sign-in" ? "Anmelden" : "Konto anlegen"}
       </button>
-      {message && <p role="status">{message}</p>}
     </form>
   );
 }

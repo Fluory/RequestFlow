@@ -1,3 +1,5 @@
+import { headers } from "next/headers";
+import { cache } from "react";
 import { loadConfig, type AppConfig } from "@/config/env";
 import { createDatabase, type DatabaseHandle } from "@/db";
 import { createJobQueue } from "@/db/job-queue-client";
@@ -49,3 +51,9 @@ export async function currentActor(headers: Headers): Promise<Actor | null> {
   const { auth, database } = getRuntime();
   return getActor(auth, database.db, headers);
 }
+
+/**
+ * The signed-in actor of the page being rendered, looked up once per request and shared by the app
+ * header (layout) and the page (#52). Server actions and route handlers keep calling `currentActor`.
+ */
+export const requestActor = cache(async (): Promise<Actor | null> => currentActor(await headers()));

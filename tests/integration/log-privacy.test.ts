@@ -14,7 +14,7 @@ import { submitUpload } from "@/features/intake";
 import { drain } from "@/features/jobs";
 import { captureLogs } from "@/features/observability";
 import { getRequest } from "@/features/requests";
-import { approveRequest, correctField, currentFieldValues } from "@/features/review";
+import { approveRequest, correctField, currentFieldValues, currentLineItemValues } from "@/features/review";
 import { S3BlobStore } from "@/features/storage";
 import { createTenancy, type Tenancy } from "@/features/tenancy";
 import { companyWithAdmin, createStack, invitedUser, type Stack } from "./helpers/stack";
@@ -81,7 +81,7 @@ describe("logs of a full synthetic run carry no content and no personal data", (
       await until(async () => (await statusOf(requestId)) === "REVIEW", () => drain({ tenancy, storage, ai, boss }, { maxMs: 1_000 }));
       await correctField(tenancy, clerk, requestId, "company", "Korrigierte Firma GmbH");
       await approveRequest({ tenancy, boss }, clerk, requestId);
-      await until(async () => (await statusOf(requestId)) === "EXPORTED", () => drainExports({ tenancy, erp, boss, fieldValues: currentFieldValues }, { maxMs: 1_000 }));
+      await until(async () => (await statusOf(requestId)) === "EXPORTED", () => drainExports({ tenancy, erp, boss, fieldValues: currentFieldValues, lineItemValues: currentLineItemValues }, { maxMs: 1_000 }));
     } finally {
       restore();
     }
