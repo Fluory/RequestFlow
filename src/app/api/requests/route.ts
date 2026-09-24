@@ -1,9 +1,12 @@
+import { drainAfterResponse } from "@/app/_server/drain";
 import { currentActor, getJobClient, getRuntime } from "@/app/_server/runtime";
 import { AuthorizationError } from "@/features/identity";
 import { submitUpload, UploadRejected } from "@/features/intake";
 import { logEvent } from "@/features/observability";
 
 export const dynamic = "force-dynamic";
+// The inline drain (`after()`, JOB_DRAIN_INLINE) runs inside this function's limit (SERVERLESS_DRAIN).
+export const maxDuration = 300;
 
 const problem = (status: number, title: string) => Response.json({ error: { title } }, { status });
 
@@ -36,6 +39,7 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const boss = await getJobClient();
     const result = await submitUpload({ tenancy, storage, boss, limits: config.upload }, actor, files);
+    drainAfterResponse(); // serverless runtimes only (JOB_DRAIN_INLINE=true): process right away
     return Response.json(result, { status: 201 });
   } catch (error) {
     if (error instanceof UploadRejected) return problem(422, error.message);

@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { drainAfterResponse } from "@/app/_server/drain";
 import { currentActor, getJobClient, getRuntime } from "@/app/_server/runtime";
 import { AuthorizationError } from "@/features/identity";
 import { reprocessRequest, ReprocessRefused } from "@/features/jobs";
@@ -16,6 +17,7 @@ export async function reprocessAction(formData: FormData): Promise<void> {
   if (!requestId.success) redirect("/requests?error=refused");
   try {
     await reprocessRequest({ tenancy: getRuntime().tenancy, boss: await getJobClient() }, actor, requestId.data);
+    drainAfterResponse(); // serverless runtimes only (JOB_DRAIN_INLINE=true): retry right away
   } catch (error) {
     if (error instanceof ReprocessRefused || error instanceof AuthorizationError) redirect("/requests?error=refused");
     throw error;

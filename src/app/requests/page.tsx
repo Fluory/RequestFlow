@@ -10,6 +10,8 @@ import { StatusPill } from "./status-pill";
 import { UploadForm } from "./upload-form";
 
 export const dynamic = "force-dynamic";
+// Server actions of this page may drain inline via `after()` (JOB_DRAIN_INLINE) – SERVERLESS_DRAIN limit.
+export const maxDuration = 300;
 
 const dateFormat = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
 const STAGE_LABEL: Record<string, string> = { processing: "Verarbeitung", export: "Export" };
