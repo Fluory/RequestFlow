@@ -50,7 +50,8 @@ free tier is **not** allowed for the showcase (D8). Note its HTTPS URL.
 ## 4. Vercel project
 
 Import the GitHub repository (framework Next.js is set by `vercel.json`, function region `fra1`,
-drain route limit 300 s, one cron). Set the variables below for **Production**. Do not give Preview
+drain route limit 300 s, one cron). Keep **Fluid compute** enabled (the Hobby default) – without it the
+300 s function limit is not available; verify it in Project Settings → Functions. Set the variables below for **Production**. Do not give Preview
 deployments the showcase database – leave Preview variables empty (previews then fail closed) or use a
 separate Supabase project.
 

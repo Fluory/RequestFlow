@@ -118,7 +118,7 @@ export function loadConfig(source: Record<string, string | undefined> = process.
     const { processMs, exportMs, marginMs, maxDurationSeconds } = SERVERLESS_DRAIN;
     const worstCaseMs = processMs + env.AI_SERVICE_TIMEOUT_MS * env.UPLOAD_MAX_FILES + exportMs + env.ERP_TIMEOUT_MS + marginMs;
     if (worstCaseMs > maxDurationSeconds * 1000) {
-      throw new Error("Invalid or missing configuration: AI_SERVICE_TIMEOUT_MS, UPLOAD_MAX_FILES");
+      throw new Error("Invalid or missing configuration: AI_SERVICE_TIMEOUT_MS, ERP_TIMEOUT_MS, UPLOAD_MAX_FILES");
     }
   }
   return {

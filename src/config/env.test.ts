@@ -137,8 +137,8 @@ describe("loadConfig", () => {
 
     it("refuses a serverless drain whose worst-case processing job cannot finish within the function limit", () => {
       // Defaults: 120 s AI timeout × 10 files – far beyond one 300 s function run.
-      expect(() => loadConfig({ ...valid, CRON_SECRET: secret })).toThrow(/AI_SERVICE_TIMEOUT_MS.*UPLOAD_MAX_FILES/);
-      expect(() => loadConfig({ ...valid, JOB_DRAIN_INLINE: "true" })).toThrow(/AI_SERVICE_TIMEOUT_MS.*UPLOAD_MAX_FILES/);
+      expect(() => loadConfig({ ...valid, CRON_SECRET: secret })).toThrow(/AI_SERVICE_TIMEOUT_MS, ERP_TIMEOUT_MS, UPLOAD_MAX_FILES/);
+      expect(() => loadConfig({ ...valid, JOB_DRAIN_INLINE: "true" })).toThrow(/AI_SERVICE_TIMEOUT_MS, ERP_TIMEOUT_MS, UPLOAD_MAX_FILES/);
       expect(() => loadConfig({ ...valid, ...fits, CRON_SECRET: secret, JOB_DRAIN_INLINE: "true" })).not.toThrow();
       expect(() => loadConfig({ ...valid, AI_SERVICE_TIMEOUT_MS: "60000", UPLOAD_MAX_FILES: "4", CRON_SECRET: secret })).toThrow(/UPLOAD_MAX_FILES/);
     });
