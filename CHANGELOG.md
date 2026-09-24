@@ -6,12 +6,13 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
-- Visual design for the pilot UI: a quiet, neutral look with a shared header (navigation, company, role)
-  on every page; request status as labelled tags, field status as plain text – highlighted only where a
-  clerk must look (uncertain, unverified, corrected); flat cards, a dark primary action, distinct
-  destructive actions, and tables that scroll inside their container on narrow screens. Colours are
-  design tokens in `globals.css` (WCAG AA), system fonts only (no third-party requests). Login and upload
-  errors are now announced as alerts.
+- Visual design for the pilot UI, implemented from the Claude Design prototype "RequestFlow A": warm
+  neutral palette with one blue accent, IBM Plex Sans/Mono (self-hosted via `@fontsource`, no
+  third-party requests), a header with company, name and role, a start page with open work, and a
+  two-column review page – fields, positions and documents on the left, the selected value with its
+  source and the decision in a sticky panel on the right. Status is always labelled (⚠ for values that
+  need attention); colours are design tokens (WCAG AA). Login and upload errors are announced as alerts;
+  after an upload the message links to the new request; invitation links can be copied.
 - Observability: structured JSON logs (pino) with IDs and codes only, correlated by the request id from web
   through worker to the AI service; `/api/health` also shows whether the AI service is reachable and how
   many jobs are waiting.
