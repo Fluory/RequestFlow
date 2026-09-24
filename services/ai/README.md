@@ -393,7 +393,10 @@ These numbers describe the hand-written responses, not real model quality. Findi
 (fixed in #50, baseline updated 2026-09-24): a quote that spans a pipe-table cell border
 (`60    | Stk.`) failed the unit check, because a unit counted only directly after a number or as
 the whole quote. A known unit now also counts when one cell of the quote (split on `|` and tabs) is
-exactly the unit; the quote-in-segment check is unchanged.
+exactly the unit and no other cell names a different unit (a whole row like `60 | Stk. | 12 | kg`
+proves neither); the quote-in-segment check is unchanged. Known limit: the verifier does not know
+table columns, so a quote of only the wrong column's cell (`12 | kg`) still passes – as a bare `kg`
+quote always did.
 
 ## Verified facts (2026-09-22, in this environment)
 

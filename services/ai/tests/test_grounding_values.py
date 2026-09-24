@@ -265,6 +265,8 @@ def test_unit_value_is_checked_and_canonicalised(value: str, quote: str, normali
         ("pcs", "1 | St 37-2"),
         ("Stk.", "60 | Stückliste"),
         ("t", "5 | t=5"),
+        ("pcs", "| 60 | Stk. | 12 | kg |"),
+        ("kg", "| 60 | Stk. | 12 | kg |"),
     ],
 )
 def test_unit_not_in_quote_is_not_ok(value: str, quote: str) -> None:

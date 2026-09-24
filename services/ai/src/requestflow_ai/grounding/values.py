@@ -255,7 +255,11 @@ def _check_unit(value: str, quote: str) -> ValueCheck:
     if canonical is None:
         return _check_text(value, quote)
     # Exact match per cell (the whole quote is one cell when it has no border): no fuzziness.
-    if any(canonical_unit(cell) == canonical for cell in _CELL_BORDER.split(quote)):
+    # A quote whose cells name different units (a whole row like `60 | Stk. | 12 | kg`) is
+    # ambiguous: it does not prove which unit belongs to the item, so no cell counts (#50 review).
+    cells = (canonical_unit(cell) for cell in _CELL_BORDER.split(quote))
+    cell_units = {unit for unit in cells if unit is not None}
+    if cell_units == {canonical}:
         return ValueCheck(ok=True, normalized=canonical)
     for match in _UNIT_AFTER_NUMBER.finditer(quote):
         if canonical_unit(match.group("unit")) == canonical:
