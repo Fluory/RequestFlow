@@ -261,6 +261,7 @@ export const fieldCorrections = appSchema
         columns: [table.requestId, table.companyId],
         foreignColumns: [requests.id, requests.companyId],
       }).onDelete("cascade"),
+      check("field_corrections_item_index_check", sql`item_index is null or item_index >= 0`),
       tenantPolicy("field_corrections"),
     ],
   )

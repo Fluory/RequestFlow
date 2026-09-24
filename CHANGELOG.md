@@ -59,3 +59,7 @@ This file records what changes **in the product** – process and session state 
 - Database roles `app_owner` (migrations) and `app_rw` (runtime, no RLS bypass); schema `app`.
 - Verify commands `pnpm verify:changed`, `pnpm verify`, `pnpm verify:full`; CI runs integration
   tests against real PostgreSQL + SeaweedFS.
+
+### Fixed
+- The database refuses a line-item correction with a negative position, like it already does for
+  extracted values – defence in depth below the review check (#47).

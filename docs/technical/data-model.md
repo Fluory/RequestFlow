@@ -57,7 +57,7 @@ All three: `company_id`, forced RLS, composite FKs to the run and request of the
 | Column | Type | Notes | Class |
 |---|---|---|---|
 | `id`, `company_id`, `request_id` | uuid | composite FK `(request_id, company_id)` → `requests` | internal |
-| `field_key`, `item_index` | text, int | header field key (six, schema v2), or a line-item field key with its position (`item_index`, #25; null for header fields) | internal |
+| `field_key`, `item_index` | text, int | header field key (six, schema v2), or a line-item field key with its position (`item_index`, #25; null for header fields; check `item_index is null or item_index >= 0`, #47) | internal |
 | `old_value`, `new_value` | text | value before / after; the newest row is the current value | confidential + personal |
 | `corrected_by`, `created_at` | uuid, timestamptz | who and when; no FK to `auth.user` (like `audit_events.actor_user_id`) – the history must survive a user's removal | personal (staff) |
 
