@@ -7,7 +7,7 @@ import { createErpMock, MemoryMockStore } from "@/features/erp-mock";
 import { createErpClient, drainExports, listExportRecords } from "@/features/export";
 import { persistExtractionRun } from "@/features/extraction";
 import { syntheticExtractResponse } from "@/features/extraction/fixtures";
-import { approveRequest, currentFieldValues } from "@/features/review";
+import { approveRequest, currentFieldValues, currentLineItemValues } from "@/features/review";
 import { getActor, type Actor } from "@/features/identity";
 import { QUEUES } from "@/features/jobs";
 import { createRequest, getRequest, listRequests, lockRequest, transitionRequest } from "@/features/requests";
@@ -118,7 +118,7 @@ describe("request list: errors, retries, filters and reprocessing (#26)", () => 
     const mock = createErpMock({ token: "e".repeat(24), store: new MemoryMockStore(), faults: ["503"] });
     const erp = createErpClient({ baseUrl: "http://erp", token: "e".repeat(24), timeoutMs: 1_000, fetch: async (input, init) => mock.handle(new Request(input, init)) });
 
-    await drainExports({ tenancy, erp, boss, fieldValues: currentFieldValues }, { maxMs: 2_000, queues });
+    await drainExports({ tenancy, erp, boss, fieldValues: currentFieldValues, lineItemValues: currentLineItemValues }, { maxMs: 2_000, queues });
 
     const request = (await tenancy.withTenant(clerk.companyId, (tx) => getRequest(tx, id)))!;
     const record = (await tenancy.withTenant(clerk.companyId, (tx) => listExportRecords(tx, [id]))).get(id);

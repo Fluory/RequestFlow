@@ -6,6 +6,9 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
+- ERP export sends the reviewed positions (description, quantity, unit, material, dimensions) with each
+  approved request – ERP contract 1.1.0, additive and optional. A position value the ERP would refuse
+  blocks the approval so the clerk can still correct it.
 - Visual design for the pilot UI, implemented from the Claude Design prototype "RequestFlow A": warm
   neutral palette with one blue accent, IBM Plex Sans/Mono (self-hosted via `@fontsource`, no
   third-party requests), a header with company, name and role, a start page with open work, and a
