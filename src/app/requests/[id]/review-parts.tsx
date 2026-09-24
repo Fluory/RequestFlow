@@ -1,6 +1,6 @@
 import type { ReviewField, ReviewStatus, ReviewView } from "@/features/review";
 
-// Presentational parts of the review page (#8, #23, #25), split out of page.tsx (#52).
+// Presentational parts of the review page (#8, #23, #25), styled after design prototype A (#52).
 
 const ATTACHMENT_ERROR: Record<string, string> = {
   unsupported_media_type: "Format nicht unterstützt",
@@ -23,40 +23,44 @@ export const STATUS_LABEL: Record<ReviewStatus, string> = {
 export const needsAttention = (field: ReviewField): boolean => field.reviewStatus === "unverified" || field.reviewStatus === "uncertain";
 
 export function StatusBadge({ status }: { status: ReviewStatus }) {
-  // Uncertain and unverified are the ones a clerk must look at: a highlighted tag, the others stay
-  // quiet text (#52) – always with the label, never colour only.
+  // Uncertain and unverified are the ones a clerk must look at: warning sign + outlined tag, never colour only.
   return (
     <span className={`badge badge-${status}`} data-testid={`status-${status}`}>
+      {status === "unverified" || status === "uncertain" ? "⚠ " : ""}
       {STATUS_LABEL[status]}
     </span>
   );
 }
 
+/** Source of the selected value: document, heading and the cited lines with the value marked. */
 export function Source({ field }: { field: ReviewField }) {
   if (!field.source) return <p className="muted">Für diesen Wert gibt es keine Fundstelle.</p>;
   const { source } = field;
   return (
-    <section aria-labelledby="source-heading" className="source">
-      <h3 id="source-heading">
-        Quelle: {source.filename} – {source.heading}
-      </h3>
+    <section aria-labelledby="source-heading" className="panel-source">
+      <div className="source-head">
+        <span className="label">Quelle</span>
+        <strong id="source-heading">
+          {source.filename} – {source.heading}
+        </strong>
+      </div>
       {source.ocr && (
         <p role="note">
-          <strong>Texterkennung (OCR):</strong> Der Text stammt aus einem gescannten Dokument – bitte mit dem Original vergleichen.
+          <strong>⚠ Texterkennung (OCR):</strong> Der Text stammt aus einem gescannten Dokument – bitte mit dem Original vergleichen.
         </p>
       )}
-      {field.corrected && <p>Fundstelle des erkannten Werts „{field.extractedValue ?? "–"}“ – der aktuelle Wert wurde manuell korrigiert.</p>}
+      {field.corrected && <p className="field-hint">Fundstelle des erkannten Werts „{field.extractedValue ?? "–"}“ – der aktuelle Wert wurde manuell korrigiert.</p>}
       <ol className="source-lines">
         {source.lines.map((line) => (
           <li key={line.segmentId} className={line.cited ? "cited" : undefined} aria-current={line.cited ? "true" : undefined}>
-            <span className="line-label">{line.label}</span>{" "}
-            {line.parts.map((part, index) => (part.mark ? <mark key={index}>{part.text}</mark> : <span key={index}>{part.text}</span>))}
+            <span className="line-label">{line.label}</span>
+            <span className="line-text">
+              {line.parts.map((part, index) => (part.mark ? <mark key={index}>{part.text}</mark> : <span key={index}>{part.text}</span>))}
+            </span>
           </li>
         ))}
       </ol>
-      <p>
-        <a href={`/api/documents/${source.documentId}`}>Original öffnen</a>
-      </p>
+      <a href={`/api/documents/${source.documentId}`}>Original öffnen</a>
     </section>
   );
 }
@@ -65,27 +69,26 @@ type DocumentsProps = Pick<ReviewView, "documents" | "skippedDocuments" | "docum
 
 export function DocumentList({ documents, skippedDocuments, documentNotes }: DocumentsProps) {
   return (
-    <ul className="doc-list">
+    <div>
       {documents.map((document) => {
         const skipped = skippedDocuments.find((entry) => entry.documentId === document.id);
         const notes = documentNotes.find((entry) => entry.documentId === document.id);
         return (
-          <li key={document.id}>
-            <a href={`/api/documents/${document.id}`}>{document.filename}</a> <small>({Math.ceil(document.sizeBytes / 1024)} KB)</small>
-            {skipped && <small> – nicht automatisch ausgewertet</small>}
-            {notes && notes.warnings.includes("ocr_pages_skipped") && <small> – nur die ersten Scan-Seiten wurden per Texterkennung gelesen</small>}
-            {notes && notes.failedAttachments.length > 0 && (
-              <ul>
-                {notes.failedAttachments.map((attachment, index) => (
-                  <li key={index} role="note">
-                    Anhang „{attachment.name ?? `Nr. ${index + 1}`}“ konnte nicht gelesen werden ({ATTACHMENT_ERROR[attachment.error ?? ""] ?? "unbekannter Grund"}) – bitte im Original prüfen.
-                  </li>
-                ))}
-              </ul>
-            )}
-          </li>
+          <div key={document.id} className="doc-row">
+            <div>
+              <a href={`/api/documents/${document.id}`}>{document.filename}</a>
+              <span className="mono muted">{Math.ceil(document.sizeBytes / 1024)} KB</span>
+            </div>
+            {skipped && <div className="doc-note">⚠ Nicht automatisch ausgewertet.</div>}
+            {notes && notes.warnings.includes("ocr_pages_skipped") && <div className="doc-note">⚠ Nur die ersten Scan-Seiten wurden per Texterkennung gelesen.</div>}
+            {notes?.failedAttachments.map((attachment, index) => (
+              <div key={index} role="note" className="doc-note">
+                ⚠ Anhang „{attachment.name ?? `Nr. ${index + 1}`}“ konnte nicht gelesen werden ({ATTACHMENT_ERROR[attachment.error ?? ""] ?? "unbekannter Grund"}) – bitte im Original prüfen.
+              </div>
+            ))}
+          </div>
         );
       })}
-    </ul>
+    </div>
   );
 }

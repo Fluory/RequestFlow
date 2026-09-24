@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CopyButton } from "@/app/_components/copy-button";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
@@ -41,31 +42,39 @@ export default async function InvitePage({ searchParams }: { searchParams: Promi
       <Link href="/users" className="back">
         ← Benutzer
       </Link>
-      <div className="auth card">
-        <h1>Mitarbeitende einladen</h1>
-        <p className="lead">Die Einladung erzeugt einen Link, den Sie selbst an die Person weitergeben.</p>
+      <h1>Mitarbeitende einladen</h1>
+      <div className="invite-form">
+        <section className="card card-pad" aria-label="Einladung">
+          {params.error && <p role="alert">Bitte eine gültige E-Mail-Adresse und Rolle angeben.</p>}
+          <form action={invite} className="auth-form">
+            <label className="field" htmlFor="email">
+              <span>E-Mail</span>
+              <input id="email" name="email" type="email" required maxLength={254} placeholder="vorname.nachname@example.com" />
+            </label>
+            <label className="field" htmlFor="role">
+              <span>Rolle</span>
+              <select id="role" name="role" defaultValue="clerk">
+                <option value="clerk">Sachbearbeitung</option>
+                <option value="admin">Administration</option>
+              </select>
+            </label>
+            <div>
+              <button type="submit" className="btn-primary btn-large">
+                Einladen
+              </button>
+            </div>
+          </form>
+        </section>
         {link && (
-          <p role="status">
-            Einladung angelegt (7 Tage gültig). Diesen Link an die eingeladene Person weitergeben: <code>{link}</code>
-          </p>
+          <section role="status" className="invite-done">
+            <strong>Einladung angelegt (7 Tage gültig).</strong>
+            <span>Diesen Link selbst an die eingeladene Person weitergeben. Eine E-Mail wird nicht verschickt.</span>
+            <div className="copy-row">
+              <code>{link}</code>
+              <CopyButton text={link} />
+            </div>
+          </section>
         )}
-        {params.error && <p role="alert">Bitte eine gültige E-Mail-Adresse und Rolle angeben.</p>}
-        <form action={invite}>
-          <p className="field">
-            <label htmlFor="email">E-Mail</label>
-            <input id="email" name="email" type="email" required maxLength={254} />
-          </p>
-          <p className="field">
-            <label htmlFor="role">Rolle</label>
-            <select id="role" name="role" defaultValue="clerk">
-              <option value="clerk">Sachbearbeitung</option>
-              <option value="admin">Administration</option>
-            </select>
-          </p>
-          <button type="submit" className="btn-primary">
-            Einladen
-          </button>
-        </form>
       </div>
     </main>
   );

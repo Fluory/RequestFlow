@@ -5,7 +5,7 @@ const TONE: Record<string, string> = {
   NEW: "neutral",
   PROCESSING: "info",
   REVIEW: "warn",
-  APPROVED: "info",
+  APPROVED: "success",
   EXPORTED: "success",
   REJECTED: "neutral",
   ERROR: "danger",

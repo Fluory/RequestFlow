@@ -8,6 +8,8 @@ export interface Actor {
   userId: string;
   companyId: string;
   role: CompanyRole;
+  /** Display name from the session – for the UI only, never for authorization. */
+  name?: string;
 }
 
 export type Action = "requests.process" | "users.invite" | "users.manage";

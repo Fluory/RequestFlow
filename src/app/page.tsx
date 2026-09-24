@@ -1,37 +1,41 @@
 import Link from "next/link";
-import { requestActor } from "@/app/_server/runtime";
+import { Brand } from "@/app/_components/app-header";
+import { getRuntime, requestActor } from "@/app/_server/runtime";
+import { listRequests } from "@/features/requests";
 
 export const dynamic = "force-dynamic";
 
-// Start page: company, role and sign-out live in the app header (#52); this page points to the work.
+// Start page (#52, design prototype A): entry tiles; the request tile shows what needs work.
 export default async function HomePage() {
   const actor = await requestActor();
   if (!actor) {
     return (
-      <main>
-        <div className="auth card">
-          <h1>RequestFlow</h1>
-          <p className="lead">Angebotsanfragen erfassen, neben der Quelle prüfen und genau einmal ans ERP übergeben.</p>
-          <p>
-            <Link href="/login">Anmelden</Link> · <Link href="/signup">Konto mit Einladung anlegen</Link>
-          </p>
-          <p className="muted">Pilot – alle Daten sind synthetisch.</p>
+      <main className="auth">
+        <div className="auth-inner">
+          <Brand className="auth-brand" />
+          <div className="card">
+            <h1>RequestFlow</h1>
+            <p className="muted">Angebotsanfragen erfassen, neben der Quelle prüfen und genau einmal ans ERP übergeben.</p>
+            <p>
+              <Link href="/login">Anmelden</Link> · <Link href="/signup">Konto mit Einladung anlegen</Link>
+            </p>
+          </div>
+          <p className="auth-foot">Pilot – alle Daten sind synthetisch.</p>
         </div>
       </main>
     );
   }
+  // Pilot volumes (20–50 requests a day): counting the tenant's list in memory is enough.
+  const requests = await getRuntime().tenancy.withTenant(actor.companyId, (tx) => listRequests(tx, {}));
+  const count = (status: string) => requests.filter((request) => request.status === status).length;
+  const stats = requests.length ? `${count("REVIEW")} zur Prüfung · ${count("ERROR")} mit Fehler · ${requests.length} insgesamt` : "Noch keine Anfragen";
   return (
     <main>
-      <div className="page-head">
-        <div>
-          <h1>Willkommen</h1>
-          <p className="lead">Angebotsanfragen hochladen, neben der Quelle prüfen und genau einmal ans ERP übergeben.</p>
-        </div>
-      </div>
+      <h1>Start</h1>
       <nav className="tiles" aria-label="Bereiche">
         <Link href="/requests" className="tile">
           <strong>Anfragen</strong>
-          <span>Hochladen, prüfen, korrigieren und freigeben</span>
+          <span>{stats}</span>
         </Link>
         {actor.role === "admin" && (
           <>
@@ -41,7 +45,7 @@ export default async function HomePage() {
             </Link>
             <Link href="/invite" className="tile">
               <strong>Mitarbeitende einladen</strong>
-              <span>Einladungslink für neue Kolleg:innen erzeugen</span>
+              <span>Einladungslink erzeugen, 7 Tage gültig</span>
             </Link>
           </>
         )}

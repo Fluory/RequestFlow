@@ -11,7 +11,7 @@ import { UploadForm } from "./upload-form";
 
 export const dynamic = "force-dynamic";
 
-const dateFormat = new Intl.DateTimeFormat("de-DE", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Berlin" });
+const dateFormat = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
 const STAGE_LABEL: Record<string, string> = { processing: "Verarbeitung", export: "Export" };
 const MESSAGES: Record<string, string> = {
   reprocessed: "Erneut eingeplant.",
@@ -41,21 +41,16 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
 
   return (
     <main>
-      <div className="page-head">
-        <div>
-          <h1>Anfragen</h1>
-          <p className="lead">Hochgeladene Anfragen werden automatisch ausgelesen und erscheinen danach zur Prüfung.</p>
-        </div>
-      </div>
-      <section className="card" aria-label="Anfrage hochladen">
-        <UploadForm />
-      </section>
+      <h1>Anfragen</h1>
       {done && <p role="status">{done}</p>}
       {error && <p role="alert">{error}</p>}
-      <section className="card card-flush" aria-label="Anfragenliste">
+      <section className="card card-pad" aria-label="Anfrage hochladen">
+        <UploadForm />
+      </section>
+      <section className="card" aria-label="Anfragenliste">
         <form method="get" aria-label="Filter" className="toolbar">
-          <label>
-            Status
+          <label className="field">
+            <span>Status</span>
             <select name="status" defaultValue={filter.status ?? ""}>
               <option value="">alle</option>
               {Object.entries(REQUEST_STATUS_LABEL).map(([value, label]) => (
@@ -65,32 +60,31 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
               ))}
             </select>
           </label>
-          <label>
-            <input type="checkbox" name="duplicate" value="1" defaultChecked={filter.possibleDuplicate === true} /> nur mögliche Duplikate
+          <label className="check">
+            <input type="checkbox" name="duplicate" value="1" defaultChecked={filter.possibleDuplicate === true} />
+            nur mögliche Duplikate
           </label>
-          <button type="submit" className="btn-small">
-            Filtern
-          </button>
-          <span className="muted hint">{requests.length === 1 ? "1 Anfrage" : `${requests.length} Anfragen`}</span>
+          <button type="submit">Filtern</button>
+          <span className="count">{requests.length === 1 ? "1 Anfrage" : `${requests.length} Anfragen`}</span>
         </form>
         {requests.length === 0 ? (
-          <p className="empty">{filter.status || filter.possibleDuplicate ? "Keine Anfragen für diesen Filter." : "Noch keine Anfragen."}</p>
+          <p className="empty">
+            {filter.status || filter.possibleDuplicate ? "Keine Anfragen für diesen Filter." : "Noch keine Anfragen. Laden Sie oben eine E-Mail oder Dateien hoch."}
+          </p>
         ) : (
           <div className="table-wrap">
-            <table>
+            <table className="requests-table">
               <thead>
                 <tr>
                   <th scope="col">Eingang</th>
-                  <th scope="col" className="subject">
-                    Betreff
-                  </th>
+                  <th scope="col">Betreff</th>
                   <th scope="col">Status</th>
                   <th scope="col" className="num">
                     Versuche
                   </th>
                   <th scope="col">Letzter Fehler</th>
                   <th scope="col">Nächster Versuch</th>
-                  <th scope="col">Hinweis</th>
+                  <th scope="col">Duplikat</th>
                   <th scope="col">
                     <span className="visually-hidden">Aktion</span>
                   </th>
@@ -99,34 +93,37 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
               <tbody>
                 {requests.map((request) => {
                   const row = requestRowView(request, exports.get(request.id));
+                  const duplicate = !request.possibleDuplicate
+                    ? null
+                    : request.duplicateDecision === "distinct"
+                      ? "als eigenständig geprüft"
+                      : request.duplicateDecision === "duplicate"
+                        ? "als Duplikat abgelehnt"
+                        : "Entscheidung offen";
                   return (
-                    <tr key={request.id} data-testid={`request-${request.id}`}>
-                      <td className="nowrap muted">{dateFormat.format(request.createdAt)}</td>
+                    <tr key={request.id} data-testid={`request-${request.id}`} className={request.status === "ERROR" ? "row-error" : undefined}>
+                      <td className="mono">{dateFormat.format(request.createdAt)}</td>
                       <td className="subject">
                         <Link href={`/requests/${request.id}`}>{request.subject ?? "(ohne Betreff)"}</Link>
                       </td>
                       <td>
-                        <StatusPill status={request.status} />
-                        {request.status === "ERROR" && row.stage && <span className="stage">{STAGE_LABEL[row.stage]}</span>}
+                        <div className="status-cell">
+                          <StatusPill status={request.status} />
+                          {request.status === "ERROR" && row.stage && <span className="stage">Stufe: {STAGE_LABEL[row.stage]}</span>}
+                        </div>
                       </td>
-                      <td className="num">{row.attempts > 0 ? row.attempts : "–"}</td>
+                      <td className="num mono">{row.attempts > 0 ? row.attempts : "–"}</td>
                       {/* The stage appears once: in the status for ERROR, as a prefix while retrying. */}
-                      <td>{row.error ? `${request.status !== "ERROR" && row.stage ? `${STAGE_LABEL[row.stage]}: ` : ""}${row.error}` : "–"}</td>
-                      <td className="nowrap">{row.nextRetryAt ? dateFormat.format(row.nextRetryAt) : "–"}</td>
-                      <td className="hint">
-                        {request.possibleDuplicate ? (
-                          request.duplicateDecision === "distinct" ? (
-                            "Duplikat geprüft: eigenständig"
-                          ) : request.duplicateDecision === "duplicate" ? (
-                            "Als Duplikat abgelehnt"
-                          ) : (
-                            <span className="badge badge-uncertain">Mögliches Duplikat – Entscheidung offen</span>
-                          )
+                      <td className="error-text">{row.error ? `${request.status !== "ERROR" && row.stage ? `${STAGE_LABEL[row.stage]}: ` : ""}${row.error}` : "–"}</td>
+                      <td className="mono">{row.nextRetryAt ? dateFormat.format(row.nextRetryAt) : "–"}</td>
+                      <td>
+                        {duplicate === "Entscheidung offen" ? (
+                          <span className="pill pill-warn">Mögliches Duplikat – Entscheidung offen</span>
                         ) : (
-                          ""
+                          (duplicate ?? <span className="muted">–</span>)
                         )}
                       </td>
-                      <td>
+                      <td className="num">
                         {request.status === "ERROR" && (
                           <form action={reprocessAction}>
                             <input type="hidden" name="requestId" value={request.id} />

@@ -48,19 +48,20 @@ export function AuthForm({ mode, invitationId }: { mode: "sign-in" | "sign-up"; 
   }
 
   return (
-    <form onSubmit={submit} aria-busy={busy}>
+    <form onSubmit={submit} aria-busy={busy} className="auth-form">
+      {message && <div role={failed ? "alert" : "status"}>{message}</div>}
       {mode === "sign-up" && (
-        <p className="field">
-          <label htmlFor="name">Name</label>
+        <label className="field" htmlFor="name">
+          <span>Name</span>
           <input id="name" name="name" required autoComplete="name" />
-        </p>
+        </label>
       )}
-      <p className="field">
-        <label htmlFor="email">E-Mail</label>
+      <label className="field" htmlFor="email">
+        <span>E-Mail</span>
         <input id="email" name="email" type="email" required autoComplete="email" />
-      </p>
-      <p className="field">
-        <label htmlFor="password">Passwort</label>
+      </label>
+      <label className="field" htmlFor="password">
+        <span>Passwort</span>
         <input
           id="password"
           name="password"
@@ -69,13 +70,11 @@ export function AuthForm({ mode, invitationId }: { mode: "sign-in" | "sign-up"; 
           minLength={12}
           autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
         />
-      </p>
-      <p>
-        <button type="submit" className="btn-primary" disabled={busy}>
-          {mode === "sign-in" ? "Anmelden" : "Konto anlegen"}
-        </button>
-      </p>
-      {message && <p role={failed ? "alert" : "status"}>{message}</p>}
+        {mode === "sign-up" && <span className="field-hint">Mindestens 12 Zeichen</span>}
+      </label>
+      <button type="submit" className="btn-primary btn-large" disabled={busy}>
+        {mode === "sign-in" ? "Anmelden" : "Konto anlegen"}
+      </button>
     </form>
   );
 }
@@ -88,7 +87,7 @@ export function SignOutButton() {
     router.refresh();
   }
   return (
-    <button type="button" className="btn-ghost btn-small" onClick={signOut}>
+    <button type="button" onClick={signOut}>
       Abmelden
     </button>
   );
