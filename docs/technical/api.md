@@ -41,6 +41,23 @@ Request (NEW), documents, audit event and the `request-process` job commit in on
 Duplicates: same `Message-ID` (read from `.eml` only – `.msg` Message-ID extraction is a follow-up)
 or the same set of file hashes within the company; checks are serialised per company.
 
+## `GET` / `POST /api/jobs/drain` (shared secret, only with `CRON_SECRET` set)
+
+One bounded drain round for runtimes without a worker (#59): pg-boss maintenance, then processing jobs
+(new ones for up to 50 s), then export jobs (up to 20 s) – the job in hand always finishes. Vercel Cron
+calls it with GET; operators may use POST. Header `Authorization: Bearer <CRON_SECRET>`, compared in
+constant time; no body is read, neither secret nor header is logged. Function limit 300 s.
+
+| Status | Body |
+|---|---|
+| 200 | `{"processing":{"processed":n,"failed":n,"deadLettered":n},"exports":{"exported":n,"failed":n,"deadLettered":n}}` – counts only |
+| 401 | `{"error":{"title":"Nicht autorisiert."}}` + `WWW-Authenticate: Bearer` – missing or wrong secret |
+| 404 | `CRON_SECRET` not configured (feature off, e.g. Docker Compose with its worker) |
+| 503 | `{"error":{"title":"Verarbeitung derzeit nicht möglich."}}` – invalid configuration or infrastructure error (log: variable names / error class) |
+
+Responses carry `cache-control: no-store`. Concurrent calls, `after()` drains and a worker are safe:
+pg-boss hands each job to one caller, and the export stays exactly-once (D9).
+
 ## `POST /api/erp-mock/v1/quote-requests` (ERP mock, only with `ERP_MOCK_ENABLED=true`)
 
 The simulated ERP of the pilot (ADR-0001 D9) – contract `contracts/erp-export.openapi.yaml`. Without the

@@ -4,7 +4,7 @@ import { loadConfig } from "@/config/env";
 import { listAuditEvents } from "@/features/audit";
 import { listDocuments } from "@/features/documents";
 import { getActor, type Actor } from "@/features/identity";
-import { submitUpload, UploadRejected, type IntakeDeps } from "@/features/intake";
+import { submitUpload, UploadRateLimited, UploadRejected, type IntakeDeps } from "@/features/intake";
 import { createJobQueue } from "@/db/job-queue-client";
 import { QUEUES } from "@/features/jobs";
 import { getRequest } from "@/features/requests";
@@ -204,5 +204,27 @@ describe("intake: upload a request and enqueue processing atomically", () => {
     } finally {
       client.release();
     }
+  });
+  it("caps uploads per person and hour when a limit is set, before anything is stored (#59 review)", async () => {
+    const clerk = (await getActor(stack.auth, stack.database.db, new Headers({ cookie: (await invitedUser(stack, adminB, "clerk")).cookie })))!;
+    const limited = { ...deps, limits: { ...deps.limits, maxPerHour: 2 } };
+    await submitUpload(limited, clerk, [{ name: "a.pdf", bytes: pdf(unique("rate-1")) }]);
+    await submitUpload(limited, clerk, [{ name: "b.pdf", bytes: pdf(unique("rate-2")) }]);
+
+    const keys: string[] = [];
+    const spyStorage = Object.assign(Object.create(storage) as S3BlobStore, {
+      put: async (key: string, ...rest: unknown[]) => {
+        keys.push(key);
+        return (storage.put as (...args: unknown[]) => Promise<void>)(key, ...rest);
+      },
+    });
+    const third = submitUpload({ ...limited, storage: spyStorage }, clerk, [{ name: "c.pdf", bytes: pdf(unique("rate-3")) }]);
+    await expect(third).rejects.toBeInstanceOf(UploadRateLimited);
+    expect(keys).toEqual([]);
+
+    // Per person: another clerk of the same company still uploads; without a limit nobody is capped.
+    const colleague = (await getActor(stack.auth, stack.database.db, new Headers({ cookie: (await invitedUser(stack, adminB, "clerk")).cookie })))!;
+    await expect(submitUpload(limited, colleague, [{ name: "d.pdf", bytes: pdf(unique("rate-4")) }])).resolves.toMatchObject({ requestId: expect.any(String) });
+    await expect(submitUpload(deps, clerk, [{ name: "e.pdf", bytes: pdf(unique("rate-5")) }])).resolves.toMatchObject({ requestId: expect.any(String) });
   });
 });

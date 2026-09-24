@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loadConfig } from "./env";
+import { loadConfig, SERVERLESS_DRAIN } from "./env";
 
 const valid = {
   DATABASE_URL: "postgres://app_rw:rw-secret@localhost:5432/requestflow",
@@ -97,5 +97,67 @@ describe("loadConfig", () => {
 
     expect(loadConfig({ ...valid, ERP_TOKEN: placeholder }).erp.token).toBe(placeholder);
     expect(() => loadConfig({ ...valid, APP_ENV: "showcase", BETTER_AUTH_SECRET: "s".repeat(40), ERP_TOKEN: placeholder })).toThrow(/ERP_TOKEN/);
+  });
+
+  it("caps uploads per hour only when set, and requires the cap on the showcase (#59 review)", () => {
+    expect(loadConfig(valid).upload.maxPerHour).toBeUndefined();
+    expect(loadConfig({ ...valid, UPLOAD_MAX_PER_HOUR: "20" }).upload.maxPerHour).toBe(20);
+    expect(() => loadConfig({ ...valid, UPLOAD_MAX_PER_HOUR: "0" })).toThrow(/UPLOAD_MAX_PER_HOUR/);
+    const showcase = { ...valid, APP_ENV: "showcase", BETTER_AUTH_SECRET: "s".repeat(40), ERP_TOKEN: "e".repeat(32) };
+    expect(() => loadConfig(showcase)).toThrow(/UPLOAD_MAX_PER_HOUR/);
+    expect(loadConfig({ ...showcase, UPLOAD_MAX_PER_HOUR: "20" }).upload.maxPerHour).toBe(20);
+  });
+
+  describe("serverless job drain and demo mode (#59)", () => {
+    // Values that fit one processing job into the drain function (60 s × 3 files).
+    const fits = { AI_SERVICE_TIMEOUT_MS: "60000", UPLOAD_MAX_FILES: "3" };
+    const secret = "c".repeat(32);
+
+    it("keeps the drain route, inline drain and demo banner off by default – empty values count as unset", () => {
+      const defaults = loadConfig(valid);
+      const empty = loadConfig({ ...valid, CRON_SECRET: "", JOB_DRAIN_INLINE: "", DEMO_MODE: "" });
+
+      expect(defaults.jobs).toEqual({ cronSecret: undefined, drainInline: false });
+      expect(defaults.demoMode).toBe(false);
+      expect(empty.jobs).toEqual({ cronSecret: undefined, drainInline: false });
+      expect(empty.demoMode).toBe(false);
+    });
+
+    it("reads CRON_SECRET, JOB_DRAIN_INLINE=true and DEMO_MODE=true", () => {
+      const config = loadConfig({ ...valid, ...fits, CRON_SECRET: secret, JOB_DRAIN_INLINE: "true", DEMO_MODE: "true" });
+
+      expect(config.jobs).toEqual({ cronSecret: secret, drainInline: true });
+      expect(config.demoMode).toBe(true);
+    });
+
+    it("refuses a CRON_SECRET shorter than 24 characters and non-boolean switches, naming only the variable", () => {
+      let message = "";
+      try {
+        loadConfig({ ...valid, ...fits, CRON_SECRET: "too-short-secret" });
+      } catch (error) {
+        message = String(error);
+      }
+
+      expect(message).toMatch(/CRON_SECRET/);
+      expect(message).not.toMatch(/too-short-secret/);
+      expect(() => loadConfig({ ...valid, JOB_DRAIN_INLINE: "yes" })).toThrow(/JOB_DRAIN_INLINE/);
+      expect(() => loadConfig({ ...valid, DEMO_MODE: "1" })).toThrow(/DEMO_MODE/);
+    });
+
+    it("refuses a serverless drain whose worst-case processing job cannot finish within the function limit", () => {
+      // Defaults: 120 s AI timeout × 10 files – far beyond one 300 s function run.
+      expect(() => loadConfig({ ...valid, CRON_SECRET: secret })).toThrow(/AI_SERVICE_TIMEOUT_MS, ERP_TIMEOUT_MS, UPLOAD_MAX_FILES/);
+      expect(() => loadConfig({ ...valid, JOB_DRAIN_INLINE: "true" })).toThrow(/AI_SERVICE_TIMEOUT_MS, ERP_TIMEOUT_MS, UPLOAD_MAX_FILES/);
+      expect(() => loadConfig({ ...valid, ...fits, CRON_SECRET: secret, JOB_DRAIN_INLINE: "true" })).not.toThrow();
+      expect(() => loadConfig({ ...valid, AI_SERVICE_TIMEOUT_MS: "60000", UPLOAD_MAX_FILES: "4", CRON_SECRET: secret })).toThrow(/UPLOAD_MAX_FILES/);
+    });
+
+    it("keeps the worst case of one drain run within the function limit", () => {
+      const { processMs, exportMs, marginMs, maxDurationSeconds } = SERVERLESS_DRAIN;
+      const worstCaseMs = processMs + 60_000 * 3 + exportMs + 20_000 + marginMs;
+
+      expect(maxDurationSeconds).toBeLessThanOrEqual(300);
+      expect(worstCaseMs).toBeLessThanOrEqual(maxDurationSeconds * 1000);
+    });
   });
 });

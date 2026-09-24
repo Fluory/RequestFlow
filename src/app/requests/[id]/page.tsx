@@ -8,6 +8,8 @@ import { approveAction, confirmNotDuplicateAction, correctFieldAction, rejectAct
 import { DocumentList, needsAttention, Source, STATUS_LABEL, StatusBadge } from "./review-parts";
 
 export const dynamic = "force-dynamic";
+// Server actions of this page may drain inline via `after()` (JOB_DRAIN_INLINE) – SERVERLESS_DRAIN limit.
+export const maxDuration = 300;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const dateFormat = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });

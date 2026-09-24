@@ -110,7 +110,9 @@ migration aborts if `app_owner`/`app_rw` are missing or could bypass RLS – fix
 
 `docker/postgres/init/01-roles.sh` runs only in the local container. On any other PostgreSQL (showcase,
 customer) an operator creates `app_owner` and `app_rw` once with the same statements (passwords from
-the secret manager), before the first `setup` run; the first migration refuses to run otherwise.
+the secret manager), before the first `setup` run; the first migration refuses to run otherwise. For
+Supabase use `scripts/supabase-bootstrap.sql`; the whole showcase setup (Vercel + Supabase, jobs without
+a worker, switch-off and rollback) is in [deployment-vercel.md](deployment-vercel.md).
 
 ## Login rate limit and client IP
 

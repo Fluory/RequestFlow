@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm build",
+  "regions": ["fra1"],
+  "functions": {
+    "src/app/api/jobs/drain/route.ts": { "maxDuration": 300 }
+  },
+  "crons": [{ "path": "/api/jobs/drain", "schedule": "0 5 * * *" }]
+}

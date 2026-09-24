@@ -3,6 +3,8 @@
 - **Status:** Accepted – 2026-09-22 by Fluory (orchestrator); every decision D1–D11 was confirmed individually
 - **Deviation from the draft:** D8 – the orchestrator chose a Python AI service from day 1 instead of
   the drafted recommendation (full TypeScript); the draft recommendation is kept as alternative 1 in D8
+- **Amendment 2026-09-24 (D11, also touches D3/D5):** the showcase uses Supabase Postgres + Supabase
+  Storage instead of Neon + R2 – see "Amendment 2026-09-24" at the end of D11
 - **Deciders:** Fluory (orchestrator) · drafted by a Claude session
 - **Inputs:** `docs/input/2026-09-22-kundenanfrage.md` (customer request), `PROJECT-START.md` (discovery)
 - **Facts verified:** 2026-09-22 against official docs, registries and provider terms (sources at the end).
@@ -610,6 +612,46 @@ exceptions register (`docs/technical/architecture.md`).
 acceptance, including the AI-service hosting spike. *Heuristic.*
 **Revisit when** the customer environment is known.
 
+### Amendment 2026-09-24 – Supabase instead of Neon + R2 (decided by Fluory, orchestrator; #59)
+
+**Decision.** The showcase keeps Vercel (Hobby) for the TS app but uses **Supabase** in
+`eu-central-1` (Frankfurt) for both stateful parts: **Supabase Postgres** replaces Neon (D3) and
+**Supabase Storage through its S3-compatible API** replaces Cloudflare R2 (D5). One vendor less,
+one dashboard, the same region for database and files. Local, CI and the production path are
+unchanged (PostgreSQL 17 container, SeaweedFS, the customer's choice). Nothing Supabase-specific
+enters the code: the app still talks plain PostgreSQL (Drizzle, pg-boss) and the S3 API.
+
+**Consequences.**
+- **Connections.** At runtime `app_rw` connects through the **Supavisor transaction pooler (port
+  6543)** – serverless functions open many short connections. This is pooler-safe: `withTenant()`
+  sets the tenant with `set_config('app.company_id', …, true)`, i.e. transaction-local; node-postgres
+  and Drizzle use unnamed prepared statements; pg-boss polls (no LISTEN/NOTIFY, D4) and its maintenance
+  takes transaction-scoped advisory locks. `statement_timeout` is also set on the role `app_rw`
+  (bootstrap script), so it holds even if the pooler drops the client's startup parameter. Migrations (`pnpm setup:deploy`, `app_owner`) use the **session
+  pooler** (port 5432) or the direct connection – DDL and the pg-boss installer need a session.
+  The smoke check (runbook step 8) reads `SHOW statement_timeout` as `app_rw`.
+- **Roles.** `app_owner`/`app_rw` are created once by the operator with `scripts/supabase-bootstrap.sql`
+  (mirrors `docker/postgres/init/01-roles.sh`; `app_rw` NOBYPASSRLS); the first migration still
+  refuses unsafe roles. The Supabase `postgres`/`service_role` credentials are never given to the app.
+- **Data API.** The schemas `app`, `pgboss` and our auth schema must **not** be added to the exposed
+  schemas of the Supabase Data API (PostgREST/GraphQL); the app never uses the Data API, and `anon`/
+  `authenticated` get no grants on our schemas.
+- **Schema `auth`.** Supabase reserves the schema `auth` for its own Auth service – our Better Auth
+  schema of the same name cannot be deployed there. It is renamed to `identity` (#60, PR #63): a fresh
+  database creates `identity` directly, an existing one renames its own `auth` schema only.
+- **Storage.** A **private** bucket; S3 access keys from the Storage settings (server-side only),
+  endpoint `https://<project-ref>.storage.supabase.co/storage/v1/s3`, path-style URLs. The R2
+  "EU jurisdiction on the free plan" open point is obsolete.
+- **Jobs.** Unchanged from D2: no worker on Vercel. A protected route `/api/jobs/drain`
+  (`CRON_SECRET`) runs one bounded round of `drain()` + `drainExports()` incl. pg-boss maintenance;
+  `after()` triggers it after upload, approval and reprocess (`JOB_DRAIN_INLINE=true`). The Hobby cron
+  runs **at most once per day** – the exceptions-register entry "no unattended retries" still applies.
+  Worst case of one run (AI timeout × files + windows) must fit into the 300 s function limit;
+  `loadConfig` enforces it.
+- **AI service host** is still open (spike). Recommendation: **Google Cloud Run in the EU** (same GCP
+  project as Vertex `eu`, container image already exists, no 5 GB package or 300 s limit for docling/OCR).
+- **Runbook:** `docs/technical/deployment-vercel.md`.
+
 ---
 
 ## Summary of the challenged decisions
@@ -688,7 +730,7 @@ explicit requirements.
 - pg-boss maintenance API for serverless `drain()`.
 - docling EML/MSG coverage and its provenance granularity for XLSX cells.
 - Google Gen AI SDK configuration for the Vertex `eu` endpoint.
-- R2 EU jurisdiction on the free plan.
+- ~~R2 EU jurisdiction on the free plan.~~ Obsolete – Supabase Storage instead (D11 amendment 2026-09-24).
 - The AI-service showcase host (spike).
 
 ## Sources (verified 2026-09-22)

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, or, sql, type SQL } from "drizzle-orm";
 import { requests, type RequestStatus } from "@/db/schema";
 import { tenantOf, type TenantTx } from "@/features/tenancy";
 import { parseCursor, REQUEST_PAGE_SIZE } from "./cursor";
@@ -152,4 +152,14 @@ export async function recordProcessingFailure(tx: TenantTx, id: string, failure:
     .update(requests)
     .set({ errorMessage: failure.message, nextRetryAt: failure.nextRetryAt })
     .where(and(eq(requests.id, id), eq(requests.status, "PROCESSING")));
+}
+
+/** Requests a user created since `since` (upload rate limit, #59 review) – within the tenant. */
+export async function countRequestsCreatedBy(tx: TenantTx, userId: string, since: Date): Promise<number> {
+  tenantOf(tx);
+  const [row] = await tx
+    .select({ count: sql<number>`count(*)::int` })
+    .from(requests)
+    .where(and(eq(requests.createdBy, userId), gte(requests.createdAt, since)));
+  return row?.count ?? 0;
 }

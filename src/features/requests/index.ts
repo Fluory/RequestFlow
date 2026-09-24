@@ -1,6 +1,7 @@
 // Public API of the `requests` module: request aggregate and status machine.
 export {
   countRequestsByStatus,
+  countRequestsCreatedBy,
   createRequest,
   findDuplicate,
   getRequest,

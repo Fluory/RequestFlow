@@ -11,6 +11,14 @@ export class UploadRejected extends Error {
   }
 }
 
+/** Too many uploads by one person within the hour (showcase cost cap, #59) – answered with 429. */
+export class UploadRateLimited extends UploadRejected {
+  constructor(readonly maxPerHour: number) {
+    super(`Höchstens ${maxPerHour} Uploads pro Stunde – bitte später erneut versuchen.`);
+    this.name = "UploadRateLimited";
+  }
+}
+
 export interface UploadLimits {
   maxFileBytes: number;
 }
