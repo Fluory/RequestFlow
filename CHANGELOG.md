@@ -61,4 +61,4 @@ This file records what changes **in the product** – process and session state 
   tests against real PostgreSQL + SeaweedFS.
 
 ### Changed
-- AI service logs use the web/worker format: `time` (ISO 8601, `Z`) instead of `ts`, lower-case pino level labels (`warn`, not `WARNING`), no `logger` key.
+- AI service logs use the web/worker format: `time` (ISO 8601, `Z`) instead of `ts`, lower-case pino level labels (`warn`, not `WARNING`), `logger` only on library records.

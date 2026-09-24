@@ -85,9 +85,14 @@ class JsonFormatter(logging.Formatter):
         for key in _ALLOWED_EXTRAS:
             if key in record.__dict__:
                 payload[key] = record.__dict__[key]
+        # A library's own record (docling, httpx, uvicorn) names its source; our records do not
+        # need it, like the pino lines (#51 review).
+        if not record.name.startswith("requestflow_ai"):
+            payload["logger"] = record.name
         if record.exc_info and record.exc_info[0] is not None:
             payload["excType"] = record.exc_info[0].__name__
-        return json.dumps(payload, ensure_ascii=False, default=str)
+        # Compact separators like pino, so a line is byte-for-byte the same shape as web/worker.
+        return json.dumps(payload, ensure_ascii=False, default=str, separators=(",", ":"))
 
 
 def configure_logging(level: str = "INFO") -> None:

@@ -87,7 +87,8 @@ constant name, never free text) plus allow-listed IDs and codes only. Correlatio
 everywhere, `documentId`; `jobId`, `companyId` and `attempt` only in web/worker lines (the AI service
 receives just `X-Request-Id`). Web/worker (pino, `src/features/observability/log.ts`) add `code`,
 `status`, `durationMs`, `count`; the AI service (`services/ai/src/requestflow_ai/jsonlog.py`) keeps its
-own whitelist (`status`, `latencyMs`, `errorCode`, token counts, …). Example:
+own whitelist (`status`, `latencyMs`, `errorCode`, token counts, …), plus `excType` (exception class only,
+never its message) and `logger` for records of a library (docling, httpx, uvicorn). Compact JSON like pino. Example:
 `{"level":"info","time":"2026-09-24T10:00:00.123Z","event":"request_completed","requestId":"req-0001","status":200}`
 
 - Both key sets are fixed in code; a test runs a full synthetic request (upload → export) and fails if a
