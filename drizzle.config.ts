@@ -5,7 +5,7 @@ export default defineConfig({
   dialect: "postgresql",
   schema: "./src/db/schema/index.ts",
   out: "./src/db/migrations",
-  schemaFilter: ["app", "auth"],
+  schemaFilter: ["app", "identity"],
   migrations: { schema: "drizzle" },
   dbCredentials: { url: process.env.MIGRATION_DATABASE_URL ?? "" },
 });
