@@ -71,6 +71,7 @@ export type ReviewRefusal =
   | "reason_missing"
   | "reason_too_long"
   | "value_too_long"
+  | "export_too_large"
   | "duplicate_undecided"
   | "not_a_possible_duplicate";
 
@@ -231,9 +232,11 @@ export async function approveRequest(deps: { tenancy: Tenancy; boss: JobSender }
     // A possible duplicate is approved only after a clerk decided it is not one (#27) – nothing is
     // exported twice by accident.
     if (request.possibleDuplicate && request.duplicateDecision !== "distinct") throw new ReviewRefused("duplicate_undecided");
-    if (exportLimitViolations(request.subject, await currentFieldValues(tx, requestId), await currentLineItemValues(tx, requestId)).length > 0) {
-      throw new ReviewRefused("value_too_long");
-    }
+    const violations = exportLimitViolations(request.subject, await currentFieldValues(tx, requestId), await currentLineItemValues(tx, requestId));
+    // A single value the clerk can shorten; too many positions or a too large body cannot be fixed by
+    // a correction – the clerk is told so instead of being asked to correct something (#46 review).
+    if (violations.some((key) => key !== "lineItems" && key !== "body")) throw new ReviewRefused("value_too_long");
+    if (violations.length > 0) throw new ReviewRefused("export_too_large");
     await transitionRequest(tx, request, "approve");
     await enqueueRequestExport(deps.boss, tx, requestId);
     await recordAudit(tx, { actorUserId: actor.userId, action: "request.approved", entityType: "request", entityId: requestId });

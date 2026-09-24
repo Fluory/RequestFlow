@@ -5,7 +5,7 @@ import { loadConfig } from "@/config/env";
 import { sendInTransaction } from "@/db/job-queue";
 import { createJobQueue, installJobQueues } from "@/db/job-queue-client";
 import { listAuditEvents } from "@/features/audit";
-import { insertDocuments } from "@/features/documents";
+import { insertDocuments, listDocuments } from "@/features/documents";
 import { createErpMock, MemoryMockStore, type ErpMock, type MockFault } from "@/features/erp-mock";
 import { createErpClient, drainExports, exportRequestJob, getExportRecord, type ExportDrainDeps } from "@/features/export";
 import { persistExtractionRun } from "@/features/extraction";
@@ -13,7 +13,7 @@ import { syntheticExtractResponse } from "@/features/extraction/fixtures";
 import { getActor, type Actor } from "@/features/identity";
 import { QUEUES, reprocessRequest } from "@/features/jobs";
 import { createRequest, getRequest, lockRequest, transitionRequest } from "@/features/requests";
-import { approveRequest, correctField, currentFieldValues, currentLineItemValues, ReviewRefused } from "@/features/review";
+import { approveRequest, correctField, currentFieldValues, currentLineItemValues, loadReview, ReviewRefused } from "@/features/review";
 import { createTenancy, type Tenancy } from "@/features/tenancy";
 import { companyWithAdmin, createStack, invitedUser, type Stack } from "./helpers/stack";
 
@@ -159,7 +159,33 @@ describe("export: approved requests reach the ERP exactly once", () => {
     // Corrections are capped at 500 characters, so an overlong position value can only come from the
     // extraction; the approval must refuse it while the clerk can still correct it.
     const tooLong = [{ ...POSITIONS[0]!, description: { ...found("Musterbau Beispiel GmbH", "s2"), value: "x".repeat(501) } }];
-    await expect(approved(clerk, tooLong)).rejects.toThrow(ReviewRefused);
+    await expect(approved(clerk, tooLong)).rejects.toMatchObject({ code: "value_too_long" });
+  });
+
+  it("refuses more positions than the ERP accepts with its own code – a correction cannot fix that (#46 review)", async () => {
+    const tooMany = Array.from({ length: 201 }, (_, index) => ({ ...POSITIONS[1]!, index }));
+    const refusal = approved(clerk, tooMany);
+    await expect(refusal).rejects.toBeInstanceOf(ReviewRefused);
+    await expect(refusal).rejects.toMatchObject({ code: "export_too_large" });
+  });
+
+  it("exports exactly the positions the review shows: an item correction older than the latest run is ignored (#46 review)", async () => {
+    const deps = depsWith();
+    const { requestId, job } = await approved(clerk, POSITIONS, async (id) => {
+      await correctField(tenancy, clerk, id, "quantity", "1300", 0);
+      // A newer run (as after reprocessing) makes the correction stale – positions may have shifted.
+      await tenancy.withTenant(clerk.companyId, async (tx) => {
+        const documentId = (await listDocuments(tx, id))[0]!.id;
+        await persistExtractionRun(tx, { requestId: id, jobId: randomUUID(), outcomes: [{ documentId, response: syntheticExtractResponse(documentId, {}, POSITIONS) }] });
+      });
+    });
+    let sent: { lineItems?: Array<Record<string, unknown>> } | undefined;
+    const erp = deps.erp;
+    await exportRequestJob({ ...deps, erp: { submit: (body) => ((sent = body), erp.submit(body)) } }, job);
+
+    expect(sent?.lineItems?.[0]).toMatchObject({ position: 1, quantity: "15.10.2026" });
+    const shown = (await loadReview(tenancy, clerk, requestId))!.lineItems.map((item) => Object.fromEntries(item.fields.map((field) => [field.key, field.value])));
+    expect(sent?.lineItems?.map(({ position: _position, ...values }) => values)).toEqual(shown);
   });
 
   it("duplicate delivery of the same job: the row lock lets one export, the other sees EXPORTED and never calls the ERP", async () => {

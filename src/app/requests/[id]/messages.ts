@@ -13,6 +13,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   reason_missing: "Bitte einen Grund für die Ablehnung angeben.",
   reason_too_long: "Der Grund ist zu lang (höchstens 1000 Zeichen).",
   value_too_long: "Ein Wert ist zu lang für den ERP-Export (höchstens 500 Zeichen) – bitte zuerst korrigieren.",
+  export_too_large: "Die Anfrage ist zu umfangreich für den ERP-Export (höchstens 200 Positionen, 64 KiB) – bitte ablehnen und direkt im ERP erfassen.",
   duplicate_undecided: "Mögliches Duplikat – bitte zuerst entscheiden, ob es eine eigenständige Anfrage ist.",
   not_a_possible_duplicate: "Für diese Anfrage steht keine Duplikat-Entscheidung an.",
   forbidden: "Keine Berechtigung.",
