@@ -23,5 +23,5 @@ export async function getActor(auth: Auth, db: Database, headers: Headers): Prom
   if (!membership || !isCompanyRole(membership.role)) return null;
   const active = session.session.activeOrganizationId;
   if (active && active !== membership.companyId) return null;
-  return { userId: session.user.id, companyId: membership.companyId, role: membership.role };
+  return { userId: session.user.id, companyId: membership.companyId, role: membership.role, name: session.user.name };
 }

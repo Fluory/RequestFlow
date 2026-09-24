@@ -13,7 +13,7 @@ import { getActor, type Actor } from "@/features/identity";
 import { processRequestJob, QUEUES, reprocessRequest, ReprocessRefused } from "@/features/jobs";
 import { latestRun } from "@/features/extraction";
 import { createRequest, getRequest, lockRequest, transitionRequest } from "@/features/requests";
-import { approveRequest, confirmNotDuplicate, currentFieldValues, rejectAsDuplicate, ReviewRefused } from "@/features/review";
+import { approveRequest, confirmNotDuplicate, currentFieldValues, currentLineItemValues, rejectAsDuplicate, ReviewRefused } from "@/features/review";
 import { createTenancy, type Tenancy } from "@/features/tenancy";
 import { companyWithAdmin, createStack, invitedUser, type Stack } from "./helpers/stack";
 
@@ -94,7 +94,7 @@ describe("duplicate handling", () => {
     await expect(reprocessRequest({ tenancy, boss }, clerk, duplicateId)).rejects.toBeInstanceOf(ReprocessRefused);
     const mock = createErpMock({ token: "t".repeat(24), store: new MemoryMockStore() });
     const erp = createErpClient({ baseUrl: "http://erp", token: "t".repeat(24), timeoutMs: 500, fetch: async (input, init) => mock.handle(new Request(input, init)) });
-    expect(await exportRequestJob({ tenancy, erp, fieldValues: currentFieldValues }, { id: randomUUID(), data: { requestId: duplicateId, companyId: clerk.companyId } })).toBe("skipped");
+    expect(await exportRequestJob({ tenancy, erp, fieldValues: currentFieldValues, lineItemValues: currentLineItemValues }, { id: randomUUID(), data: { requestId: duplicateId, companyId: clerk.companyId } })).toBe("skipped");
     expect(mock.created()).toBe(0);
     expect(await exportJobs(duplicateId)).toBe(0);
   });
