@@ -39,7 +39,8 @@ query sees zero rows and every write fails.
 | `rejection_reason` | text | free-text reason of a rejection, max 1000 chars (refused above, not cut – review module); also in the `request.rejected` audit event | confidential |
 
 Unique `(id, company_id)` so child tables can pin the company with composite foreign keys (FK checks
-bypass RLS). Purpose: one quote request per row. Retention: open question for the customer (ADR-0001 open points).
+bypass RLS). Index `(company_id, created_at desc, id desc)` serves the paged request list (#48, #61) and
+every lookup by company. Purpose: one quote request per row. Retention: open question for the customer (ADR-0001 open points).
 
 ### `app.extraction_runs`, `app.extraction_segments`, `app.extracted_fields` – processing results (#7)
 

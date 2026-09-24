@@ -1,0 +1,2 @@
+DROP INDEX "app"."requests_company_id_idx";--> statement-breakpoint
+CREATE INDEX "requests_company_created_idx" ON "app"."requests" USING btree ("company_id","created_at" DESC NULLS FIRST,"id" DESC NULLS FIRST);

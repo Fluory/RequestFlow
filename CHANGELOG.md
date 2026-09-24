@@ -63,3 +63,7 @@ This file records what changes **in the product** – process and session state 
 ### Fixed
 - The database refuses a line-item correction with a negative position, like it already does for
   extracted values – defence in depth below the review check (#47).
+
+### Changed
+- The request list reads each page from an index in its sort order instead of sorting all of the
+  company's requests (#61).
