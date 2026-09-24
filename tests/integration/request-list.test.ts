@@ -220,6 +220,7 @@ describe("request list: keyset paging (#48)", () => {
     const second = await page(actor, {}, first.nextCursor!);
     expect(second.rows).toHaveLength(10);
     expect(second.nextCursor).toBeNull();
+    expect([first.firstPage, second.firstPage]).toEqual([true, false]);
 
     const all = [...first.rows, ...second.rows];
     expect(new Set(all.map((row) => row.id)).size).toBe(60);
@@ -298,6 +299,7 @@ describe("request list: keyset paging (#48)", () => {
       const result = await page(actor, {}, cursor);
       expect(result.rows.map((row) => row.id)).toEqual(first.rows.map((row) => row.id));
       expect(result.nextCursor).toBeNull();
+      expect(result.firstPage).toBe(true);
     }
   });
 });

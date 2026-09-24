@@ -28,6 +28,8 @@ export interface RequestPage {
   rows: RequestRow[];
   /** Cursor of the next (older) page, or null on the last page. */
   nextCursor: string | null;
+  /** false when a valid cursor positioned this page; a missing, unknown or foreign cursor gives the first page. */
+  firstPage: boolean;
 }
 
 /**
@@ -38,12 +40,15 @@ export interface RequestPage {
 export async function listRequests(tx: TenantTx, filter: RequestFilter = {}, page: { after?: string | null } = {}): Promise<RequestPage> {
   tenantOf(tx);
   const cursor = parseCursor(page.after);
-  const anchor = cursor ? (await tx.select({ id: requests.id }).from(requests).where(eq(requests.id, cursor)))[0] : undefined;
+  // The anchor's created_at is read as text at full (microsecond) precision in the same query as its
+  // id, so a JS Date never truncates it and there is no second lookup that could miss (#48 review).
+  const anchor = cursor
+    ? (await tx.select({ id: requests.id, createdAt: sql<string>`${requests.createdAt}::text` }).from(requests).where(eq(requests.id, cursor)))[0]
+    : undefined;
   const conditions = [
     filter.status ? eq(requests.status, filter.status) : undefined,
     filter.possibleDuplicate === undefined ? undefined : eq(requests.possibleDuplicate, filter.possibleDuplicate),
-    // The anchor's created_at is compared in SQL at full (microsecond) precision; RLS scopes the subquery too.
-    anchor ? sql`(${requests.createdAt}, ${requests.id}) < (select r.created_at, r.id from app.requests r where r.id = ${anchor.id})` : undefined,
+    anchor ? sql`(${requests.createdAt}, ${requests.id}) < (${anchor.createdAt}::timestamptz, ${anchor.id}::uuid)` : undefined,
   ].filter((condition) => condition !== undefined);
   const rows = await tx
     .select()
@@ -53,7 +58,7 @@ export async function listRequests(tx: TenantTx, filter: RequestFilter = {}, pag
     .limit(REQUEST_PAGE_SIZE + 1);
   const hasMore = rows.length > REQUEST_PAGE_SIZE;
   const visible = hasMore ? rows.slice(0, REQUEST_PAGE_SIZE) : rows;
-  return { rows: visible, nextCursor: hasMore ? visible.at(-1)!.id : null };
+  return { rows: visible, nextCursor: hasMore ? visible.at(-1)!.id : null, firstPage: anchor === undefined };
 }
 
 /** Number of the company's requests per status (start page); statuses without requests are absent. */

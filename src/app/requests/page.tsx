@@ -44,11 +44,11 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
   const filter = filterOf(query);
   const after = parseCursor(query.after) ?? undefined;
   // One page (#48); export records only for the rows of this page.
-  const { requests, nextCursor, exports } = await getRuntime().tenancy.withTenant(actor.companyId, async (tx) => {
-    const { rows, nextCursor } = await listRequests(tx, filter, { after });
-    return { requests: rows, nextCursor, exports: await listExportRecords(tx, rows.map((row) => row.id)) };
+  const { requests, nextCursor, firstPage, exports } = await getRuntime().tenancy.withTenant(actor.companyId, async (tx) => {
+    const { rows, nextCursor, firstPage } = await listRequests(tx, filter, { after });
+    return { requests: rows, nextCursor, firstPage, exports: await listExportRecords(tx, rows.map((row) => row.id)) };
   });
-  const paged = after !== undefined || nextCursor !== null;
+  const paged = !firstPage || nextCursor !== null;
   const done = query.done === "reprocessed" ? pick("reprocessed") : undefined;
   const error = query.error === "refused" ? pick("refused") : undefined;
 
@@ -158,8 +158,8 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
         )}
         {paged && (
           <nav aria-label="Seiten" className="toolbar">
-            {after !== undefined && <Link href={pageHref(filter)}>Zurück zum Anfang</Link>}
-            {nextCursor && <Link href={pageHref(filter, nextCursor)}>Ältere Anfragen</Link>}
+            {!firstPage && <Link href={pageHref(filter)}>Zurück zum Anfang</Link>}
+            {nextCursor && <Link href={pageHref(filter, nextCursor)} rel="next">Ältere Anfragen</Link>}
           </nav>
         )}
       </section>
