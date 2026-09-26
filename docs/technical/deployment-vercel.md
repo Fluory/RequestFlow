@@ -42,27 +42,31 @@ process list.
 The last output lists `app_owner` and `app_rw` with `f | f | f` (no superuser, no RLS bypass, no role
 creation). The script is all-or-nothing; running it twice fails on "role already exists" – that is fine.
 
-## 3. AI service (second Vercel project)
+## 3. AI service (second Vercel project, container)
 
-1. Import the same GitHub repository as a **second Vercel project** with **Root Directory `services/ai`**.
-   Vercel detects Python from `pyproject.toml`; the entry is `requestflow_ai.vercel_app:app`
-   (`[tool.vercel]`), the region `fra1` comes from `services/ai/vercel.json`. Keep Fluid compute on.
-2. Variables (**Production** only):
+1. Import the same GitHub repository as a **second Vercel project**: framework **`container`**, Root
+   Directory **`services/ai`**. Vercel builds `services/ai/Dockerfile.vercel` (same build as
+   `Dockerfile`) and runs it on Vercel Functions (container images, beta). A plain Python function does
+   not fit: the bundle is 1386 MB against the 500 MB function limit (ADR-0001 D11 amendment 2026-09-26).
+2. Deployment Protection: **Vercel Authentication for preview deployments only** – the web app calls the
+   production URL server-side; the API itself is protected by `AI_SERVICE_TOKEN`.
+3. Variables (**Production**):
 
    | Variable | Value |
    |---|---|
+   | `PORT` | `8080` – the image runs as a non-root user, which cannot bind Vercel's default port 80 |
    | `AI_SERVICE_TOKEN` | random, ≥ 24 chars – the **same** value as `AI_SERVICE_TOKEN` in the web app |
    | `AI_ALLOW_GEMINI_API_DEV` | `true` |
-   | `GEMINI_API_KEY` | entered by the orchestrator in the Vercel dashboard – never in a chat, the repo or an issue |
+   | `GEMINI_API_KEY` | the orchestrator's key – set it through `vercel env add GEMINI_API_KEY production --sensitive` with the value on stdin, never in a chat, the repo or an issue |
    | `AI_PDF_PIPELINE` / `AI_PDF_OCR` | `textlines` / `off` – no model downloads on the showcase |
 
    `VERTEX_PROJECT` stays **unset**: together with `AI_ALLOW_GEMINI_API_DEV=true` the service refuses to start.
-3. **Exception (ADR-0001 D11 amendment 2026-09-26, exceptions register):** the Gemini API free tier is only
+4. **Exception (ADR-0001 D11 amendment 2026-09-26, exceptions register):** the Gemini API free tier is only
    allowed while the showcase is invite-only for the orchestrator with synthetic data. Before anyone else
    gets a demo account (at the latest 2026-10-31): enable billing for the key (paid tier) or switch to
    Vertex `eu` (`VERTEX_PROJECT`, service account, `AI_ALLOW_GEMINI_API_DEV` removed).
-4. `GET <ai-url>/healthz` → 200. Note the production URL → `AI_SERVICE_URL` of the web app (§4).
-   The API is protected by the bearer token; the web app calls it server-side only.
+5. `GET <ai-url>/healthz` → 200. The production URL → `AI_SERVICE_URL` of the web app (§4).
+   Instances scale to zero after 5 minutes without traffic; the first call after that pays a cold start.
 
 ## 4. Vercel project
 

@@ -5,7 +5,7 @@
   the drafted recommendation (full TypeScript); the draft recommendation is kept as alternative 1 in D8
 - **Amendment 2026-09-24 (D11, also touches D3/D5):** the showcase uses Supabase Postgres + Supabase
   Storage instead of Neon + R2 – see "Amendment 2026-09-24" at the end of D11
-- **Amendment 2026-09-26 (D11, touches D8):** AI service on Vercel (spike) and a Gemini API free-tier
+- **Amendment 2026-09-26 (D11, touches D8):** AI service as a container on Vercel and a Gemini API free-tier
   key for the invite-only showcase as a temporary exception – see "Amendment 2026-09-26" at the end of D11
 - **Deciders:** Fluory (orchestrator) · drafted by a Claude session
 - **Inputs:** `docs/input/2026-09-22-kundenanfrage.md` (customer request), `PROJECT-START.md` (discovery)
@@ -657,10 +657,12 @@ enters the code: the app still talks plain PostgreSQL (Drizzle, pg-boss) and the
 ### Amendment 2026-09-26 – AI service on Vercel and a Gemini API free-tier key (decided by Fluory, orchestrator; #67)
 
 **Decision.**
-1. On the showcase the AI service runs as a **second Vercel project** (Python runtime, root directory
-   `services/ai`, entry `requestflow_ai.vercel_app:app` via `[tool.vercel]` in `pyproject.toml`,
-   region `fra1`), PDF pipeline `textlines`, OCR off. It is a spike: bundle size, cold start and one
-   extraction are measured and recorded in the PR of #67.
+1. On the showcase the AI service runs as a **second Vercel project** that runs the existing service
+   image as a **container on Vercel Functions** (beta; framework `container`, root directory
+   `services/ai`, `Dockerfile.vercel`, `PORT=8080`, region `fra1`), PDF pipeline `textlines`, OCR off.
+   Spike result (#67, 2026-09-26): the Python-function route fails – the bundle is **1386 MB** against a
+   **500 MB** function limit (deployment `dpl_EhZt9SnyAgsH84ayhjXWicgqanpA`); the container image builds
+   in about 4 minutes (image size limit 15 GB). Cold start and one extraction: recorded in the PR of #67.
 2. Model calls use a **Gemini API key on the free tier** (`AI_ALLOW_GEMINI_API_DEV=true`,
    `GEMINI_API_KEY` set only in the Vercel project) – a temporary exception to D8.
 
@@ -677,7 +679,7 @@ only, demo banner on; the exception expires before anyone else gets an account, 
 **Alternatives.** Google Cloud Run + Vertex `eu` (runbook recommendation until now; needs GCP billing) ·
 Hugging Face Space (existing Dockerfile unchanged; new account, hosting region not verified).
 
-**Revisit when** the spike fails on size, cold start or duration (→ Cloud Run), or the exception expires.
+**Revisit when** the container beta ends or changes its terms, the cold start makes the 60 s AI timeout fail regularly (→ Cloud Run), or the exception expires.
 
 ---
 
