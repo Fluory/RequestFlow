@@ -8,7 +8,7 @@
 
 | Blocker | Why |
 |---|---|
-| AI service host chosen and running | The drain calls it; recommendation: **Google Cloud Run in the EU** (same GCP project as Vertex `eu`, existing image `services/ai`, no 300 s / package limits) |
+| AI service running (§3) | The drain calls it. Showcase decision 2026-09-26 (ADR-0001 D11 amendment, #67): a second **Vercel** project with a Gemini API key (temporary exception). Fallback if the Vercel spike fails: Google Cloud Run in the EU with Vertex `eu` |
 
 What runs where: Vercel (Hobby) runs the Next.js app, the drain route and the ERP mock
 (`/api/erp-mock`). Supabase (`eu-central-1`) holds Postgres (incl. the pg-boss queue) and the files.
@@ -42,11 +42,27 @@ process list.
 The last output lists `app_owner` and `app_rw` with `f | f | f` (no superuser, no RLS bypass, no role
 creation). The script is all-or-nothing; running it twice fails on "role already exists" – that is fine.
 
-## 3. AI service
+## 3. AI service (second Vercel project)
 
-Deploy `services/ai` (Cloud Run EU recommended) with Vertex `eu` credentials (a service account of the
-GCP project, never an API key in the repo) and a random `AI_SERVICE_TOKEN` (≥ 24 chars). The Gemini
-free tier is **not** allowed for the showcase (D8). Note its HTTPS URL.
+1. Import the same GitHub repository as a **second Vercel project** with **Root Directory `services/ai`**.
+   Vercel detects Python from `pyproject.toml`; the entry is `requestflow_ai.vercel_app:app`
+   (`[tool.vercel]`), the region `fra1` comes from `services/ai/vercel.json`. Keep Fluid compute on.
+2. Variables (**Production** only):
+
+   | Variable | Value |
+   |---|---|
+   | `AI_SERVICE_TOKEN` | random, ≥ 24 chars – the **same** value as `AI_SERVICE_TOKEN` in the web app |
+   | `AI_ALLOW_GEMINI_API_DEV` | `true` |
+   | `GEMINI_API_KEY` | entered by the orchestrator in the Vercel dashboard – never in a chat, the repo or an issue |
+   | `AI_PDF_PIPELINE` / `AI_PDF_OCR` | `textlines` / `off` – no model downloads on the showcase |
+
+   `VERTEX_PROJECT` stays **unset**: together with `AI_ALLOW_GEMINI_API_DEV=true` the service refuses to start.
+3. **Exception (ADR-0001 D11 amendment 2026-09-26, exceptions register):** the Gemini API free tier is only
+   allowed while the showcase is invite-only for the orchestrator with synthetic data. Before anyone else
+   gets a demo account (at the latest 2026-10-31): enable billing for the key (paid tier) or switch to
+   Vertex `eu` (`VERTEX_PROJECT`, service account, `AI_ALLOW_GEMINI_API_DEV` removed).
+4. `GET <ai-url>/healthz` → 200. Note the production URL → `AI_SERVICE_URL` of the web app (§4).
+   The API is protected by the bearer token; the web app calls it server-side only.
 
 ## 4. Vercel project
 

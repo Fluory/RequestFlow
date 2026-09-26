@@ -4,17 +4,17 @@ from __future__ import annotations
 
 import importlib
 import sys
+from types import ModuleType
 
 import pytest
+from conftest import TEST_TOKEN
 from fastapi import FastAPI
 from pydantic import ValidationError
-
-from conftest import TEST_TOKEN
 
 ENTRY = "requestflow_ai.vercel_app"
 
 
-def _import_entry() -> object:
+def _import_entry() -> ModuleType:
     sys.modules.pop(ENTRY, None)
     return importlib.import_module(ENTRY)
 
@@ -27,7 +27,7 @@ def test_exposes_the_extract_api_as_app(monkeypatch: pytest.MonkeyPatch) -> None
 
     module = _import_entry()
 
-    app = getattr(module, "app")
+    app = module.app
     assert isinstance(app, FastAPI)
     assert "/v1/extract" in {getattr(route, "path", "") for route in app.routes}
 

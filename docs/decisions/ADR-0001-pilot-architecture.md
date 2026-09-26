@@ -5,6 +5,8 @@
   the drafted recommendation (full TypeScript); the draft recommendation is kept as alternative 1 in D8
 - **Amendment 2026-09-24 (D11, also touches D3/D5):** the showcase uses Supabase Postgres + Supabase
   Storage instead of Neon + R2 – see "Amendment 2026-09-24" at the end of D11
+- **Amendment 2026-09-26 (D11, touches D8):** AI service on Vercel (spike) and a Gemini API free-tier
+  key for the invite-only showcase as a temporary exception – see "Amendment 2026-09-26" at the end of D11
 - **Deciders:** Fluory (orchestrator) · drafted by a Claude session
 - **Inputs:** `docs/input/2026-09-22-kundenanfrage.md` (customer request), `PROJECT-START.md` (discovery)
 - **Facts verified:** 2026-09-22 against official docs, registries and provider terms (sources at the end).
@@ -652,6 +654,31 @@ enters the code: the app still talks plain PostgreSQL (Drizzle, pg-boss) and the
   project as Vertex `eu`, container image already exists, no 5 GB package or 300 s limit for docling/OCR).
 - **Runbook:** `docs/technical/deployment-vercel.md`.
 
+### Amendment 2026-09-26 – AI service on Vercel and a Gemini API free-tier key (decided by Fluory, orchestrator; #67)
+
+**Decision.**
+1. On the showcase the AI service runs as a **second Vercel project** (Python runtime, root directory
+   `services/ai`, entry `requestflow_ai.vercel_app:app` via `[tool.vercel]` in `pyproject.toml`,
+   region `fra1`), PDF pipeline `textlines`, OCR off. It is a spike: bundle size, cold start and one
+   extraction are measured and recorded in the PR of #67.
+2. Model calls use a **Gemini API key on the free tier** (`AI_ALLOW_GEMINI_API_DEV=true`,
+   `GEMINI_API_KEY` set only in the Vercel project) – a temporary exception to D8.
+
+**Why.** No GCP account for now; one platform for both runtimes; the code path already exists and is
+fail-closed (`AI_ALLOW_GEMINI_API_DEV` together with `VERTEX_PROJECT` refuses to start; no fallback).
+
+**Conditions of the exception.** The Gemini API terms (verified 2026-09-22) allow human review and
+product-improvement use of free-tier content and state: *"You may use only Paid Services when making
+API Clients available to users in the European Economic Area, Switzerland, or the UK."* There is no EU
+data-residency guarantee. Therefore: invite-only demo accounts held by the orchestrator, synthetic data
+only, demo banner on; the exception expires before anyone else gets an account, at the latest
+2026-10-31 → paid tier (same key with billing) or Vertex `eu`. Recorded in the exceptions register.
+
+**Alternatives.** Google Cloud Run + Vertex `eu` (runbook recommendation until now; needs GCP billing) ·
+Hugging Face Space (existing Dockerfile unchanged; new account, hosting region not verified).
+
+**Revisit when** the spike fails on size, cold start or duration (→ Cloud Run), or the exception expires.
+
 ---
 
 ## Summary of the challenged decisions
@@ -713,6 +740,7 @@ explicit requirements.
 |---|---|---|
 | Showcase: no unattended retries (Hobby cron once/day) | Showcase only; production runs a worker | when a production-like demo is needed |
 | No RLS on the `auth`/`pgboss` schemas | Not tenant business data; only server code has access | on review at M3 |
+| Gemini API free-tier key on the showcase (#67) | Invite-only for the orchestrator, synthetic data only, demo banner; Google's terms require paid services for API clients offered to EEA users (D11 amendment 2026-09-26) | before anyone else gets a demo account, at the latest 2026-10-31 |
 | Gemini free tier for local development | Synthetic data only; never in showcase or production | when the Vertex budget is set up for development |
 
 ## Open points
