@@ -45,7 +45,9 @@ Proof (the same commands as CI):
 | `VERTEX_PROJECT` | – (required) | GCP project for Vertex AI. |
 | `VERTEX_LOCATION` | `eu` | Vertex location (`eu` multi-region; a region such as `europe-west3` also works). |
 | `VERTEX_MODEL` | `gemini-3.5-flash` | Model ID. |
-| `AI_MODEL_TIMEOUT_SECONDS` | `60` | Timeout of one model call. The SDK does not retry; retries belong to the worker (pg-boss). |
+| `AI_MODEL_TIMEOUT_SECONDS` | `60` | Time budget of one model call, **retries included**: every attempt only gets what is left, so the call never runs longer. Keep it below the caller's `AI_SERVICE_TIMEOUT_MS` minus parsing time. |
+| `AI_MODEL_RETRY_ATTEMPTS` | `3` | Attempts in total (1–5) when the model answers 429 or 503 (overload, rate limit). Timeouts, network and all other errors are not retried here – they fail the call, and the worker (pg-boss) retries the job later. A retry only starts with at least 10 s of budget left. |
+| `AI_MODEL_RETRY_INITIAL_DELAY_SECONDS` | `1` | First wait before a retry (≤ 5); it doubles per attempt, capped at 8 s, plus up to 25 % jitter. |
 | `AI_ALLOW_GEMINI_API_DEV` | `false` | **Local development with synthetic data only.** Uses the Gemini API (free tier) instead of Vertex. Needs this flag **and** `GEMINI_API_KEY`, and `VERTEX_PROJECT` must be unset (both set → the service refuses to start). It is never used as a fallback, and a key alone changes nothing. |
 | `GEMINI_API_KEY` | – | Only read when the dev flag is `true`. |
 | `AI_PDF_PIPELINE` | `textlines` | `textlines` (model-free) or `layout` (docling layout model, see below). |

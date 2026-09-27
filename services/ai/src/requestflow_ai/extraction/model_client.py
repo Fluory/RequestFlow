@@ -13,6 +13,8 @@ No custom ``base_url`` is needed for ``eu``.
 from __future__ import annotations
 
 import logging
+import random
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -63,30 +65,74 @@ class ModelClient(Protocol):
     def extract(self, system_instruction: str, user_content: str) -> ModelResponse: ...
 
 
+@dataclass(frozen=True)
+class RetryPolicy:
+    """Retries inside one model call (#69). Only overload and rate-limit answers are transient; a
+    timeout or network error is not retried, because it already used the budget. All attempts
+    together stay within ``budget_seconds`` (the model timeout), each one only gets what is left."""
+
+    budget_seconds: float
+    attempts: int = 1
+    initial_delay_seconds: float = 1.0
+
+
+_RETRYABLE_STATUS = frozenset({429, 503})
+_MAX_DELAY_SECONDS = 8.0
+# A retry needs room for a whole answer (one extraction takes about 8 s, measured in #67).
+_MIN_ATTEMPT_SECONDS = 10.0
+
+
 class GeminiModelClient:
-    def __init__(self, client: Client, model: str) -> None:
+    def __init__(
+        self,
+        client: Client,
+        model: str,
+        retry: RetryPolicy,
+        *,
+        clock: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
         self._client = client
         self._model = model
+        self._retry = retry
+        self._clock = clock
+        self._sleep = sleep
 
     @property
     def model_id(self) -> str:
         return self._model
 
     def extract(self, system_instruction: str, user_content: str) -> ModelResponse:
-        config = types.GenerateContentConfig(
-            system_instruction=system_instruction,
-            response_mime_type="application/json",
-            response_schema=ModelExtraction,
-            temperature=0,
-            candidate_count=1,
-            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
-        )
-        try:
-            response = self._client.models.generate_content(
-                model=self._model, contents=user_content, config=config
-            )
-        except (errors.APIError, httpx.HTTPError, GoogleAuthError) as exc:
-            raise ModelClientError(type(exc).__name__) from exc
+        deadline = self._clock() + self._retry.budget_seconds
+        delay = self._retry.initial_delay_seconds
+        attempt = 1
+        while True:
+            remaining = deadline - self._clock()
+            try:
+                response = self._client.models.generate_content(
+                    model=self._model,
+                    contents=user_content,
+                    config=self._config(system_instruction, remaining),
+                )
+                break
+            except errors.APIError as exc:
+                wait = min(delay, _MAX_DELAY_SECONDS) * (1 + random.random() / 4)  # noqa: S311 - jitter, not security
+                left = deadline - self._clock() - wait
+                if (
+                    exc.code not in _RETRYABLE_STATUS
+                    or attempt >= self._retry.attempts
+                    or left < _MIN_ATTEMPT_SECONDS
+                ):
+                    raise ModelClientError(type(exc).__name__) from exc
+                _log.warning(
+                    "model_call_retry",
+                    extra={"attempt": attempt, "status": exc.code, "waitMs": round(wait * 1000)},
+                )
+                self._sleep(wait)
+                delay *= 2
+                attempt += 1
+            except (httpx.HTTPError, GoogleAuthError) as exc:
+                raise ModelClientError(type(exc).__name__) from exc
 
         text = response.text
         if not text:
@@ -108,6 +154,20 @@ class GeminiModelClient:
             model_version=response.model_version,
         )
 
+    @staticmethod
+    def _config(system_instruction: str, remaining_seconds: float) -> types.GenerateContentConfig:
+        return types.GenerateContentConfig(
+            system_instruction=system_instruction,
+            response_mime_type="application/json",
+            response_schema=ModelExtraction,
+            temperature=0,
+            candidate_count=1,
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+            # This attempt gets only what is left of the budget (at least 1 s; the SDK needs a
+            # timeout).
+            http_options=types.HttpOptions(timeout=max(1000, int(remaining_seconds * 1000))),
+        )
+
 
 CredentialsLoader = Callable[..., tuple[Any, str | None]]
 
@@ -120,9 +180,14 @@ def build_model_client(
     credentials_loader: CredentialsLoader = google.auth.default,
 ) -> ModelClient:
     """Create the configured model client or raise ``ModelClientInitError`` (fail-closed)."""
+    # No SDK retry: it would also repeat timeouts outside the budget (#72 review); see RetryPolicy.
     http_options = types.HttpOptions(
-        timeout=int(settings.ai_model_timeout_seconds * 1000),
-        httpx_client=httpx_client,
+        timeout=int(settings.ai_model_timeout_seconds * 1000), httpx_client=httpx_client
+    )
+    retry = RetryPolicy(
+        budget_seconds=settings.ai_model_timeout_seconds,
+        attempts=settings.ai_model_retry_attempts,
+        initial_delay_seconds=settings.ai_model_retry_initial_delay_seconds,
     )
 
     if settings.ai_allow_gemini_api_dev and settings.vertex_project:
@@ -145,7 +210,7 @@ def build_model_client(
             client = Client(vertexai=False, api_key=key, http_options=http_options)
         except Exception as exc:
             raise ModelClientInitError("Gemini API client init failed") from exc
-        return GeminiModelClient(client, settings.vertex_model)
+        return GeminiModelClient(client, settings.vertex_model, retry)
 
     if not settings.vertex_project:
         raise ModelClientInitError(
@@ -172,4 +237,4 @@ def build_model_client(
     # Defence in depth: an API key from the environment must never switch Vertex to key mode.
     if not client.vertexai or getattr(client._api_client, "api_key", None):
         raise ModelClientInitError("Vertex AI client resolved to API-key mode; refusing to start")
-    return GeminiModelClient(client, settings.vertex_model)
+    return GeminiModelClient(client, settings.vertex_model, retry)

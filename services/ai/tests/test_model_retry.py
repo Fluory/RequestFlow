@@ -1,0 +1,142 @@
+"""Transient model errors are retried inside one extraction call (#69), replayed over HTTP."""
+
+from __future__ import annotations
+
+from typing import Any
+
+import httpx
+import pytest
+from conftest import fake_credentials, make_settings, no_adc, recorded
+
+from requestflow_ai.extraction.model_client import (
+    ModelClient,
+    ModelClientError,
+    build_model_client,
+)
+
+FAST = {"ai_model_retry_initial_delay_seconds": 0.01}
+
+
+def _error(status: int) -> dict[str, Any]:
+    return {"error": {"code": status, "message": "synthetic upstream error"}}
+
+
+class Sequence:
+    """Answers with the given (status, body) pairs in order; the last pair repeats."""
+
+    def __init__(self, *responses: tuple[int, dict[str, Any]]) -> None:
+        self._responses = list(responses)
+        self.requests: list[httpx.Request] = []
+
+    def handler(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(request)
+        status, body = self._responses.pop(0) if len(self._responses) > 1 else self._responses[0]
+        return httpx.Response(status, json=body)
+
+    def client(self) -> httpx.Client:
+        return httpx.Client(transport=httpx.MockTransport(self.handler))
+
+
+def _vertex(sequence: Sequence, **overrides: Any) -> ModelClient:
+    return build_model_client(
+        make_settings(**FAST, **overrides),
+        credentials=fake_credentials(),
+        httpx_client=sequence.client(),
+        credentials_loader=no_adc,
+    )
+
+
+def test_a_503_is_retried_and_the_call_succeeds() -> None:
+    sequence = Sequence((503, _error(503)), (200, recorded("musterbau_pdf.json")))
+
+    _vertex(sequence).extract("S", "U")
+
+    assert len(sequence.requests) == 2
+
+
+def test_a_429_is_retried() -> None:
+    sequence = Sequence((429, _error(429)), (200, recorded("musterbau_pdf.json")))
+
+    _vertex(sequence).extract("S", "U")
+
+    assert len(sequence.requests) == 2
+
+
+def test_a_persistent_503_gives_up_after_three_attempts() -> None:
+    sequence = Sequence((503, _error(503)))
+
+    with pytest.raises(ModelClientError):
+        _vertex(sequence).extract("S", "U")
+
+    assert len(sequence.requests) == 3
+
+
+@pytest.mark.parametrize("status", [400, 401, 403, 404, 500])
+def test_other_errors_are_not_retried(status: int) -> None:
+    sequence = Sequence((status, _error(status)))
+
+    with pytest.raises(ModelClientError):
+        _vertex(sequence).extract("S", "U")
+
+    assert len(sequence.requests) == 1
+
+
+def test_a_timeout_is_not_retried() -> None:
+    # A hanging model already used the whole budget; another attempt would outlive the worker
+    # (#72 review).
+    requests: list[httpx.Request] = []
+
+    def hang(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        raise httpx.ReadTimeout("synthetic timeout", request=request)
+
+    client = build_model_client(
+        make_settings(**FAST),
+        credentials=fake_credentials(),
+        httpx_client=httpx.Client(transport=httpx.MockTransport(hang)),
+        credentials_loader=no_adc,
+    )
+
+    with pytest.raises(ModelClientError):
+        client.extract("S", "U")
+
+    assert len(requests) == 1
+
+
+def test_no_retry_without_enough_budget_left() -> None:
+    # Budget below the minimum a retry needs: a 503 fails at once instead of eating the worker's
+    # time.
+    sequence = Sequence((503, _error(503)), (200, recorded("musterbau_pdf.json")))
+
+    with pytest.raises(ModelClientError):
+        _vertex(sequence, ai_model_timeout_seconds=5).extract("S", "U")
+
+    assert len(sequence.requests) == 1
+
+
+def test_each_attempt_gets_only_the_remaining_budget() -> None:
+    sequence = Sequence((503, _error(503)), (200, recorded("musterbau_pdf.json")))
+
+    _vertex(sequence, ai_model_timeout_seconds=30).extract("S", "U")
+
+    first, second = (request.extensions["timeout"]["read"] for request in sequence.requests)
+    assert first <= 30
+    assert second < first
+
+
+def test_the_gemini_api_dev_path_retries_too() -> None:
+    sequence = Sequence((503, _error(503)), (200, recorded("musterbau_pdf.json")))
+    client = build_model_client(
+        make_settings(
+            **FAST,
+            ai_allow_gemini_api_dev=True,
+            gemini_api_key="synthetic-dev-key",
+            vertex_project=None,
+        ),
+        httpx_client=sequence.client(),
+        credentials_loader=no_adc,
+    )
+
+    client.extract("S", "U")
+
+    assert len(sequence.requests) == 2
