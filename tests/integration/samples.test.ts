@@ -5,10 +5,10 @@ import { loadConfig } from "@/config/env";
 import { createJobQueue } from "@/db/job-queue-client";
 import { listAuditEvents } from "@/features/audit";
 import { createErpMock, MemoryMockStore } from "@/features/erp-mock";
-import { createErpClient, getExportRecord } from "@/features/export";
+import { createErpClient, exportRequestJob, getExportRecord } from "@/features/export";
 import { getActor, type Actor } from "@/features/identity";
 import { QUEUES, ReprocessRefused, reprocessRequest } from "@/features/jobs";
-import { getRequest } from "@/features/requests";
+import { getRequest, lockRequest, transitionRequest } from "@/features/requests";
 import { currentFieldValues, currentLineItemValues, loadReview } from "@/features/review";
 import { RECORDED_MODEL_PREFIX, seedSamples, type SampleDeps } from "@/features/samples";
 import { S3BlobStore } from "@/features/storage";
@@ -60,7 +60,7 @@ describe("prepared samples", () => {
     await stack.close();
   });
 
-  it("seeds one sample in review and one approved and exported sample – nothing left in the queue", async () => {
+  it("seeds one sample in review and one approved and exported sample; a later delivery of the export job is a no-op", async () => {
     const [admin] = actors as [Actor];
     const seeded = await seedSamples(deps(), admin);
 
@@ -94,11 +94,12 @@ describe("prepared samples", () => {
     expect(runs.rows).toHaveLength(2);
     for (const run of runs.rows) expect(run).toMatchObject({ total_tokens: 0, latency_ms: 0, model_id: expect.stringMatching(new RegExp(`^${RECORDED_MODEL_PREFIX}`)) });
 
-    // The jobs ran inline: nothing a drain could send to the live model, nothing waiting.
-    for (const id of [review, exported]) {
-      expect(await jobsFor(QUEUES.processRequest, id)).toBe(0);
-      expect(await jobsFor(QUEUES.exportRequest, id)).toBe(0);
-    }
+    // Processing ran inline and was never queued: nothing a drain could send to the live model.
+    for (const id of [review, exported]) expect(await jobsFor(QUEUES.processRequest, id)).toBe(0);
+    // The approval queued its export job as always (#83 re-review); delivered later, it finds EXPORTED.
+    expect(await jobsFor(QUEUES.exportRequest, exported)).toBe(1);
+    expect(await exportRequestJob(deps().export, { id: "later-delivery", data: { requestId: exported, companyId: admin.companyId } })).toBe("skipped");
+    expect(await tenancy.withTenant(admin.companyId, (tx) => getExportRecord(tx, exported))).toMatchObject({ erpReference: record!.erpReference });
   });
 
   it("is idempotent: a second run creates nothing while the samples still serve", async () => {
@@ -110,7 +111,7 @@ describe("prepared samples", () => {
     expect(await samplesOf(admin)).toEqual(before);
   });
 
-  it("queues the export when the ERP is unreachable, so the normal retry takes over", async () => {
+  it("leaves the export to the queued job when the ERP is unreachable – nothing half-written", async () => {
     const admin = actors[1]!;
 
     const seeded = await seedSamples(deps({ erpDown: true }), admin);
@@ -119,6 +120,22 @@ describe("prepared samples", () => {
     expect(exported.status).toBe("APPROVED");
     expect((await tenancy.withTenant(admin.companyId, (tx) => getRequest(tx, exported.requestId)))?.status).toBe("APPROVED");
     expect(await jobsFor(QUEUES.exportRequest, exported.requestId)).toBe(1);
+    expect(await tenancy.withTenant(admin.companyId, (tx) => getExportRecord(tx, exported.requestId))).toBeNull();
+  });
+
+  it("a sample whose export failed can still be exported again – only processing is refused (#83 re-review)", async () => {
+    const admin = actors[1]!;
+    const exported = (await samplesOf(admin)).find((sample) => sample.status === "APPROVED")!;
+    // The export gave up (as the drain would after its retries); its queued job is gone.
+    await stack.database.pool.query("delete from pgboss.job where name = $1 and singleton_key = $2", [QUEUES.exportRequest, exported.id]);
+    await tenancy.withTenant(admin.companyId, async (tx) =>
+      transitionRequest(tx, (await lockRequest(tx, exported.id))!, "export.failed", { errorStage: "export", errorMessage: "ERP nicht erreichbar." }),
+    );
+
+    await reprocessRequest({ tenancy, boss }, admin, exported.id);
+
+    expect((await tenancy.withTenant(admin.companyId, (tx) => getRequest(tx, exported.id)))?.status).toBe("APPROVED");
+    expect(await jobsFor(QUEUES.exportRequest, exported.id)).toBe(1);
   });
 
   it("an aborted run leaves the sample in ERROR, not in progress; the next run replaces it; no live reprocess", async () => {

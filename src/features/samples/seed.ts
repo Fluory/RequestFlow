@@ -2,8 +2,7 @@ import { randomUUID } from "node:crypto";
 import { exportRequestJob, type ExportDeps } from "@/features/export";
 import type { Actor } from "@/features/identity";
 import { submitUpload, type IntakeDeps } from "@/features/intake";
-import { enqueueRequestExport, markProcessingFailed, processRequestJob, type JobSender } from "@/features/jobs";
-import { logEvent } from "@/features/observability";
+import { markProcessingFailed, processRequestJob, type JobSender } from "@/features/jobs";
 import { countSamples, type RequestRow } from "@/features/requests";
 import { approveRequest } from "@/features/review";
 import { freshSampleMail, recordedAiClient, SAMPLES, sampleRecording, type Sample } from "./samples";
@@ -24,14 +23,19 @@ export interface SampleDeps extends IntakeDeps {
 export interface SeededSample {
   key: string;
   requestId: string;
-  /** APPROVED: the ERP was not reachable, the export job is queued and retried like any other. */
+  /** APPROVED: the ERP was not reachable; the export job queued with the approval retries it like any other. */
   status: "REVIEW" | "EXPORTED" | "APPROVED";
 }
 
-/** A sender that queues nothing and hands out the id of the job it was asked to queue. */
-function inlineSender(): { sender: JobSender; jobId: () => string } {
+/**
+ * A sender that remembers the id of the job it was asked to queue. `queue` present: the job is really
+ * queued (in the caller's transaction) through it; absent: nothing is queued and the id is made up.
+ */
+function recordingSender(queue?: JobSender): { sender: JobSender; jobId: () => string } {
   let id: string | undefined;
-  const sender = { send: async () => (id = randomUUID()) } as unknown as JobSender;
+  const sender = {
+    send: async (...args: Parameters<JobSender["send"]>) => (id = queue ? ((await queue.send(...args)) ?? undefined) : randomUUID()),
+  } as unknown as JobSender;
   return {
     sender,
     jobId: () => {
@@ -45,10 +49,10 @@ function inlineSender(): { sender: JobSender; jobId: () => string } {
  * Seeds the prepared samples of the actor's company (#71), idempotently: a sample is created only when no
  * sample of its purpose still serves. Every step runs the real path – intake (original stored, request,
  * documents, audit, duplicate check), processing (run, segments, fields, REVIEW) and, for the exported
- * sample, approval and export (ERP call with idempotency key, export row, audit). One deliberate
- * difference: the jobs run inline instead of through the queue – processing with the recorded answer, so
- * no drain can ever send a sample to the live model, and the export right away, so visitors see the ERP
- * reference without doing anything.
+ * sample, approval and export (ERP call with idempotency key, export row, audit). Two deliberate
+ * differences: processing runs inline with the recorded answer and is never queued, so no drain can send
+ * a sample to the live model; and the export job queued by the approval runs right away, so visitors see
+ * the ERP reference without doing anything.
  */
 export async function seedSamples(deps: SampleDeps, actor: Actor): Promise<SeededSample[]> {
   const seeded: SeededSample[] = [];
@@ -63,7 +67,8 @@ export async function seedSamples(deps: SampleDeps, actor: Actor): Promise<Seede
 }
 
 async function createSample(deps: SampleDeps, actor: Actor, sample: Sample): Promise<string> {
-  const processing = inlineSender();
+  // Processing is never queued: a queued job could reach the live model.
+  const processing = recordingSender();
   const { requestId } = await submitUpload({ ...deps, boss: processing.sender }, actor, [{ name: sample.filename, bytes: freshSampleMail(sample) }], {
     source: "sample",
   });
@@ -79,17 +84,19 @@ async function createSample(deps: SampleDeps, actor: Actor, sample: Sample): Pro
   return requestId;
 }
 
+/**
+ * The approval queues the export job in its own transaction, as always (ADR-0001 D9) – so an aborted
+ * seed can never leave an approved sample without one (#83 re-review). The seed then runs that very job
+ * right away; when the queue delivers it later it finds EXPORTED and skips. An unreachable ERP simply
+ * leaves the job to the queue's retries.
+ */
 async function approveAndExport(deps: SampleDeps, actor: Actor, requestId: string): Promise<"EXPORTED" | "APPROVED"> {
-  const exporting = inlineSender();
+  const exporting = recordingSender(deps.boss);
   await approveRequest({ tenancy: deps.tenancy, boss: exporting.sender }, actor, requestId);
-  const job = { id: exporting.jobId(), data: { requestId, companyId: actor.companyId } };
   try {
-    await exportRequestJob(deps.export, job);
+    await exportRequestJob(deps.export, { id: exporting.jobId(), data: { requestId, companyId: actor.companyId } });
     return "EXPORTED";
-  } catch (error) {
-    // The ERP is not reachable right now: hand the export to the queue, which retries it like any other.
-    await deps.tenancy.withTenant(actor.companyId, (tx) => enqueueRequestExport(deps.boss, tx, requestId));
-    logEvent("warn", "sample.export_queued", { requestId, companyId: actor.companyId }, { code: error instanceof Error ? error.name : "unknown" });
+  } catch {
     return "APPROVED";
   }
 }
