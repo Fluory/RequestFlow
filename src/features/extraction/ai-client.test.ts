@@ -56,6 +56,47 @@ describe("AI service client", () => {
     await expect(client.extract(input)).rejects.toMatchObject({ retryable: true, status });
   });
 
+  // #80: the contract's error code names the cause (model provider vs. our service); staff texts depend on it.
+  it.each([
+    [502, { error: { code: "model_error", message: "the model call failed" } }, "model_error"],
+    [502, { error: { code: "model_output_invalid", message: "m" } }, "model_output_invalid"],
+    [429, { error: { code: "busy", message: "all extraction slots are busy" } }, "busy"],
+    [500, { error: { code: "internal_error", message: "m" } }, "internal_error"],
+    [503, { error: { code: "not-a-contract-code", message: "m" } }, "unavailable"],
+  ] as const)("keeps the contract error code of a retryable HTTP %i answer", async (status, body, code) => {
+    handler = (_request, response) => json(response, status, body);
+    const client = createAiServiceClient({ baseUrl, token: "t".repeat(24), timeoutMs: 2000 });
+
+    await expect(client.extract(input)).rejects.toMatchObject({ retryable: true, status, code });
+  });
+
+  it("classifies a retryable answer without a JSON error body (e.g. a platform 502 page) as unavailable", async () => {
+    handler = (_request, response) => {
+      response.writeHead(502, { "content-type": "text/html" });
+      response.end("<html>Bad Gateway</html>");
+    };
+    const client = createAiServiceClient({ baseUrl, token: "t".repeat(24), timeoutMs: 2000 });
+
+    await expect(client.extract(input)).rejects.toMatchObject({ retryable: true, status: 502, code: "unavailable" });
+  });
+
+  it("reads at most a small error object: an oversized error body is dropped, not buffered (#82 review)", async () => {
+    handler = (_request, response) => json(response, 502, { error: { code: "model_error", message: "m".repeat(64 * 1024) } });
+    const client = createAiServiceClient({ baseUrl, token: "t".repeat(24), timeoutMs: 2000 });
+
+    await expect(client.extract(input)).rejects.toMatchObject({ retryable: true, status: 502, code: "unavailable" });
+  });
+
+  it("classifies an error body that stalls after the headers as a timeout (#82 review)", async () => {
+    handler = (_request, response) => {
+      response.writeHead(503, { "content-type": "application/json" });
+      response.write('{"error":'); // …and never finishes
+    };
+    const client = createAiServiceClient({ baseUrl, token: "t".repeat(24), timeoutMs: 200 });
+
+    await expect(client.extract(input)).rejects.toMatchObject({ retryable: true, status: 503, code: "timeout" });
+  });
+
   it.each([
     [413, "document"],
     [415, "document"],
