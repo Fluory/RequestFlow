@@ -118,6 +118,12 @@ With the same shell variables and a strong `SEED_PASSWORD` (≥ 12 chars, passwo
 creates the two synthetic companies with their admins (invite-only; see `src/seed.ts`). Hand the
 accounts out only to people who may see the demo.
 
+Then `pnpm seed:samples` (same variables and `SEED_PASSWORD`) prepares per company one sample to review and one
+approved sample whose export the next drain sends to the ERP mock (#71). Their extraction replays answers recorded
+once with `pnpm samples:record` (`src/features/samples/data/`) – no model call, so the samples work even while the
+model provider is overloaded. List and detail label them „Vorbereitetes Beispiel – aufgezeichnete KI-Antwort“. The
+step is idempotent: repeat it whenever visitors have decided the samples, and it adds only what is missing.
+
 ## 7. Jobs without a worker
 
 - `after()`: with `JOB_DRAIN_INLINE=true`, upload, approval and "Erneut verarbeiten" drain once after the
