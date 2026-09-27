@@ -1,0 +1,313 @@
+{
+  "documentId": "sample-pumpe-p204",
+  "documentKind": "eml",
+  "segments": [
+    {
+      "id": "eml-h-from",
+      "text": "From: Instandhaltung <instandhaltung@muster-chemie.example.com>",
+      "locator": {
+        "kind": "email",
+        "part": "header",
+        "line": 1,
+        "header": "From"
+      }
+    },
+    {
+      "id": "eml-h-subject",
+      "text": "Subject: Anfrage Dichtungssatz fuer Pumpe P-204",
+      "locator": {
+        "kind": "email",
+        "part": "header",
+        "line": 2,
+        "header": "Subject"
+      }
+    },
+    {
+      "id": "eml-l1",
+      "text": "Sehr geehrte Damen und Herren,",
+      "locator": {
+        "kind": "email",
+        "part": "body",
+        "line": 1,
+        "header": null
+      }
+    },
+    {
+      "id": "eml-l3",
+      "text": "bitte senden Sie uns ein Angebot fuer:",
+      "locator": {
+        "kind": "email",
+        "part": "body",
+        "line": 3,
+        "header": null
+      }
+    },
+    {
+      "id": "eml-l5",
+      "text": "1) 2 Stk. Gleitringdichtung 45 mm, Werkstoff SiC/SiC",
+      "locator": {
+        "kind": "email",
+        "part": "body",
+        "line": 5,
+        "header": null
+      }
+    },
+    {
+      "id": "eml-l6",
+      "text": "2) 4 Stk. O-Ring 120 x 4 mm, Werkstoff FKM",
+      "locator": {
+        "kind": "email",
+        "part": "body",
+        "line": 6,
+        "header": null
+      }
+    },
+    {
+      "id": "eml-l8",
+      "text": "Liefertermin: 20.11.2026",
+      "locator": {
+        "kind": "email",
+        "part": "body",
+        "line": 8,
+        "header": null
+      }
+    },
+    {
+      "id": "eml-l9",
+      "text": "Bitte legen Sie ein Abnahmepruefzeugnis 3.1 nach EN 10204 bei.",
+      "locator": {
+        "kind": "email",
+        "part": "body",
+        "line": 9,
+        "header": null
+      }
+    },
+    {
+      "id": "eml-l11",
+      "text": "Mit freundlichen Gruessen",
+      "locator": {
+        "kind": "email",
+        "part": "body",
+        "line": 11,
+        "header": null
+      }
+    },
+    {
+      "id": "eml-l12",
+      "text": "Tom Beispiel",
+      "locator": {
+        "kind": "email",
+        "part": "body",
+        "line": 12,
+        "header": null
+      }
+    },
+    {
+      "id": "eml-l13",
+      "text": "Muster Chemie GmbH",
+      "locator": {
+        "kind": "email",
+        "part": "body",
+        "line": 13,
+        "header": null
+      }
+    },
+    {
+      "id": "eml-l14",
+      "text": "Tel. +49 221 5550199",
+      "locator": {
+        "kind": "email",
+        "part": "body",
+        "line": 14,
+        "header": null
+      }
+    }
+  ],
+  "fields": {
+    "company": {
+      "value": "Muster Chemie GmbH",
+      "status": "found",
+      "evidence": {
+        "segmentId": "eml-l13",
+        "quote": "Muster Chemie GmbH"
+      },
+      "modelStatus": "found",
+      "reason": null
+    },
+    "contact_person": {
+      "value": "Tom Beispiel",
+      "status": "found",
+      "evidence": {
+        "segmentId": "eml-l12",
+        "quote": "Tom Beispiel"
+      },
+      "modelStatus": "found",
+      "reason": null
+    },
+    "email": {
+      "value": "instandhaltung@muster-chemie.example.com",
+      "status": "found",
+      "evidence": {
+        "segmentId": "eml-h-from",
+        "quote": "instandhaltung@muster-chemie.example.com"
+      },
+      "modelStatus": "found",
+      "reason": null
+    },
+    "phone": {
+      "value": "+49 221 5550199",
+      "status": "found",
+      "evidence": {
+        "segmentId": "eml-l14",
+        "quote": "+49 221 5550199"
+      },
+      "modelStatus": "found",
+      "reason": null
+    },
+    "requested_delivery_date": {
+      "value": "2026-11-20",
+      "status": "found",
+      "evidence": {
+        "segmentId": "eml-l8",
+        "quote": "20.11.2026"
+      },
+      "modelStatus": "found",
+      "reason": null
+    },
+    "additional_requirements": {
+      "value": "Bitte legen Sie ein Abnahmepruefzeugnis 3.1 nach EN 10204 bei.",
+      "status": "found",
+      "evidence": {
+        "segmentId": "eml-l9",
+        "quote": "Bitte legen Sie ein Abnahmepruefzeugnis 3.1 nach EN 10204 bei."
+      },
+      "modelStatus": "found",
+      "reason": null
+    }
+  },
+  "lineItems": [
+    {
+      "index": 0,
+      "description": {
+        "value": "Gleitringdichtung",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l5",
+          "quote": "Gleitringdichtung"
+        },
+        "modelStatus": "found",
+        "reason": null
+      },
+      "quantity": {
+        "value": "2",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l5",
+          "quote": "2"
+        },
+        "modelStatus": "found",
+        "reason": null
+      },
+      "unit": {
+        "value": "pcs",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l5",
+          "quote": "Stk."
+        },
+        "modelStatus": "found",
+        "reason": null
+      },
+      "material": {
+        "value": "SiC/SiC",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l5",
+          "quote": "SiC/SiC"
+        },
+        "modelStatus": "found",
+        "reason": null
+      },
+      "dimensions": {
+        "value": "45 mm",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l5",
+          "quote": "45 mm"
+        },
+        "modelStatus": "found",
+        "reason": null
+      }
+    },
+    {
+      "index": 1,
+      "description": {
+        "value": "O-Ring",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l6",
+          "quote": "O-Ring"
+        },
+        "modelStatus": "found",
+        "reason": null
+      },
+      "quantity": {
+        "value": "4",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l6",
+          "quote": "4"
+        },
+        "modelStatus": "found",
+        "reason": null
+      },
+      "unit": {
+        "value": "pcs",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l6",
+          "quote": "Stk."
+        },
+        "modelStatus": "found",
+        "reason": null
+      },
+      "material": {
+        "value": "FKM",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l6",
+          "quote": "FKM"
+        },
+        "modelStatus": "found",
+        "reason": null
+      },
+      "dimensions": {
+        "value": "120 x 4 mm",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l6",
+          "quote": "120 x 4 mm"
+        },
+        "modelStatus": "found",
+        "reason": null
+      }
+    }
+  ],
+  "run": {
+    "modelId": "gemini-3.5-flash",
+    "promptVersion": "extract_v2",
+    "schemaVersion": "2",
+    "latencyMs": 13539,
+    "modelVersion": "gemini-3.5-flash",
+    "pdfPipeline": null,
+    "tokens": {
+      "inputTokens": 1280,
+      "outputTokens": 1096,
+      "totalTokens": 4522
+    },
+    "modelLatencyMs": 13534
+  },
+  "warnings": [],
+  "requestId": "c072709f-679f-4c22-95c5-829a6ff6c909",
+  "attachments": []
+}
