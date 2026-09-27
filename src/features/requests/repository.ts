@@ -14,6 +14,8 @@ export interface NewRequest {
   fingerprint?: string | null;
   possibleDuplicate?: boolean;
   duplicateOfId?: string | null;
+  /** `sample` (#71): a prepared showcase case; default `upload`. */
+  source?: RequestRow["source"];
 }
 
 // Repository of the request aggregate. Every function needs a tenant transaction; the company id is
@@ -152,12 +154,6 @@ export async function recordProcessingFailure(tx: TenantTx, id: string, failure:
     .update(requests)
     .set({ errorMessage: failure.message, nextRetryAt: failure.nextRetryAt })
     .where(and(eq(requests.id, id), eq(requests.status, "PROCESSING")));
-}
-
-/** Marks a request as a prepared showcase sample (#71) – its label in list and detail comes from here. */
-export async function markSample(tx: TenantTx, id: string): Promise<void> {
-  tenantOf(tx);
-  await tx.update(requests).set({ source: "sample" }).where(eq(requests.id, id));
 }
 
 /** Samples of the tenant in one of `statuses` (#71: the seed creates a sample only when none is open). */

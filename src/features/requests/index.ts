@@ -11,7 +11,6 @@ export {
   type RequestPage,
   lockDuplicateDetection,
   lockRequest,
-  markSample,
   recordDuplicateDecision,
   recordExportRetry,
   recordProcessingFailure,

@@ -153,7 +153,8 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                         )}
                       </td>
                       <td className="num">
-                        {request.status === "ERROR" && (
+                        {/* A sample in ERROR from processing is not reprocessed: that would call the live model (#71). */}
+                        {request.status === "ERROR" && !(request.source === "sample" && request.errorStage === "processing") && (
                           <form action={reprocessAction}>
                             <input type="hidden" name="requestId" value={request.id} />
                             <button type="submit" className="btn-small" aria-label={`Erneut verarbeiten: ${request.subject ?? "(ohne Betreff)"}`}>

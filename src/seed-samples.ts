@@ -1,11 +1,13 @@
-// Prepared samples (`pnpm seed:samples`, #71): per demo company one sample to review and one approved
-// sample whose export runs through the normal queue. Idempotent – safe to repeat, e.g. after visitors
+// Prepared samples (`pnpm seed:samples`, #71): per demo company one sample to review and one approved and
+// exported sample (the ERP must be reachable, else its export is queued). Idempotent – safe to repeat, e.g. after visitors
 // decided the samples. The extraction replays recorded answers (src/features/samples); no model call.
 // Needs the demo companies (`pnpm seed:demo`) and the same shell variables (runbook §6).
 import { loadConfig } from "@/config/env";
 import { createDatabase } from "@/db";
 import { createJobQueue } from "@/db/job-queue-client";
+import { createErpClient } from "@/features/export";
 import { createAuth, getActor } from "@/features/identity";
+import { currentFieldValues, currentLineItemValues } from "@/features/review";
 import { seedSamples } from "@/features/samples";
 import { S3BlobStore } from "@/features/storage";
 import { createTenancy } from "@/features/tenancy";
@@ -21,7 +23,15 @@ async function main(): Promise<void> {
   const storage = new S3BlobStore(config.storage);
   const boss = await createJobQueue(config.databaseUrl);
   // No hourly upload cap: seeding is an operator step, and a sample never calls the model.
-  const deps = { tenancy: createTenancy(database.db), storage, boss, limits: { ...config.upload, maxPerHour: undefined } };
+  const tenancy = createTenancy(database.db);
+  const deps = {
+    tenancy,
+    storage,
+    boss,
+    limits: { ...config.upload, maxPerHour: undefined },
+    // The exported sample goes to the configured ERP (on the showcase: the ERP mock route) right away.
+    export: { tenancy, erp: createErpClient(config.erp), fieldValues: currentFieldValues, lineItemValues: currentLineItemValues },
+  };
   try {
     for (const email of ADMINS) {
       const login = await auth.api.signInEmail({ body: { email, password }, returnHeaders: true });

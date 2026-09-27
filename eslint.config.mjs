@@ -12,8 +12,9 @@ const config = [
     },
   },
   // Logs are a data-leak path (#28): application code logs through `logEvent` (fixed key set, IDs and
-  // codes only). Exempt: the operator's seed script and deploy step (`setup.ts`) – no tenant data,
-  // their messages explain role/connection problems with URLs masked.
+  // codes only). Exempt: the operator's seed scripts (`seed.ts`, `seed-samples.ts`), the sample recorder
+  // (`samples-record.ts`, #71) and the deploy step (`setup.ts`) – they print sample keys, statuses and
+  // field statuses of synthetic mails, never tenant data or secrets; setup masks URLs.
   { files: ["src/**/*.{ts,tsx}"], ignores: ["src/seed.ts", "src/seed-samples.ts", "src/samples-record.ts", "src/setup.ts"], rules: { "no-console": "error" } },
 ];
 
