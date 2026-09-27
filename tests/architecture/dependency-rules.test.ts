@@ -18,7 +18,8 @@ function cruise(entry: string) {
   return { status: result.status, output: `${result.stdout}${result.stderr}` };
 }
 
-describe("module boundary rules", () => {
+// Each case starts a real dependency-cruiser run: up to ~5 s on Windows (#87 review), ~1 s on Linux CI.
+describe("module boundary rules", { timeout: 20_000 }, () => {
   it("rejects a deep import into another module's internals", () => {
     const { status, output } = cruise("src/features/alpha");
 
