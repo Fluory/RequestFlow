@@ -1,0 +1,363 @@
+{
+  "documentId": "sample-werk-ost",
+  "documentKind": "eml",
+  "segments": [
+    {
+      "id": "eml-h-from",
+      "text": "From: Einkauf <einkauf@beispiel-anlagenbau.example.com>",
+      "locator": {
+        "kind": "email",
+        "part": "header",
+        "line": 1,
+        "header": "From"
+      }
+    },
+    {
+      "id": "eml-h-subject",
+      "text": "Subject: Anfrage Rohrbogen und Flansche fuer Werk Ost",
+      "locator": {
+        "kind": "email",
+        "part": "header",
+        "line": 2,
+        "header": "Subject"
+      }
+    },
+    {
+      "id": "eml-l1",
+      "text": "Guten Tag,",
+      "locator": {
+        "kind": "email",
+        "part": "body",
+        "line": 1,
+        "header": null
+      }
+    },
+    {
+      "id": "eml-l3",
+      "text": "wir bitten um ein Angebot fuer folgende Positionen:",
+      "locator": {
+        "kind": "email",
+        "part": "body",
+        "line": 3,
+        "header": null
+      }
+    },
+    {
+      "id": "eml-l5",
+      "text": "1) 8 Stk. Rohrbogen 90 Grad DN 80, Werkstoff P235GH",
+      "locator": {
+        "kind": "email",
+        "part": "body",
+        "line": 5,
+        "header": null
+      }
+    },
+    {
+      "id": "eml-l6",
+      "text": "2) 16 Stk. Vorschweissflansch DN 80 PN 40, Werkstoff 1.0460",
+      "locator": {
+        "kind": "email",
+        "part": "body",
+        "line": 6,
+        "header": null
+      }
+    },
+    {
+      "id": "eml-l7",
+      "text": "3) 16 Stk. Flachdichtung DN 80 PN 40, Werkstoff Graphit",
+      "locator": {
+        "kind": "email",
+        "part": "body",
+        "line": 7,
+        "header": null
+      }
+    },
+    {
+      "id": "eml-l9",
+      "text": "Gewuenschter Liefertermin: KW 48",
+      "locator": {
+        "kind": "email",
+        "part": "body",
+        "line": 9,
+        "header": null
+      }
+    },
+    {
+      "id": "eml-l11",
+      "text": "Mit freundlichen Gruessen",
+      "locator": {
+        "kind": "email",
+        "part": "body",
+        "line": 11,
+        "header": null
+      }
+    },
+    {
+      "id": "eml-l12",
+      "text": "Jana Beispiel",
+      "locator": {
+        "kind": "email",
+        "part": "body",
+        "line": 12,
+        "header": null
+      }
+    },
+    {
+      "id": "eml-l13",
+      "text": "Beispiel Anlagenbau GmbH",
+      "locator": {
+        "kind": "email",
+        "part": "body",
+        "line": 13,
+        "header": null
+      }
+    },
+    {
+      "id": "eml-l14",
+      "text": "Tel. +49 40 5550123",
+      "locator": {
+        "kind": "email",
+        "part": "body",
+        "line": 14,
+        "header": null
+      }
+    }
+  ],
+  "fields": {
+    "company": {
+      "value": "Beispiel Anlagenbau GmbH",
+      "status": "found",
+      "evidence": {
+        "segmentId": "eml-l13",
+        "quote": "Beispiel Anlagenbau GmbH"
+      },
+      "modelStatus": "found",
+      "reason": null
+    },
+    "contact_person": {
+      "value": "Jana Beispiel",
+      "status": "found",
+      "evidence": {
+        "segmentId": "eml-l12",
+        "quote": "Jana Beispiel"
+      },
+      "modelStatus": "found",
+      "reason": null
+    },
+    "email": {
+      "value": "einkauf@beispiel-anlagenbau.example.com",
+      "status": "found",
+      "evidence": {
+        "segmentId": "eml-h-from",
+        "quote": "einkauf@beispiel-anlagenbau.example.com"
+      },
+      "modelStatus": "found",
+      "reason": null
+    },
+    "phone": {
+      "value": "+49 40 5550123",
+      "status": "found",
+      "evidence": {
+        "segmentId": "eml-l14",
+        "quote": "+49 40 5550123"
+      },
+      "modelStatus": "found",
+      "reason": null
+    },
+    "requested_delivery_date": {
+      "value": "KW 48",
+      "status": "uncertain",
+      "evidence": {
+        "segmentId": "eml-l9",
+        "quote": "KW 48"
+      },
+      "modelStatus": "uncertain",
+      "reason": "calendar_week_only"
+    },
+    "additional_requirements": {
+      "value": null,
+      "status": "missing",
+      "evidence": null,
+      "modelStatus": "missing",
+      "reason": null
+    }
+  },
+  "lineItems": [
+    {
+      "index": 0,
+      "description": {
+        "value": "Rohrbogen 90 Grad",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l5",
+          "quote": "Rohrbogen 90 Grad"
+        },
+        "modelStatus": "found",
+        "reason": null
+      },
+      "quantity": {
+        "value": "8",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l5",
+          "quote": "8"
+        },
+        "modelStatus": "found",
+        "reason": null
+      },
+      "unit": {
+        "value": "pcs",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l5",
+          "quote": "Stk."
+        },
+        "modelStatus": "found",
+        "reason": null
+      },
+      "material": {
+        "value": "P235GH",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l5",
+          "quote": "P235GH"
+        },
+        "modelStatus": "found",
+        "reason": null
+      },
+      "dimensions": {
+        "value": "DN 80",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l5",
+          "quote": "DN 80"
+        },
+        "modelStatus": "found",
+        "reason": null
+      }
+    },
+    {
+      "index": 1,
+      "description": {
+        "value": "Vorschweissflansch",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l6",
+          "quote": "Vorschweissflansch"
+        },
+        "modelStatus": "found",
+        "reason": null
+      },
+      "quantity": {
+        "value": "16",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l6",
+          "quote": "16"
+        },
+        "modelStatus": "found",
+        "reason": null
+      },
+      "unit": {
+        "value": "pcs",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l6",
+          "quote": "Stk."
+        },
+        "modelStatus": "found",
+        "reason": null
+      },
+      "material": {
+        "value": "1.0460",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l6",
+          "quote": "1.0460"
+        },
+        "modelStatus": "found",
+        "reason": null
+      },
+      "dimensions": {
+        "value": "DN 80 PN 40",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l6",
+          "quote": "DN 80 PN 40"
+        },
+        "modelStatus": "found",
+        "reason": null
+      }
+    },
+    {
+      "index": 2,
+      "description": {
+        "value": "Flachdichtung",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l7",
+          "quote": "Flachdichtung"
+        },
+        "modelStatus": "found",
+        "reason": null
+      },
+      "quantity": {
+        "value": "16",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l7",
+          "quote": "16"
+        },
+        "modelStatus": "found",
+        "reason": null
+      },
+      "unit": {
+        "value": "pcs",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l7",
+          "quote": "Stk."
+        },
+        "modelStatus": "found",
+        "reason": null
+      },
+      "material": {
+        "value": "Graphit",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l7",
+          "quote": "Graphit"
+        },
+        "modelStatus": "found",
+        "reason": null
+      },
+      "dimensions": {
+        "value": "DN 80 PN 40",
+        "status": "found",
+        "evidence": {
+          "segmentId": "eml-l7",
+          "quote": "DN 80 PN 40"
+        },
+        "modelStatus": "found",
+        "reason": null
+      }
+    }
+  ],
+  "run": {
+    "modelId": "gemini-3.5-flash",
+    "promptVersion": "extract_v2",
+    "schemaVersion": "2",
+    "latencyMs": 24741,
+    "modelVersion": "gemini-3.5-flash",
+    "pdfPipeline": null,
+    "tokens": {
+      "inputTokens": 1281,
+      "outputTokens": 749,
+      "totalTokens": 3558
+    },
+    "modelLatencyMs": 24737
+  },
+  "warnings": [],
+  "requestId": "cb7fbdce-e1ce-4c21-812c-29f8e4a4e7a2",
+  "attachments": []
+}

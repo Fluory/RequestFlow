@@ -22,6 +22,8 @@ export async function reprocessRequest(deps: { tenancy: Tenancy; boss: JobSender
   await deps.tenancy.withTenant(actor.companyId, async (tx) => {
     const request = await lockRequest(tx, requestId);
     if (!request || request.status !== "ERROR" || (request.errorStage !== "processing" && request.errorStage !== "export")) throw new ReprocessRefused();
+    // A sample's extraction is a recording (#71): processing it again would call the live model.
+    if (request.source === "sample" && request.errorStage === "processing") throw new ReprocessRefused();
     const stage = request.errorStage;
     await transitionRequest(tx, request, stage === "export" ? "reprocess.export" : "reprocess.processing", { errorStage: null, errorMessage: null, nextRetryAt: null });
     if (stage === "export") await enqueueRequestExport(deps.boss, tx, requestId);

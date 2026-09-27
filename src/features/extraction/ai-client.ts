@@ -139,6 +139,12 @@ function consistent(response: z.infer<typeof responseSchema>, documentId: string
   );
 }
 
+/** A contract-valid, consistent answer for `documentId`, or null – live answers and recorded ones (#71). */
+export function parseExtractResponse(value: unknown, documentId: string): ExtractResponse | null {
+  const parsed = responseSchema.safeParse(value);
+  return parsed.success && consistent(parsed.data, documentId) ? (parsed.data as unknown as ExtractResponse) : null;
+}
+
 export interface AiServiceClient {
   extract(input: ExtractInput): Promise<ExtractResponse>;
 }
@@ -173,11 +179,9 @@ export function createAiServiceClient(settings: AiServiceSettings): AiServiceCli
         const scope = DOCUMENT_STATUS.has(response.status) ? "document" : "service";
         throw new AiServiceError("rejected", false, scope, response.status);
       }
-      const parsed = responseSchema.safeParse(await response.json().catch(() => null));
-      if (!parsed.success || !consistent(parsed.data, input.documentId)) {
-        throw new AiServiceError("contract_violation", false, "service", response.status);
-      }
-      return parsed.data as unknown as ExtractResponse;
+      const parsed = parseExtractResponse(await response.json().catch(() => null), input.documentId);
+      if (!parsed) throw new AiServiceError("contract_violation", false, "service", response.status);
+      return parsed;
     },
   };
 }

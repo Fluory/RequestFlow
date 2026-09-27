@@ -5,6 +5,7 @@ import { getRuntime, requestActor } from "@/app/_server/runtime";
 import { duplicateDecidable, loadReview, REJECTION_REASON_MAX, type ReviewField } from "@/features/review";
 import { processingNotice } from "../processing-notice";
 import { requestRowView } from "../row-view";
+import { SAMPLE_EXPLANATION, SAMPLE_LABEL } from "../sample-label";
 import { StatusPill } from "../status-pill";
 import { DONE_MESSAGES, ERROR_MESSAGES, messageFor } from "./messages";
 import { approveAction, confirmNotDuplicateAction, correctFieldAction, rejectAction, rejectAsDuplicateAction } from "./actions";
@@ -83,6 +84,11 @@ export default async function RequestPage({
           <span>Eingang {dateFormat.format(request.createdAt)}</span>
         </div>
       </div>
+      {request.source === "sample" && (
+        <p className="callout callout-info" data-testid="sample-notice">
+          <strong>{SAMPLE_LABEL}.</strong> {SAMPLE_EXPLANATION}
+        </p>
+      )}
       {done && <p role="status">{done}</p>}
       {error && <p role="alert">{error}</p>}
       {request.status === "ERROR" && request.errorMessage && (

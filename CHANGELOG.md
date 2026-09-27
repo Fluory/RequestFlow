@@ -6,6 +6,10 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
+- Prepared samples for the showcase (`pnpm seed:samples`): per demo company one synthetic request to review
+  (with an uncertain and a missing value) and one already approved and exported through the normal path. Their
+  extraction replays a recorded AI answer, so they work even while the model provider is overloaded; list and
+  detail label them "Vorbereitetes Beispiel – aufgezeichnete KI-Antwort" (#71).
 - ERP export sends the reviewed positions (description, quantity, unit, material, dimensions) with each
   approved request – ERP contract 1.1.0, additive and optional. A position value the ERP would refuse
   blocks the approval so the clerk can still correct it.

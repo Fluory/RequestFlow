@@ -2,6 +2,7 @@
 export {
   countRequestsByStatus,
   countRequestsCreatedBy,
+  countSamples,
   createRequest,
   findDuplicate,
   getRequest,

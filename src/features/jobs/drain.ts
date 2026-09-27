@@ -98,7 +98,7 @@ async function runJob(deps: DrainDeps, queue: string, job: { id: string; data: R
 }
 
 /** Moves a request to ERROR (stage processing) with a readable cause and an audit event. */
-async function markError(tenancy: Tenancy, job: RequestJob, cause: string | null, jobId: string): Promise<void> {
+export async function markError(tenancy: Tenancy, job: RequestJob, cause: string | null, jobId: string): Promise<void> {
   await tenancy.withTenant(job.companyId, async (tx) => {
     const request = await lockRequest(tx, job.requestId);
     if (!request || !canTransition(request.status, "processing.failed")) return;

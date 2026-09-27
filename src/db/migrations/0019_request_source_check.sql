@@ -1,0 +1,1 @@
+ALTER TABLE "app"."requests" ADD CONSTRAINT "requests_source_check" CHECK (source in ('upload', 'sample'));
