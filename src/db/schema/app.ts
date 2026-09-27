@@ -24,6 +24,8 @@ export const tenantPolicy = (table: string) =>
 
 export const REQUEST_STATUSES = ["NEW", "PROCESSING", "REVIEW", "APPROVED", "EXPORTED", "REJECTED", "ERROR"] as const;
 export type RequestStatus = (typeof REQUEST_STATUSES)[number];
+export const REQUEST_SOURCES = ["upload", "sample"] as const;
+export type RequestSource = (typeof REQUEST_SOURCES)[number];
 
 // Minimal request aggregate – the first tenant table (#4). #5 and #7 extend it additively.
 export const requests = appSchema
@@ -37,7 +39,8 @@ export const requests = appSchema
       status: text("status").$type<RequestStatus>().default("NEW").notNull(),
       createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
       // Intake (#5): who uploaded, what arrived, duplicate fingerprint (ADR-0001 D9).
-      source: text("source").$type<"upload">().default("upload").notNull(),
+      // `sample` (#71): a prepared showcase case whose extraction replays a recorded model answer.
+      source: text("source").$type<RequestSource>().default("upload").notNull(),
       createdBy: uuid("created_by"),
       subject: text("subject"),
       messageId: text("message_id"),
@@ -69,6 +72,7 @@ export const requests = appSchema
       }),
       check("requests_status_check", sql.raw(`status in (${REQUEST_STATUSES.map((s) => `'${s}'`).join(", ")})`)),
       check("requests_duplicate_decision_check", sql`duplicate_decision is null or duplicate_decision in ('distinct', 'duplicate')`),
+      check("requests_source_check", sql.raw(`source in (${REQUEST_SOURCES.map((s) => `'${s}'`).join(", ")})`)),
       tenantPolicy("requests"),
     ],
   )
