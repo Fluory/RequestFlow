@@ -1,7 +1,7 @@
 import { SERVERLESS_DRAIN } from "@/config/env";
 import { buildJobDeps, drainRound, handledJobs, type DrainRoundResult, type JobDeps } from "@/job-drain";
 import { logEvent } from "@/features/observability";
-import { processBudgetMs, scheduleAfterResponse } from "./drain-request";
+import { createThrottle, processBudgetMs, scheduleAfterResponse } from "./drain-request";
 import { getJobClient, getRuntime } from "./runtime";
 
 // Serverless drain of the web process (#59, ADR-0001 D2): the showcase has no worker, so the route
@@ -43,4 +43,15 @@ export async function drainNow(invokedAt: number = Date.now()): Promise<DrainRou
  */
 export function drainAfterResponse(invokedAt: number): void {
   scheduleAfterResponse(getRuntime().config.jobs.drainInline, () => drainNow(invokedAt));
+}
+
+const pageViewThrottle = createThrottle(30_000);
+
+/**
+ * Opening the request list or a request (#70): with JOB_DRAIN_INLINE=true a due retry is picked up by
+ * normal use instead of waiting for the daily cron – at most once per 30 s and function instance.
+ */
+export function drainOnPageView(): void {
+  if (!getRuntime().config.jobs.drainInline || !pageViewThrottle()) return;
+  drainAfterResponse(Date.now());
 }

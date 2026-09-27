@@ -31,6 +31,20 @@ export function processBudgetMs(budgetMs: number, invokedAt: number, now: number
 }
 
 /**
+ * At most one `true` per `minIntervalMs` (#70): page views may pick up due retries on the showcase,
+ * but a burst of views must not start a burst of drains. State lives in the returned closure, so it is
+ * per function instance – good enough for a cost guard, not a global lock.
+ */
+export function createThrottle(minIntervalMs: number): (now?: number) => boolean {
+  let last: number | undefined;
+  return (now = Date.now()) => {
+    if (last !== undefined && now - last < minIntervalMs) return false;
+    last = now;
+    return true;
+  };
+}
+
+/**
  * Runs `run` via `after()` once the response is sent – only when `enabled` (JOB_DRAIN_INLINE=true).
  * Failures never reach the user's response; they are logged by error class only.
  */

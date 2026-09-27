@@ -1,7 +1,7 @@
 import { after } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { captureLogs } from "@/features/observability";
-import { handleDrainRequest, isAuthorized, processBudgetMs, scheduleAfterResponse } from "./drain-request";
+import { createThrottle, handleDrainRequest, isAuthorized, processBudgetMs, scheduleAfterResponse } from "./drain-request";
 
 // `after()` is the Next.js runtime boundary (it needs a request scope): replaced by a recorder.
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: vi.fn() }));
@@ -143,5 +143,26 @@ describe("processBudgetMs (#59 review)", () => {
     expect(processBudgetMs(50_000, 1_000, 1_000)).toBe(50_000);
     expect(processBudgetMs(50_000, 1_000, 21_000)).toBe(30_000);
     expect(processBudgetMs(50_000, 1_000, 90_000)).toBe(0);
+  });
+});
+
+// #70: page views pick up due retries on the showcase, but at most once per interval and instance.
+describe("createThrottle", () => {
+  it("allows the first call and then nothing until the interval has passed", () => {
+    const allow = createThrottle(30_000);
+
+    expect(allow(1_000)).toBe(true);
+    expect(allow(1_001)).toBe(false);
+    expect(allow(30_999)).toBe(false);
+    expect(allow(31_000)).toBe(true);
+    expect(allow(31_001)).toBe(false);
+  });
+
+  it("keeps separate state per throttle", () => {
+    const first = createThrottle(30_000);
+    const second = createThrottle(30_000);
+
+    expect(first(0)).toBe(true);
+    expect(second(0)).toBe(true);
   });
 });
