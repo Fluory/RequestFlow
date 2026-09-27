@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { components } from "./ai-service.contract";
 import type { ExtractResponse } from "./types";
 
 // Client of the stateless AI service (contract: contracts/ai-service.openapi.yaml, types generated in
@@ -60,6 +61,29 @@ const responseSchema = z.object({
 }).loose();
 
 const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+// Every error code of the contract (a Record, so a new code in the generated types fails the build until
+// it is listed). A retryable answer keeps its code, so staff read the real cause (#80): `model_error`
+// means the model provider failed, not our service.
+const CONTRACT_ERROR_CODES: Record<components["schemas"]["ErrorDetail"]["code"], true> = {
+  invalid_request: true,
+  unauthorized: true,
+  length_required: true,
+  document_too_large: true,
+  unsupported_media_type: true,
+  document_unparseable: true,
+  document_too_long: true,
+  busy: true,
+  model_error: true,
+  model_output_invalid: true,
+  internal_error: true,
+};
+const errorBody = z.object({ error: z.object({ code: z.string() }) });
+
+/** The contract code of an error answer, or `unavailable` (no JSON error body, e.g. a platform 502 page). */
+async function errorCode(response: Response): Promise<string> {
+  const parsed = errorBody.safeParse(await response.json().catch(() => null));
+  return parsed.success && Object.hasOwn(CONTRACT_ERROR_CODES, parsed.data.error.code) ? parsed.data.error.code : "unavailable";
+}
 const DOCUMENT_STATUS = new Set([413, 415, 422]);
 
 /**
@@ -105,8 +129,8 @@ export function createAiServiceClient(settings: AiServiceSettings): AiServiceCli
         throw new AiServiceError(timedOut ? "timeout" : "unreachable", true, "service");
       }
       if (!response.ok) {
+        if (RETRYABLE_STATUS.has(response.status)) throw new AiServiceError(await errorCode(response), true, "service", response.status);
         await response.body?.cancel();
-        if (RETRYABLE_STATUS.has(response.status)) throw new AiServiceError("unavailable", true, "service", response.status);
         // Only these say "this document": everything else (400, 401, 403, 404, 405, …) points at the
         // call itself – a misconfigured URL or client bug must not look like unreadable documents.
         const scope = DOCUMENT_STATUS.has(response.status) ? "document" : "service";
