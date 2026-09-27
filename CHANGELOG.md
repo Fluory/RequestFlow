@@ -86,6 +86,9 @@ This file records what changes **in the product** – process and session state 
   existing `auth` schema only when the app owns it.
 
 ### Fixed
+- AI service: model calls answered with 429 or 503 (provider overload) are retried up to three attempts
+  in total with backoff instead of failing the extraction at once; all attempts together stay within
+  the model timeout, and timeouts are not retried (#69).
 - AI verifier: a unit quoted together with the neighbouring table cell (e.g. `60    | Stk.`) is now
   confirmed as `found` when one cell of the quote is exactly the unit; quotes that differ from the
   source in real characters are still rejected (#50).

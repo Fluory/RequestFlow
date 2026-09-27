@@ -61,6 +61,7 @@ creation). The script is all-or-nothing; running it twice fails on "role already
    | `AI_ALLOW_GEMINI_API_DEV` | `true` |
    | `GEMINI_API_KEY` | the orchestrator's key – the orchestrator pipes it in from a file they created themselves; never in a chat, the repo or an issue |
    | `AI_PDF_PIPELINE` / `AI_PDF_OCR` | `textlines` / `off` – no model downloads on the showcase |
+   | `AI_MODEL_TIMEOUT_SECONDS` | `45` – budget of one model call including retries; it must stay below the web app's `AI_SERVICE_TIMEOUT_MS` (60 s) minus parsing, or the worker gives up while the model still runs |
 
    `VERTEX_PROJECT` stays **unset**: together with `AI_ALLOW_GEMINI_API_DEV=true` the service refuses to start.
 4. **Exception (ADR-0001 D11 amendment 2026-09-26, exceptions register):** the Gemini API free tier is only
