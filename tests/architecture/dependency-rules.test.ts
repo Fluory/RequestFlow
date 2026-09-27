@@ -4,12 +4,14 @@ import { describe, expect, it } from "vitest";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const fixture = fileURLToPath(new URL("../fixtures/depcruise", import.meta.url));
-const bin = `${root}node_modules/.bin/depcruise`;
+// Node runs the package's own entry: `node_modules/.bin/depcruise` is a POSIX shell shim that Windows
+// cannot spawn without a shell (ENOENT, #78).
+const bin = `${root}node_modules/dependency-cruiser/bin/dependency-cruiser.mjs`;
 
 // Runs the real dependency-cruiser with the project's config against a fixture tree that
 // contains one deliberate deep import across modules.
 function cruise(entry: string) {
-  const result = spawnSync(bin, [entry, "--config", `${root}.dependency-cruiser.cjs`, "--no-progress", "--output-type", "err"], {
+  const result = spawnSync(process.execPath, [bin, entry, "--config", `${root}.dependency-cruiser.cjs`, "--no-progress", "--output-type", "err"], {
     cwd: fixture,
     encoding: "utf8",
   });
