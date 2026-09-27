@@ -8,7 +8,7 @@
 
 | Blocker | Why |
 |---|---|
-| AI service host chosen and running | The drain calls it; recommendation: **Google Cloud Run in the EU** (same GCP project as Vertex `eu`, existing image `services/ai`, no 300 s / package limits) |
+| AI service running (§3) | The drain calls it. Showcase decision 2026-09-26 (ADR-0001 D11 amendment, #67): a second **Vercel** project with a Gemini API key (temporary exception). Fallback if the Vercel spike fails: Google Cloud Run in the EU with Vertex `eu` |
 
 What runs where: Vercel (Hobby) runs the Next.js app, the drain route and the ERP mock
 (`/api/erp-mock`). Supabase (`eu-central-1`) holds Postgres (incl. the pg-boss queue) and the files.
@@ -42,11 +42,34 @@ process list.
 The last output lists `app_owner` and `app_rw` with `f | f | f` (no superuser, no RLS bypass, no role
 creation). The script is all-or-nothing; running it twice fails on "role already exists" – that is fine.
 
-## 3. AI service
+## 3. AI service (second Vercel project, container)
 
-Deploy `services/ai` (Cloud Run EU recommended) with Vertex `eu` credentials (a service account of the
-GCP project, never an API key in the repo) and a random `AI_SERVICE_TOKEN` (≥ 24 chars). The Gemini
-free tier is **not** allowed for the showcase (D8). Note its HTTPS URL.
+1. Import the same GitHub repository as a **second Vercel project**: framework **`container`**, Root
+   Directory **`services/ai`**. Vercel builds `services/ai/Dockerfile.vercel` (same build as
+   `Dockerfile`) and runs it on Vercel Functions (container images, beta). A plain Python function does
+   not fit: the bundle is 1386 MB against the 500 MB function limit (ADR-0001 D11 amendment 2026-09-26).
+2. Deployment Protection: **Vercel Authentication for preview deployments only** – the web app calls the
+   production URL server-side; the API itself is protected by `AI_SERVICE_TOKEN`.
+3. Variables (**Production**). Every secret – here `AI_SERVICE_TOKEN` and `GEMINI_API_KEY` – is added as
+   **sensitive** (`vercel env add <NAME> production --sensitive`, value on stdin), so nobody can read it
+   back in the dashboard:
+
+   | Variable | Value |
+   |---|---|
+   | `PORT` | `8080` – the image runs as a non-root user, which cannot bind Vercel's default port 80 |
+   | `AI_SERVICE_TOKEN` | random, ≥ 24 chars – the **same** value as `AI_SERVICE_TOKEN` in the web app |
+   | `AI_ALLOW_GEMINI_API_DEV` | `true` |
+   | `GEMINI_API_KEY` | the orchestrator's key – the orchestrator pipes it in from a file they created themselves; never in a chat, the repo or an issue |
+   | `AI_PDF_PIPELINE` / `AI_PDF_OCR` | `textlines` / `off` – no model downloads on the showcase |
+
+   `VERTEX_PROJECT` stays **unset**: together with `AI_ALLOW_GEMINI_API_DEV=true` the service refuses to start.
+4. **Exception (ADR-0001 D11 amendment 2026-09-26, exceptions register):** the Gemini API free tier is only
+   allowed while the showcase is invite-only for the orchestrator with synthetic data. Before anyone else
+   gets a demo account (at the latest 2026-10-31): enable billing for the key (paid tier) or switch to
+   Vertex `eu` (`VERTEX_PROJECT`, service account, `AI_ALLOW_GEMINI_API_DEV` removed).
+5. `GET <ai-url>/healthz` → 200. The production URL → `AI_SERVICE_URL` of the web app (§4).
+   Instances scale to zero after 5 minutes without traffic (vercel.com/docs/functions/container-images,
+   verified 2026-09-27); the first call after that pays a cold start (measured about 5.6 s).
 
 ## 4. Vercel project
 
@@ -54,7 +77,8 @@ Import the GitHub repository (framework Next.js is set by `vercel.json`, functio
 drain route limit 300 s, one cron). Keep **Fluid compute** enabled (the Hobby default) – without it the
 300 s function limit is not available; verify it in Project Settings → Functions. Set the variables below for **Production**. Do not give Preview
 deployments the showcase database – leave Preview variables empty (previews then fail closed) or use a
-separate Supabase project.
+separate Supabase project. Add every secret (`DATABASE_URL`, the S3 keys, `BETTER_AUTH_SECRET`,
+`AI_SERVICE_TOKEN`, `ERP_TOKEN`, `CRON_SECRET`) as **sensitive**, as in §3.
 
 | Variable | Value |
 |---|---|
@@ -125,6 +149,13 @@ accounts out only to people who may see the demo.
 - Code: Vercel "Instant Rollback" to the previous deployment. Migrations are forward-only
   (`docs/technical/operations.md` → Rollback); roll back code only to a version that knows the schema.
 - Rotate a leaked secret in its settings page, then redeploy (Vercel reads variables at deploy time).
+- Pause the AI service: pause the Vercel project `requestflow-ai`; uploads then end in a visible
+  processing error with retries instead of reaching the model.
+- When the Gemini free-tier exception expires (ADR-0001 D11 amendment 2026-09-26, at the latest
+  2026-10-31): delete the key in Google AI Studio, remove `GEMINI_API_KEY` and `AI_ALLOW_GEMINI_API_DEV`
+  from `requestflow-ai`, then switch to the paid tier or Vertex `eu` (§3 step 4) and redeploy.
+- Remove the showcase completely: delete both Vercel projects (`requestflow`, `requestflow-ai`) and the
+  Supabase project – all data is synthetic, nothing has to be kept.
 
 ## Known limits
 

@@ -1,0 +1,10 @@
+# Not needed at runtime on Vercel – keeps the upload small (dependencies come from pyproject/uv.lock).
+# Anchored with a leading slash: `src/requestflow_ai/evals/` is runtime code and must stay.
+/tests/
+/evals/
+/scripts/
+/Dockerfile
+/.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/

@@ -81,6 +81,6 @@ Expected early triggers here: `security-review`, `database-migration`, `ai-eval`
 - **Tenant context is mandatory.** Every data access runs through a module repository inside `withTenant(companyId, …)`; `companyId` comes from the session, never from client input. No raw DB client outside `src/db` and `src/features/tenancy` (ADR-0001 D7).
 - **The AI service is stateless.** It never gets DB or storage credentials or tenant logic; the TS worker sends bytes and persists results (D8). pg-boss is the only queue (D4).
 - **"Found" needs proof.** A field is `found` only if the grounding verifier confirmed its quote in the cited segment; never relax this to make evals pass (D8).
-- **Gemini free tier:** local development with synthetic data only – never in the showcase or with customer data (D8).
+- **Gemini free tier:** local development with synthetic data only; on the showcase only as the temporary, invite-only exception of ADR-0001 D11 amendment 2026-09-26 (#67, exceptions register) – never with customer data (D8).
 - **Exactly-once export** relies on the idempotency key + unique export row + row lock – keep all three (D9).
 - Line endings: `.gitattributes` forces LF. Git Bash on Windows tolerates CRLF (tested 2026-09-22); LF keeps scripts portable to Linux shells (CI, WSL2, containers).
