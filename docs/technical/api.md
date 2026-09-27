@@ -9,6 +9,7 @@
 |---|---|
 | 200 | `{"status":"ok","checks":{"database":"ok","storage":"ok"},"dependencies":{"aiService":"ok"},"backlog":{"request-process":0,"request-export":0}}` |
 | 503 | `{"status":"degraded","checks":{"<name>":"failed", …}}` – names only, never hosts, users or error text |
+| 200 | `dependencies.aiService`: `ok`, `failed` (answered with an error / refused) or `starting` (no answer in time – e.g. a cold start, #81); informational, never changes the status |
 | 503 | `{"status":"degraded","checks":{"config":"failed"}}` – invalid configuration (the server log names the variables) |
 
 - Each check has a 3 s time limit; `cache-control: no-store`.

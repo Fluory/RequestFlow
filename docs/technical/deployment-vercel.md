@@ -141,7 +141,8 @@ step is idempotent: repeat it whenever visitors have decided the samples, and it
 
 ## 8. Smoke check
 
-1. `GET /api/health` → 200, `database` and `storage` `ok`, `aiService` `ok`.
+1. `GET /api/health` → 200, `database` and `storage` `ok`, `aiService` `ok`. Right after a pause the first
+   call may read `aiService` `starting` (the container's cold start, ~6 s) – repeat after 10 s (#81).
 2. Drain route: without header → 401; with the secret → 200 JSON.
 3. The banner „Demo – nur synthetische Daten" is visible on the login page.
 4. Sign in as the seeded admin, upload a synthetic `.eml` (like the one in `tests/e2e/review-smoke.spec.ts`)

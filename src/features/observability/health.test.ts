@@ -50,6 +50,32 @@ describe("runHealthChecks", () => {
     });
   });
 
+  // #81: a dependency that does not answer in time is usually a scaled-to-zero container waking up
+  // (the probe itself wakes it) – "starting", not "failed". An answered error stays "failed".
+  it("reports a dependency without an answer in time as starting, not failed", async () => {
+    const result = await runHealthChecks({ database: ok }, { timeoutMs: 20, dependencies: { aiService: hanging } });
+
+    expect(result.httpStatus).toBe(200);
+    expect(result.report.dependencies).toEqual({ aiService: "starting" });
+  });
+
+  it("also counts the probe's own timeout (AbortSignal.timeout) as starting", async () => {
+    const aborted = async () => {
+      throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    };
+
+    const result = await runHealthChecks({ database: ok }, { timeoutMs: 100, dependencies: { aiService: aborted } });
+
+    expect(result.report.dependencies).toEqual({ aiService: "starting" });
+  });
+
+  it("keeps a check (database, storage) that times out as failed with 503", async () => {
+    const result = await runHealthChecks({ database: hanging }, { timeoutMs: 20, dependencies: { aiService: hanging } });
+
+    expect(result.httpStatus).toBe(503);
+    expect(result.report).toMatchObject({ status: "degraded", checks: { database: "failed" }, dependencies: { aiService: "starting" } });
+  });
+
   it("times out a hanging gauge as unknown (null) and never leaks error text", async () => {
     const result = await runHealthChecks({ database: ok }, { timeoutMs: 20, backlog: { "request-process": () => new Promise<number>(() => {}) } });
 

@@ -1,11 +1,16 @@
 export type HealthCheck = () => Promise<void>;
 export type CheckResult = "ok" | "failed";
+/**
+ * `starting` (#81): no answer within the time limit – for a scaled-to-zero container usually its cold
+ * start, which the probe itself triggers; the next probe normally reads `ok`. An answered error is `failed`.
+ */
+export type DependencyResult = CheckResult | "starting";
 
 export interface HealthReport {
   status: "ok" | "degraded";
   checks: Record<string, CheckResult>;
   /** Informational (#28): reachable or not – does not change the HTTP status (e.g. the optional AI profile). */
-  dependencies?: Record<string, CheckResult>;
+  dependencies?: Record<string, DependencyResult>;
   /** Informational (#28): jobs waiting per queue; null when unknown. */
   backlog?: Record<string, number | null>;
 }
@@ -21,11 +26,17 @@ export async function runHealthChecks(
   checks: Record<string, HealthCheck>,
   options: { timeoutMs: number; dependencies?: Record<string, HealthCheck>; backlog?: Record<string, () => Promise<number>> },
 ): Promise<HealthResult> {
-  const settleAll = (group: Record<string, HealthCheck>) =>
-    Promise.all(Object.entries(group).map(async ([name, check]) => [name, await settle(check, options.timeoutMs)] as const));
+  // A required check that does not answer in time has failed; an informational dependency is starting.
+  const settleAll = <R extends string>(group: Record<string, HealthCheck>, onTimeout: R) =>
+    Promise.all(
+      Object.entries(group).map(async ([name, check]) => {
+        const outcome = await settle(check, options.timeoutMs);
+        return [name, outcome === "timeout" ? onTimeout : outcome] as const;
+      }),
+    );
   const [entries, dependencies, backlog] = await Promise.all([
-    settleAll(checks),
-    options.dependencies ? settleAll(options.dependencies) : undefined,
+    settleAll(checks, "failed" as const),
+    options.dependencies ? settleAll(options.dependencies, "starting" as const) : undefined,
     options.backlog
       ? Promise.all(
           Object.entries(options.backlog).map(async ([name, gauge]) => {
@@ -45,16 +56,20 @@ export async function runHealthChecks(
   return { httpStatus: healthy ? 200 : 503, report };
 }
 
-async function settle(check: HealthCheck, timeoutMs: number): Promise<CheckResult> {
+const TIMED_OUT = Symbol("timed out");
+// Our own limit, or the probe's AbortSignal.timeout (a DOMException named TimeoutError).
+const isTimeout = (error: unknown) => error === TIMED_OUT || (error instanceof Error && error.name === "TimeoutError");
+
+async function settle(check: HealthCheck, timeoutMs: number): Promise<CheckResult | "timeout"> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error("timeout")), timeoutMs);
+    timer = setTimeout(() => reject(TIMED_OUT), timeoutMs);
   });
   try {
     await Promise.race([check(), timeout]);
     return "ok";
-  } catch {
-    return "failed";
+  } catch (error) {
+    return isTimeout(error) ? "timeout" : "failed";
   } finally {
     clearTimeout(timer);
   }
