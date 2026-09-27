@@ -25,12 +25,21 @@ export class PermanentProcessingError extends Error {
 // is kept as an original but skipped with a visible note.
 const AI_KINDS = new Set(["pdf", "eml", "xlsx", "docx", "msg"]);
 
+// Causes of retryable AI failures (#80): the model provider failing is not our service being down. No
+// text promises a retry – it stays when the attempts are used up; the next retry is shown separately.
+const RETRYABLE_CAUSE: Record<string, string> = {
+  timeout: "Der KI-Dienst hat nicht rechtzeitig geantwortet.",
+  unreachable: "Der KI-Dienst ist nicht erreichbar.",
+  model_error: "Das KI-Modell des Anbieters war nicht verfügbar (z. B. überlastet).",
+  model_output_invalid: "Das KI-Modell hat keine verwertbare Antwort geliefert.",
+  busy: "Der KI-Dienst ist gerade ausgelastet.",
+};
+
 /** Human-readable causes for staff (DR4): no stack traces, no hosts, no document content. */
 export function describeFailure(error: unknown): string {
   if (error instanceof PermanentProcessingError) return error.cause_;
   if (error instanceof AiServiceError) {
-    if (error.code === "timeout") return "Der KI-Dienst hat nicht rechtzeitig geantwortet.";
-    if (error.retryable) return "Der KI-Dienst ist nicht erreichbar.";
+    if (error.retryable) return Object.hasOwn(RETRYABLE_CAUSE, error.code) ? RETRYABLE_CAUSE[error.code]! : "Der KI-Dienst ist vorübergehend gestört.";
     return "Der KI-Dienst hat die Anfrage abgelehnt – bitte die Administration informieren.";
   }
   return "Unerwarteter Fehler bei der Verarbeitung.";

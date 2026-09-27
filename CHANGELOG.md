@@ -90,6 +90,9 @@ This file records what changes **in the product** – process and session state 
   existing `auth` schema only when the app owns it.
 
 ### Fixed
+- Processing errors name the actual cause: when the model provider fails (e.g. overloaded), staff read
+  "Das KI-Modell des Anbieters war nicht verfügbar (z. B. überlastet)." instead of "Der KI-Dienst ist nicht
+  erreichbar."; a busy or disturbed AI service and an unusable model answer have their own texts (#80).
 - Request detail: while a failed attempt waits for its retry, the page shows the same facts as the list –
   last error, attempts and the next retry – instead of "Die Dokumente werden gerade ausgewertet". On the
   showcase, opening the list or a request picks up due retries (at most once per 30 s and never while

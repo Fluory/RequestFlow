@@ -188,8 +188,22 @@ describe("processing: worker, AI service, retries and visible errors", () => {
     await drainUntil(async () => (await requestOf(admin, requestId))?.status === "ERROR");
 
     const request = await requestOf(admin, requestId);
-    expect(request).toMatchObject({ status: "ERROR", errorStage: "processing", errorMessage: "Der KI-Dienst ist nicht erreichbar.", attempts: 2, nextRetryAt: null });
+    // A bare 5xx without the contract's error object: our service is disturbed, not unreachable (#80).
+    expect(request).toMatchObject({ status: "ERROR", errorStage: "processing", errorMessage: "Der KI-Dienst ist vorübergehend gestört.", attempts: 2, nextRetryAt: null });
     expect(request?.errorMessage).not.toMatch(/127\.0\.0\.1|Error|at /);
+  });
+
+  it("names the model provider as the cause when the AI service answers model_error (#80)", async () => {
+    reply = () => ({ status: 502, body: { error: { code: "model_error", message: "the model call failed" }, requestId: null } });
+    const { requestId } = await newRequest(admin, [{ name: "a.eml", kind: "eml", bytes: MAIL }]);
+
+    await drainUntil(async () => (await requestOf(admin, requestId))?.status === "ERROR");
+
+    expect(await requestOf(admin, requestId)).toMatchObject({
+      status: "ERROR",
+      errorMessage: "Das KI-Modell des Anbieters war nicht verfügbar (z. B. überlastet).",
+      attempts: 2,
+    });
   });
 
   it("treats a timeout as retryable", async () => {
