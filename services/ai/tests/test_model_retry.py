@@ -81,6 +81,49 @@ def test_other_errors_are_not_retried(status: int) -> None:
     assert len(sequence.requests) == 1
 
 
+def test_a_timeout_is_not_retried() -> None:
+    # A hanging model already used the whole budget; another attempt would outlive the worker
+    # (#72 review).
+    requests: list[httpx.Request] = []
+
+    def hang(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        raise httpx.ReadTimeout("synthetic timeout", request=request)
+
+    client = build_model_client(
+        make_settings(**FAST),
+        credentials=fake_credentials(),
+        httpx_client=httpx.Client(transport=httpx.MockTransport(hang)),
+        credentials_loader=no_adc,
+    )
+
+    with pytest.raises(ModelClientError):
+        client.extract("S", "U")
+
+    assert len(requests) == 1
+
+
+def test_no_retry_without_enough_budget_left() -> None:
+    # Budget below the minimum a retry needs: a 503 fails at once instead of eating the worker's
+    # time.
+    sequence = Sequence((503, _error(503)), (200, recorded("musterbau_pdf.json")))
+
+    with pytest.raises(ModelClientError):
+        _vertex(sequence, ai_model_timeout_seconds=5).extract("S", "U")
+
+    assert len(sequence.requests) == 1
+
+
+def test_each_attempt_gets_only_the_remaining_budget() -> None:
+    sequence = Sequence((503, _error(503)), (200, recorded("musterbau_pdf.json")))
+
+    _vertex(sequence, ai_model_timeout_seconds=30).extract("S", "U")
+
+    first, second = (request.extensions["timeout"]["read"] for request in sequence.requests)
+    assert first <= 30
+    assert second < first
+
+
 def test_the_gemini_api_dev_path_retries_too() -> None:
     sequence = Sequence((503, _error(503)), (200, recorded("musterbau_pdf.json")))
     client = build_model_client(

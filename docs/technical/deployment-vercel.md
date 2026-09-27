@@ -50,15 +50,18 @@ creation). The script is all-or-nothing; running it twice fails on "role already
    not fit: the bundle is 1386 MB against the 500 MB function limit (ADR-0001 D11 amendment 2026-09-26).
 2. Deployment Protection: **Vercel Authentication for preview deployments only** – the web app calls the
    production URL server-side; the API itself is protected by `AI_SERVICE_TOKEN`.
-3. Variables (**Production**):
+3. Variables (**Production**). Every secret – here `AI_SERVICE_TOKEN` and `GEMINI_API_KEY` – is added as
+   **sensitive** (`vercel env add <NAME> production --sensitive`, value on stdin), so nobody can read it
+   back in the dashboard:
 
    | Variable | Value |
    |---|---|
    | `PORT` | `8080` – the image runs as a non-root user, which cannot bind Vercel's default port 80 |
    | `AI_SERVICE_TOKEN` | random, ≥ 24 chars – the **same** value as `AI_SERVICE_TOKEN` in the web app |
    | `AI_ALLOW_GEMINI_API_DEV` | `true` |
-   | `GEMINI_API_KEY` | the orchestrator's key – set it through `vercel env add GEMINI_API_KEY production --sensitive` with the value on stdin, never in a chat, the repo or an issue |
+   | `GEMINI_API_KEY` | the orchestrator's key – the orchestrator pipes it in from a file they created themselves; never in a chat, the repo or an issue |
    | `AI_PDF_PIPELINE` / `AI_PDF_OCR` | `textlines` / `off` – no model downloads on the showcase |
+   | `AI_MODEL_TIMEOUT_SECONDS` | `45` – budget of one model call including retries; it must stay below the web app's `AI_SERVICE_TIMEOUT_MS` (60 s) minus parsing, or the worker gives up while the model still runs |
 
    `VERTEX_PROJECT` stays **unset**: together with `AI_ALLOW_GEMINI_API_DEV=true` the service refuses to start.
 4. **Exception (ADR-0001 D11 amendment 2026-09-26, exceptions register):** the Gemini API free tier is only
@@ -66,7 +69,8 @@ creation). The script is all-or-nothing; running it twice fails on "role already
    gets a demo account (at the latest 2026-10-31): enable billing for the key (paid tier) or switch to
    Vertex `eu` (`VERTEX_PROJECT`, service account, `AI_ALLOW_GEMINI_API_DEV` removed).
 5. `GET <ai-url>/healthz` → 200. The production URL → `AI_SERVICE_URL` of the web app (§4).
-   Instances scale to zero after 5 minutes without traffic; the first call after that pays a cold start.
+   Instances scale to zero after 5 minutes without traffic (vercel.com/docs/functions/container-images,
+   verified 2026-09-27); the first call after that pays a cold start (measured about 5.6 s).
 
 ## 4. Vercel project
 
@@ -74,7 +78,8 @@ Import the GitHub repository (framework Next.js is set by `vercel.json`, functio
 drain route limit 300 s, one cron). Keep **Fluid compute** enabled (the Hobby default) – without it the
 300 s function limit is not available; verify it in Project Settings → Functions. Set the variables below for **Production**. Do not give Preview
 deployments the showcase database – leave Preview variables empty (previews then fail closed) or use a
-separate Supabase project.
+separate Supabase project. Add every secret (`DATABASE_URL`, the S3 keys, `BETTER_AUTH_SECRET`,
+`AI_SERVICE_TOKEN`, `ERP_TOKEN`, `CRON_SECRET`) as **sensitive**, as in §3.
 
 | Variable | Value |
 |---|---|
@@ -145,6 +150,13 @@ accounts out only to people who may see the demo.
 - Code: Vercel "Instant Rollback" to the previous deployment. Migrations are forward-only
   (`docs/technical/operations.md` → Rollback); roll back code only to a version that knows the schema.
 - Rotate a leaked secret in its settings page, then redeploy (Vercel reads variables at deploy time).
+- Pause the AI service: pause the Vercel project `requestflow-ai`; uploads then end in a visible
+  processing error with retries instead of reaching the model.
+- When the Gemini free-tier exception expires (ADR-0001 D11 amendment 2026-09-26, at the latest
+  2026-10-31): delete the key in Google AI Studio, remove `GEMINI_API_KEY` and `AI_ALLOW_GEMINI_API_DEV`
+  from `requestflow-ai`, then switch to the paid tier or Vertex `eu` (§3 step 4) and redeploy.
+- Remove the showcase completely: delete both Vercel projects (`requestflow`, `requestflow-ai`) and the
+  Supabase project – all data is synthetic, nothing has to be kept.
 
 ## Known limits
 
