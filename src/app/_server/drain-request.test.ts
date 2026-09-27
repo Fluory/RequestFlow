@@ -1,7 +1,7 @@
 import { after } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { captureLogs } from "@/features/observability";
-import { handleDrainRequest, isAuthorized, processBudgetMs, scheduleAfterResponse } from "./drain-request";
+import { createRunGate, handleDrainRequest, isAuthorized, processBudgetMs, scheduleAfterResponse } from "./drain-request";
 
 // `after()` is the Next.js runtime boundary (it needs a request scope): replaced by a recorder.
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: vi.fn() }));
@@ -143,5 +143,44 @@ describe("processBudgetMs (#59 review)", () => {
     expect(processBudgetMs(50_000, 1_000, 1_000)).toBe(50_000);
     expect(processBudgetMs(50_000, 1_000, 21_000)).toBe(30_000);
     expect(processBudgetMs(50_000, 1_000, 90_000)).toBe(0);
+  });
+});
+
+// #70: page views pick up due retries on the showcase – at most once per interval and instance, and
+// never while this instance's previous drain still runs (a drain can outlast the interval, #73 review).
+describe("createRunGate", () => {
+  it("allows the first start and then nothing until the interval has passed", () => {
+    const gate = createRunGate(30_000, 300_000);
+
+    expect(gate.tryStart(1_000)).toBe(true);
+    gate.finish();
+    expect(gate.tryStart(1_001)).toBe(false);
+    expect(gate.tryStart(30_999)).toBe(false);
+    expect(gate.tryStart(31_000)).toBe(true);
+  });
+
+  it("blocks while the previous run is still going, even after the interval", () => {
+    const gate = createRunGate(30_000, 300_000);
+
+    expect(gate.tryStart(0)).toBe(true);
+    expect(gate.tryStart(90_000)).toBe(false);
+    gate.finish();
+    expect(gate.tryStart(90_001)).toBe(true);
+  });
+
+  it("treats a run as gone after the stale limit, so a lost run cannot block page views forever", () => {
+    const gate = createRunGate(30_000, 300_000);
+
+    expect(gate.tryStart(0)).toBe(true);
+    expect(gate.tryStart(299_999)).toBe(false);
+    expect(gate.tryStart(300_000)).toBe(true);
+  });
+
+  it("keeps separate state per gate", () => {
+    const first = createRunGate(30_000, 300_000);
+    const second = createRunGate(30_000, 300_000);
+
+    expect(first.tryStart(0)).toBe(true);
+    expect(second.tryStart(0)).toBe(true);
   });
 });

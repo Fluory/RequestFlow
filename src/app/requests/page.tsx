@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { drainOnPageView } from "@/app/_server/drain";
 import { getRuntime, requestActor } from "@/app/_server/runtime";
 import { listExportRecords } from "@/features/export";
 import { listRequests, parseCursor, type RequestFilter } from "@/features/requests";
@@ -42,6 +43,7 @@ function pageHref(filter: RequestFilter, after?: string): string {
 export default async function RequestsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const actor = await requestActor();
   if (!actor) redirect("/login");
+  drainOnPageView();
   const query = await searchParams;
   const filter = filterOf(query);
   const after = parseCursor(query.after) ?? undefined;

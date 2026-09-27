@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { drainOnPageView } from "@/app/_server/drain";
 import { getRuntime, requestActor } from "@/app/_server/runtime";
 import { duplicateDecidable, loadReview, REJECTION_REASON_MAX, type ReviewField } from "@/features/review";
+import { processingNotice } from "../processing-notice";
+import { requestRowView } from "../row-view";
 import { StatusPill } from "../status-pill";
 import { DONE_MESSAGES, ERROR_MESSAGES, messageFor } from "./messages";
 import { approveAction, confirmNotDuplicateAction, correctFieldAction, rejectAction, rejectAsDuplicateAction } from "./actions";
@@ -15,7 +18,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const dateFormat = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
 const NO_FIELDS: Record<string, string> = {
   NEW: "Die Anfrage wartet auf die Verarbeitung. Erkannte Angaben erscheinen danach hier.",
-  PROCESSING: "Die Dokumente werden gerade ausgewertet.",
+  // The processing state itself (running, failed attempt, next retry) is the notice above (#70).
+  PROCESSING: "Erkannte Angaben erscheinen hier nach der Auswertung.",
 };
 
 // Review page (#8, #25), layout after design prototype A (#52): fields, positions and documents on the
@@ -33,6 +37,7 @@ export default async function RequestPage({
   if (!UUID.test(id)) notFound();
   const view = await loadReview(getRuntime().tenancy, actor, id);
   if (!view) notFound();
+  drainOnPageView();
   const { request, fields, lineItems, documents, skippedDocuments, documentNotes, exportRecord } = view;
   const query = await searchParams;
   // `?field=<key>` selects a header field, `?field=<key>&item=<n>` a line-item field (#25). Without a (valid)
@@ -50,6 +55,7 @@ export default async function RequestPage({
   const canDecideDuplicate = duplicateDecidable(request);
   const done = messageFor(DONE_MESSAGES, query.done);
   const error = messageFor(ERROR_MESSAGES, query.error);
+  const notice = processingNotice(request.status, requestRowView(request, exportRecord ?? undefined), (date) => dateFormat.format(date));
   const openItems = lineItems.reduce((count, item) => count + item.fields.filter(needsAttention).length, fields.filter(needsAttention).length);
   // The anchor brings the panel into view on narrow screens, where it sits below the tables.
   const fieldHref = (field: ReviewField) =>
@@ -82,6 +88,11 @@ export default async function RequestPage({
       {request.status === "ERROR" && request.errorMessage && (
         <p role="alert">
           <strong>Fehler:</strong> {request.errorMessage}
+        </p>
+      )}
+      {notice && (
+        <p className={notice.tone === "warning" ? "callout callout-warn" : "callout callout-info"} role="status" data-testid="processing-notice">
+          {notice.text}
         </p>
       )}
       {request.status === "REJECTED" && request.rejectionReason && (

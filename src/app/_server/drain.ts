@@ -1,7 +1,7 @@
 import { SERVERLESS_DRAIN } from "@/config/env";
 import { buildJobDeps, drainRound, handledJobs, type DrainRoundResult, type JobDeps } from "@/job-drain";
 import { logEvent } from "@/features/observability";
-import { processBudgetMs, scheduleAfterResponse } from "./drain-request";
+import { createRunGate, processBudgetMs, scheduleAfterResponse } from "./drain-request";
 import { getJobClient, getRuntime } from "./runtime";
 
 // Serverless drain of the web process (#59, ADR-0001 D2): the showcase has no worker, so the route
@@ -43,4 +43,25 @@ export async function drainNow(invokedAt: number = Date.now()): Promise<DrainRou
  */
 export function drainAfterResponse(invokedAt: number): void {
   scheduleAfterResponse(getRuntime().config.jobs.drainInline, () => drainNow(invokedAt));
+}
+
+// Stale after the function limit (maxDuration 300 s of the pages): by then the run is over either way.
+const pageViewGate = createRunGate(30_000, 300_000);
+
+/**
+ * Opening the request list or a request (#70): with JOB_DRAIN_INLINE=true a due retry is picked up by
+ * normal use instead of waiting for the daily cron – at most once per 30 s and function instance, and
+ * never while this instance's previous page-view drain still runs.
+ */
+export function drainOnPageView(): void {
+  const { drainInline } = getRuntime().config.jobs;
+  if (!drainInline || !pageViewGate.tryStart()) return;
+  const invokedAt = Date.now();
+  scheduleAfterResponse(drainInline, async () => {
+    try {
+      await drainNow(invokedAt);
+    } finally {
+      pageViewGate.finish();
+    }
+  });
 }

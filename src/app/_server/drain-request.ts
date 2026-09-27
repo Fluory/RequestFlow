@@ -30,6 +30,38 @@ export function processBudgetMs(budgetMs: number, invokedAt: number, now: number
   return Math.max(0, budgetMs - (now - invokedAt));
 }
 
+export interface RunGate {
+  /** `true` when a run may start now; the caller must call `finish()` when it ends. */
+  tryStart(now?: number): boolean;
+  finish(): void;
+}
+
+/**
+ * Page views may pick up due retries on the showcase (#70), but a burst of views must not start a burst
+ * of drains: at most one start per `minIntervalMs`, and none while the previous run still goes – a drain
+ * can outlast the interval (#73 review). A run older than `staleAfterMs` (the function limit) counts as
+ * gone, so a lost `finish()` cannot block page views forever. State lives in the closure, so it is per
+ * function instance – a cost guard, not a global lock (pg-boss keeps the jobs themselves exactly-once).
+ */
+export function createRunGate(minIntervalMs: number, staleAfterMs: number): RunGate {
+  let lastStart: number | undefined;
+  let running = false;
+  return {
+    tryStart(now = Date.now()) {
+      if (lastStart !== undefined) {
+        const since = now - lastStart;
+        if (since < minIntervalMs || (running && since < staleAfterMs)) return false;
+      }
+      lastStart = now;
+      running = true;
+      return true;
+    },
+    finish() {
+      running = false;
+    },
+  };
+}
+
 /**
  * Runs `run` via `after()` once the response is sent – only when `enabled` (JOB_DRAIN_INLINE=true).
  * Failures never reach the user's response; they are logged by error class only.

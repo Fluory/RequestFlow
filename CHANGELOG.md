@@ -86,6 +86,10 @@ This file records what changes **in the product** – process and session state 
   existing `auth` schema only when the app owns it.
 
 ### Fixed
+- Request detail: while a failed attempt waits for its retry, the page shows the same facts as the list –
+  last error, attempts and the next retry – instead of "Die Dokumente werden gerade ausgewertet". On the
+  showcase, opening the list or a request picks up due retries (at most once per 30 s and never while
+  the previous one still runs) instead of waiting for the daily cron (#70).
 - AI service: model calls answered with 429 or 503 (provider overload) are retried up to three attempts
   in total with backoff instead of failing the extraction at once; all attempts together stay within
   the model timeout, and timeouts are not retried (#69).
