@@ -54,7 +54,7 @@ Deliberately accepted risks – without an entry here a deviation counts as a de
 | Upload cap per person only where configured | Local and CI run without `UPLOAD_MAX_PER_HOUR`; the showcase refuses to start without it (#59); concurrent uploads may pass the check together – a cost cap, not an exact quota | Fluory | 2026-12-31 (review at M3) |
 | `.msg` uploads checked by OLE signature only | Structure check of Outlook messages needs a CFB parser; files are served only as attachments with `nosniff` and parsed later by the stateless AI service | Fluory | with #23 (MSG parsing) |
 | Gemini API free-tier key on the showcase (#67) | Orchestrator decision 2026-09-26 (ADR-0001 D11 amendment): no GCP for now. Google's terms require paid services for API clients offered to users in the EEA and allow human review of free-tier content, so the showcase stays invite-only for the orchestrator, synthetic data only, demo banner on | Fluory | before anyone else gets a demo account, at the latest 2026-10-31 – then paid tier (same key with billing) or Vertex `eu` |
-| Gemini API free tier for local development | Synthetic data only; never showcase or customer data (D8) | Fluory | when a Vertex development budget exists |
+| Gemini API free tier for local development | Synthetic data only; never showcase (except the #67 row above until its expiry) or customer data (D8) | Fluory | when a Vertex development budget exists |
 
 ## Data flow
 

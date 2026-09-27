@@ -448,7 +448,8 @@ owns *parse → extract → verify* and the evals. Its pipeline has four steps.
 - **Gemini API free tier – local development with synthetic data only.** Its terms allow human
   review and product improvement of free-tier content, and state: *"You may use only Paid Services
   when making API Clients available to users in the EEA, Switzerland, or the UK."* The showcase
-  therefore uses Vertex (paid). Cost is capped by rate limits, upload limits and a GCP budget alert.
+  therefore uses Vertex (paid) – *amended 2026-09-26: until the exception expires, a free-tier key on the
+  invite-only showcase (D11 amendment 2026-09-26, exceptions register).* Cost is capped by rate limits, upload limits and a GCP budget alert.
 - **Avoid:** PyMuPDF / pymupdf4llm (AGPL-3.0 – a licensing problem for a closed customer product).
 
 **Prompt injection.** Document text is data inside delimiters. The model has no tools, and its
@@ -489,7 +490,8 @@ approval (add-on `ki-rag`). The eval set contains injection cases.
 - A service contract that must stay in sync, mitigated by generated TS types and contract tests.
 - A larger container image because of docling's models. *Size unverified.*
 - CPU latency of OCR and table models. *Unverified – measure in the pilot.*
-- The showcase host of the AI service is open (see D11).
+- ~~The showcase host of the AI service is open (see D11).~~ Resolved – a container on Vercel Functions
+  (D11 amendment 2026-09-26).
 
 **Rationale.** The strongest document handling from day 1. The security and tenancy surface stays
 in one place because the service is stateless.
@@ -662,7 +664,9 @@ enters the code: the app still talks plain PostgreSQL (Drizzle, pg-boss) and the
    `services/ai`, `Dockerfile.vercel`, `PORT=8080`, region `fra1`), PDF pipeline `textlines`, OCR off.
    Spike result (#67, 2026-09-26): the Python-function route fails – the bundle is **1386 MB** against a
    **500 MB** function limit (deployment `dpl_EhZt9SnyAgsH84ayhjXWicgqanpA`); the container image builds
-   in about 4 minutes (image size limit 15 GB). Cold start and one extraction: recorded in the PR of #67.
+   in about 4 minutes (image size limit 15 GB). Measured 2026-09-26/27: cold start about 5.6 s, warm
+   `/healthz` 0.37 s, one extraction of the synthetic test mail about 8 s. Large functions (beta, up to
+   5 GB) were not tried – the container route runs the existing image unchanged.
 2. Model calls use a **Gemini API key on the free tier** (`AI_ALLOW_GEMINI_API_DEV=true`,
    `GEMINI_API_KEY` set only in the Vercel project) – a temporary exception to D8.
 
@@ -706,8 +710,8 @@ Hugging Face Space (existing Dockerfile unchanged; new account, hosting region n
 - There are two toolchains and a service contract to maintain.
 - On the showcase, retries are only picked up when something triggers `drain()`.
 - We own the auth configuration and have to watch the Better Auth advisories.
-- The AI service's showcase host and container footprint are unverified; a spike is due before the
-  showcase.
+- ~~The AI service's showcase host and container footprint are unverified; a spike is due before the
+  showcase.~~ Measured in #67 (D11 amendment 2026-09-26).
 - The pilot takes ~13 days, not 10 (confirmed by the orchestrator).
 
 ## Pilot budget check (heuristic, solo developer)
@@ -743,7 +747,7 @@ explicit requirements.
 | Showcase: no unattended retries (Hobby cron once/day) | Showcase only; production runs a worker | when a production-like demo is needed |
 | No RLS on the `auth`/`pgboss` schemas | Not tenant business data; only server code has access | on review at M3 |
 | Gemini API free-tier key on the showcase (#67) | Invite-only for the orchestrator, synthetic data only, demo banner; Google's terms require paid services for API clients offered to EEA users (D11 amendment 2026-09-26) | before anyone else gets a demo account, at the latest 2026-10-31 |
-| Gemini free tier for local development | Synthetic data only; never in showcase or production | when the Vertex budget is set up for development |
+| Gemini free tier for local development | Synthetic data only; never in showcase (except the #67 row above until its expiry) or production | when the Vertex budget is set up for development |
 
 ## Open points
 
@@ -761,7 +765,7 @@ explicit requirements.
 - docling EML/MSG coverage and its provenance granularity for XLSX cells.
 - Google Gen AI SDK configuration for the Vertex `eu` endpoint.
 - ~~R2 EU jurisdiction on the free plan.~~ Obsolete – Supabase Storage instead (D11 amendment 2026-09-24).
-- The AI-service showcase host (spike).
+- ~~The AI-service showcase host (spike).~~ Done – container on Vercel Functions (D11 amendment 2026-09-26).
 
 ## Sources (verified 2026-09-22)
 
@@ -783,3 +787,7 @@ explicit requirements.
 - Parsing: github.com/docling-project/docling · pypi.org/project/PyMuPDF · pypi.org/project/pdfplumber ·
   npm registry (alternative 1: unpdf, mammoth, postal-mime, @kenjiuno/msgreader) · docs.sheetjs.com
 - promptfoo: github.com/promptfoo/promptfoo · promptfoo.dev/docs/providers/vertex
+- Vercel container route (verified 2026-09-27): vercel.com/docs/functions/container-images (beta, default
+  port 80, scale-down after 5 min without traffic in production, 30 s in preview) ·
+  vercel.com/docs/container-registry/limits-and-pricing (15 GB total image size) ·
+  vercel.com/docs/functions/limitations (500 MB uncompressed for Python functions; large functions beta up to 5 GB)
