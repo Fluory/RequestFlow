@@ -1,4 +1,4 @@
-"""Transient model errors are retried inside one extraction call (#69), replayed at the HTTP boundary."""
+"""Transient model errors are retried inside one extraction call (#69), replayed over HTTP."""
 
 from __future__ import annotations
 
@@ -8,13 +8,17 @@ import httpx
 import pytest
 from conftest import fake_credentials, make_settings, no_adc, recorded
 
-from requestflow_ai.extraction.model_client import ModelClientError, build_model_client
+from requestflow_ai.extraction.model_client import (
+    ModelClient,
+    ModelClientError,
+    build_model_client,
+)
 
 FAST = {"ai_model_retry_initial_delay_seconds": 0.01}
 
 
 def _error(status: int) -> dict[str, Any]:
-    return {"error": {"code": status, "message": "synthetic upstream error", "status": "UNAVAILABLE"}}
+    return {"error": {"code": status, "message": "synthetic upstream error"}}
 
 
 class Sequence:
@@ -33,7 +37,7 @@ class Sequence:
         return httpx.Client(transport=httpx.MockTransport(self.handler))
 
 
-def _vertex(sequence: Sequence, **overrides: Any):  # noqa: ANN202 - returns the SDK-backed client
+def _vertex(sequence: Sequence, **overrides: Any) -> ModelClient:
     return build_model_client(
         make_settings(**FAST, **overrides),
         credentials=fake_credentials(),
@@ -81,7 +85,10 @@ def test_the_gemini_api_dev_path_retries_too() -> None:
     sequence = Sequence((503, _error(503)), (200, recorded("musterbau_pdf.json")))
     client = build_model_client(
         make_settings(
-            **FAST, ai_allow_gemini_api_dev=True, gemini_api_key="synthetic-dev-key", vertex_project=None
+            **FAST,
+            ai_allow_gemini_api_dev=True,
+            gemini_api_key="synthetic-dev-key",
+            vertex_project=None,
         ),
         httpx_client=sequence.client(),
         credentials_loader=no_adc,
