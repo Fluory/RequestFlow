@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, or, sql, type SQL } from "drizzle-orm";
 import { requests, type RequestStatus } from "@/db/schema";
 import { tenantOf, type TenantTx } from "@/features/tenancy";
 import { parseCursor, REQUEST_PAGE_SIZE } from "./cursor";
@@ -152,6 +152,22 @@ export async function recordProcessingFailure(tx: TenantTx, id: string, failure:
     .update(requests)
     .set({ errorMessage: failure.message, nextRetryAt: failure.nextRetryAt })
     .where(and(eq(requests.id, id), eq(requests.status, "PROCESSING")));
+}
+
+/** Marks a request as a prepared showcase sample (#71) – its label in list and detail comes from here. */
+export async function markSample(tx: TenantTx, id: string): Promise<void> {
+  tenantOf(tx);
+  await tx.update(requests).set({ source: "sample" }).where(eq(requests.id, id));
+}
+
+/** Samples of the tenant in one of `statuses` (#71: the seed creates a sample only when none is open). */
+export async function countSamples(tx: TenantTx, statuses: readonly RequestStatus[]): Promise<number> {
+  tenantOf(tx);
+  const [row] = await tx
+    .select({ count: sql<number>`count(*)::int` })
+    .from(requests)
+    .where(and(eq(requests.source, "sample"), inArray(requests.status, [...statuses])));
+  return row?.count ?? 0;
 }
 
 /** Requests a user created since `since` (upload rate limit, #59 review) – within the tenant. */

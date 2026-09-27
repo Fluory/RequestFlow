@@ -6,6 +6,7 @@ import { listExportRecords } from "@/features/export";
 import { listRequests, parseCursor, type RequestFilter } from "@/features/requests";
 import { reprocessAction } from "./actions";
 import { requestRowView } from "./row-view";
+import { SAMPLE_LABEL } from "./sample-label";
 import { REQUEST_STATUS_LABEL } from "./status-labels";
 import { StatusPill } from "./status-pill";
 import { UploadForm } from "./upload-form";
@@ -125,6 +126,14 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                       <td className="mono">{dateFormat.format(request.createdAt)}</td>
                       <td className="subject">
                         <Link href={`/requests/${request.id}`}>{request.subject ?? "(ohne Betreff)"}</Link>
+                        {request.source === "sample" && (
+                          <>
+                            {" "}
+                            <span className="pill pill-info" data-testid="sample-label">
+                              {SAMPLE_LABEL}
+                            </span>
+                          </>
+                        )}
                       </td>
                       <td>
                         <div className="status-cell">

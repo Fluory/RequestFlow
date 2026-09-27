@@ -2,6 +2,7 @@
 export {
   countRequestsByStatus,
   countRequestsCreatedBy,
+  countSamples,
   createRequest,
   findDuplicate,
   getRequest,
@@ -10,6 +11,7 @@ export {
   type RequestPage,
   lockDuplicateDetection,
   lockRequest,
+  markSample,
   recordDuplicateDecision,
   recordExportRetry,
   recordProcessingFailure,
