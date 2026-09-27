@@ -123,6 +123,15 @@ def build_model_client(
     http_options = types.HttpOptions(
         timeout=int(settings.ai_model_timeout_seconds * 1000),
         httpx_client=httpx_client,
+        # Only overload and rate-limit answers are transient; everything else fails at once (#69).
+        retry_options=types.HttpRetryOptions(
+            attempts=settings.ai_model_retry_attempts,
+            initial_delay=settings.ai_model_retry_initial_delay_seconds,
+            max_delay=8.0,
+            exp_base=2.0,
+            jitter=1.0,
+            http_status_codes=[429, 503],
+        ),
     )
 
     if settings.ai_allow_gemini_api_dev and settings.vertex_project:

@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     vertex_location: str = "eu"
     vertex_model: str = "gemini-3.5-flash"
     ai_model_timeout_seconds: float = Field(default=60, gt=0)
+    # Transient provider errors (429/503) are retried inside one call (#69): total attempts incl.
+    # the first one, exponential backoff from the initial delay.
+    ai_model_retry_attempts: int = Field(default=3, ge=1, le=5)
+    ai_model_retry_initial_delay_seconds: float = Field(default=1.0, gt=0)
 
     # Gemini API (free tier) - local development with synthetic data only. Needs BOTH the flag
     # and the key; never used as a fallback for Vertex.
