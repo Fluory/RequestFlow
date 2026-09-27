@@ -78,10 +78,48 @@ const CONTRACT_ERROR_CODES: Record<components["schemas"]["ErrorDetail"]["code"],
   internal_error: true,
 };
 const errorBody = z.object({ error: z.object({ code: z.string() }) });
+// The contract's error object is a code and a short fixed message; anything larger is not one (#82 review).
+const MAX_ERROR_BODY_BYTES = 4 * 1024;
 
-/** The contract code of an error answer, or `unavailable` (no JSON error body, e.g. a platform 502 page). */
+const isTimeout = (error: unknown) => error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+
+/** The body as text, or null once it exceeds `limit` bytes (the rest is never buffered). */
+async function boundedText(response: Response, limit: number): Promise<string | null> {
+  const reader = response.body?.getReader();
+  if (!reader) return "";
+  const decoder = new TextDecoder();
+  let text = "";
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return text + decoder.decode();
+    size += value.byteLength;
+    if (size > limit) {
+      await reader.cancel().catch(() => undefined);
+      return null;
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+}
+
+/**
+ * The contract code of an error answer; `unavailable` without a valid error object (e.g. a platform
+ * 502 page, an oversized body); `timeout` when the body stalls until the call's timeout.
+ */
 async function errorCode(response: Response): Promise<string> {
-  const parsed = errorBody.safeParse(await response.json().catch(() => null));
+  let text: string | null;
+  try {
+    text = await boundedText(response, MAX_ERROR_BODY_BYTES);
+  } catch (error) {
+    return isTimeout(error) ? "timeout" : "unavailable";
+  }
+  let body: unknown = null;
+  try {
+    body = text === null ? null : JSON.parse(text);
+  } catch {
+    // not JSON – no contract code
+  }
+  const parsed = errorBody.safeParse(body);
   return parsed.success && Object.hasOwn(CONTRACT_ERROR_CODES, parsed.data.error.code) ? parsed.data.error.code : "unavailable";
 }
 const DOCUMENT_STATUS = new Set([413, 415, 422]);
@@ -125,8 +163,7 @@ export function createAiServiceClient(settings: AiServiceSettings): AiServiceCli
           signal: AbortSignal.timeout(settings.timeoutMs),
         });
       } catch (error) {
-        const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
-        throw new AiServiceError(timedOut ? "timeout" : "unreachable", true, "service");
+        throw new AiServiceError(isTimeout(error) ? "timeout" : "unreachable", true, "service");
       }
       if (!response.ok) {
         if (RETRYABLE_STATUS.has(response.status)) throw new AiServiceError(await errorCode(response), true, "service", response.status);

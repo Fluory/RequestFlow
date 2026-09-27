@@ -80,6 +80,23 @@ describe("AI service client", () => {
     await expect(client.extract(input)).rejects.toMatchObject({ retryable: true, status: 502, code: "unavailable" });
   });
 
+  it("reads at most a small error object: an oversized error body is dropped, not buffered (#82 review)", async () => {
+    handler = (_request, response) => json(response, 502, { error: { code: "model_error", message: "m".repeat(64 * 1024) } });
+    const client = createAiServiceClient({ baseUrl, token: "t".repeat(24), timeoutMs: 2000 });
+
+    await expect(client.extract(input)).rejects.toMatchObject({ retryable: true, status: 502, code: "unavailable" });
+  });
+
+  it("classifies an error body that stalls after the headers as a timeout (#82 review)", async () => {
+    handler = (_request, response) => {
+      response.writeHead(503, { "content-type": "application/json" });
+      response.write('{"error":'); // …and never finishes
+    };
+    const client = createAiServiceClient({ baseUrl, token: "t".repeat(24), timeoutMs: 200 });
+
+    await expect(client.extract(input)).rejects.toMatchObject({ retryable: true, status: 503, code: "timeout" });
+  });
+
   it.each([
     [413, "document"],
     [415, "document"],
