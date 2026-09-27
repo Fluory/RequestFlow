@@ -18,5 +18,4 @@ export {
   type RequestRow,
 } from "./repository";
 export { parseCursor, REQUEST_PAGE_SIZE } from "./cursor";
-export { processingNotice, type ProcessingNotice } from "./processing-notice";
 export { canTransition, InvalidTransition, nextStatus, type ErrorStage, type RequestEvent } from "./status";

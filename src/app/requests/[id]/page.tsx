@@ -2,8 +2,9 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { drainOnPageView } from "@/app/_server/drain";
 import { getRuntime, requestActor } from "@/app/_server/runtime";
-import { processingNotice } from "@/features/requests";
 import { duplicateDecidable, loadReview, REJECTION_REASON_MAX, type ReviewField } from "@/features/review";
+import { processingNotice } from "../processing-notice";
+import { requestRowView } from "../row-view";
 import { StatusPill } from "../status-pill";
 import { DONE_MESSAGES, ERROR_MESSAGES, messageFor } from "./messages";
 import { approveAction, confirmNotDuplicateAction, correctFieldAction, rejectAction, rejectAsDuplicateAction } from "./actions";
@@ -54,7 +55,7 @@ export default async function RequestPage({
   const canDecideDuplicate = duplicateDecidable(request);
   const done = messageFor(DONE_MESSAGES, query.done);
   const error = messageFor(ERROR_MESSAGES, query.error);
-  const notice = processingNotice(request, (date) => dateFormat.format(date));
+  const notice = processingNotice(request.status, requestRowView(request, exportRecord ?? undefined), (date) => dateFormat.format(date));
   const openItems = lineItems.reduce((count, item) => count + item.fields.filter(needsAttention).length, fields.filter(needsAttention).length);
   // The anchor brings the panel into view on narrow screens, where it sits below the tables.
   const fieldHref = (field: ReviewField) =>
