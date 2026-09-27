@@ -82,7 +82,8 @@ def test_other_errors_are_not_retried(status: int) -> None:
 
 
 def test_a_timeout_is_not_retried() -> None:
-    # A hanging model already used the whole budget; another attempt would outlive the worker (#72 review).
+    # A hanging model already used the whole budget; another attempt would outlive the worker
+    # (#72 review).
     requests: list[httpx.Request] = []
 
     def hang(request: httpx.Request) -> httpx.Response:
@@ -103,7 +104,8 @@ def test_a_timeout_is_not_retried() -> None:
 
 
 def test_no_retry_without_enough_budget_left() -> None:
-    # Budget below the minimum a retry needs: a 503 fails at once instead of eating the worker's time.
+    # Budget below the minimum a retry needs: a 503 fails at once instead of eating the worker's
+    # time.
     sequence = Sequence((503, _error(503)), (200, recorded("musterbau_pdf.json")))
 
     with pytest.raises(ModelClientError):

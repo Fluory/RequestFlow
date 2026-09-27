@@ -116,7 +116,7 @@ class GeminiModelClient:
                 )
                 break
             except errors.APIError as exc:
-                wait = min(delay, _MAX_DELAY_SECONDS) * (1 + random.random() / 4)
+                wait = min(delay, _MAX_DELAY_SECONDS) * (1 + random.random() / 4)  # noqa: S311 - jitter, not security
                 left = deadline - self._clock() - wait
                 if (
                     exc.code not in _RETRYABLE_STATUS
@@ -163,7 +163,8 @@ class GeminiModelClient:
             temperature=0,
             candidate_count=1,
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
-            # This attempt gets only what is left of the budget (at least 1 s, the SDK needs a timeout).
+            # This attempt gets only what is left of the budget (at least 1 s; the SDK needs a
+            # timeout).
             http_options=types.HttpOptions(timeout=max(1000, int(remaining_seconds * 1000))),
         )
 
