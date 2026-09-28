@@ -73,7 +73,7 @@ function recordingSender(queue?: JobSender): { sender: JobSender; jobId: () => s
 export async function seedSamples(deps: SampleDeps, actor: Actor): Promise<SeedResult> {
   // One run per company at a time (#93): this transaction only holds the lock; every step of the run
   // commits in its own transaction, as before. A second run waits, then sees the samples in place.
-  return deps.tenancy.withTenant(actor.companyId, async (lock) => {
+  return deps.tenancy.withTenant(actor.companyId, async (_lock) => {
     // PROBE (#99 review): without the lock the #93 tests must fail – reverted in the next commit.
     void lockSeedRun;
     void SEED_LOCK_TIMEOUT_MS;
