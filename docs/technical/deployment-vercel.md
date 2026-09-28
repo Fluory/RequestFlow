@@ -46,7 +46,9 @@ creation). The script is all-or-nothing; running it twice fails on "role already
 
 1. Import the same GitHub repository as a **second Vercel project**: framework **`container`**, Root
    Directory **`services/ai`**. Vercel builds `services/ai/Dockerfile.vercel` (same build as
-   `Dockerfile`) and runs it on Vercel Functions (container images, beta). A plain Python function does
+   `Dockerfile`: the `>>> shared` blocks must match, checked on every PR by `scripts/check-ai-dockerfiles.sh`;
+   when a Dockerfile or the lock changes, CI also builds the image and checks `/healthz` on port 8080, #79)
+   and runs it on Vercel Functions (container images, beta). A plain Python function does
    not fit: the bundle is 1386 MB against the 500 MB function limit (ADR-0001 D11 amendment 2026-09-26).
 2. Deployment Protection: **Vercel Authentication for preview deployments only** – the web app calls the
    production URL server-side; the API itself is protected by `AI_SERVICE_TOKEN`.

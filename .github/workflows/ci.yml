@@ -53,6 +53,10 @@ jobs:
       - name: Docs guard
         run: bash scripts/doku-check.sh
 
+      # The Vercel image of the AI service must not drift from the service Dockerfile (#79). Seconds.
+      - name: AI Dockerfiles in step
+        run: bash scripts/check-ai-dockerfiles.sh
+
       # PR guard: plain language, plan gate, exactly one docs decision, file-size gate,
       # before-creating proof, next step for drafts, green verify for ready-for-review.
       - name: PR guard
@@ -157,6 +161,11 @@ jobs:
           else
             echo "image=false" >> "$GITHUB_OUTPUT"
           fi
+          if git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -qE '^services/ai/(Dockerfile|Dockerfile\.vercel|\.dockerignore|\.vercelignore|pyproject\.toml|uv\.lock)$'; then
+            echo "ai_image=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ai_image=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: docker compose up → /api/health
         if: steps.diff.outputs.image == 'true'
         run: |
@@ -175,3 +184,16 @@ jobs:
       - name: Worker is running
         if: steps.diff.outputs.image == 'true'
         run: docker compose ps --status running --services | grep -qx worker
+      # The image Vercel runs on the showcase (#79): build it and prove it starts – non-root, on $PORT.
+      # Synthetic settings only; the model client is not called by /healthz.
+      - name: Vercel AI image → /healthz
+        if: steps.diff.outputs.ai_image == 'true'
+        run: |
+          docker build -f services/ai/Dockerfile.vercel -t requestflow-ai-vercel services/ai
+          docker run -d --name ai-vercel -p 8080:8080 -e PORT=8080             -e AI_SERVICE_TOKEN=ci-only-synthetic-token-0123456789             -e AI_ALLOW_GEMINI_API_DEV=true -e GEMINI_API_KEY=ci-only-not-a-key             requestflow-ai-vercel
+          for _ in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8080/healthz; then echo; exit 0; fi
+            sleep 3
+          done
+          docker logs --tail 80 ai-vercel
+          exit 1
