@@ -1,5 +1,7 @@
 # RequestFlow AI service - stateless, CPU only. Build: docker build -t requestflow-ai services/ai
 # Not built in CI yet (unverified); see README "Verified vs. unverified".
+# Blocks between ">>> shared" and "<<< shared" must equal those in Dockerfile.vercel (scripts/check-ai-dockerfiles.sh, #79).
+# >>> shared: build
 FROM python:3.13-slim
 
 COPY --from=ghcr.io/astral-sh/uv:0.8.17 /uv /usr/local/bin/uv
@@ -17,6 +19,7 @@ COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY src ./src
 RUN uv sync --frozen --no-dev
+# <<< shared
 
 # Optional: bake the docling layout model into the image for AI_PDF_PIPELINE=layout
 # (~164 MB). The default textlines pipeline needs no models.
@@ -33,8 +36,10 @@ RUN mkdir -p /opt/docling-models && \
       /app/.venv/bin/docling-tools models download rapidocr \
         --rapidocr-backend-lang torch:de -o /opt/docling-models; fi
 
+# >>> shared: user
 RUN useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin app
 USER 10001
+# <<< shared
 
 # No runtime downloads: models are baked in or not used.
 ENV PATH=/app/.venv/bin:$PATH \
