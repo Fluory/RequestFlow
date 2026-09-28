@@ -1,4 +1,5 @@
 import type { ReviewField, ReviewStatus, ReviewView } from "@/features/review";
+import { PdfPage } from "./pdf-page";
 
 // Presentational parts of the review page (#8, #23, #25), styled after design prototype A (#52).
 
@@ -32,7 +33,10 @@ export function StatusBadge({ status }: { status: ReviewStatus }) {
   );
 }
 
-/** Source of the selected value: document, heading and the cited lines with the value marked. */
+/**
+ * Source of the selected value: document, heading, for a PDF document the original page with the cited box
+ * (#74), and the cited lines with the value marked – the text stays the accessible equivalent of the page.
+ */
 export function Source({ field }: { field: ReviewField }) {
   if (!field.source) return <p className="muted">Für diesen Wert gibt es keine Fundstelle.</p>;
   const { source } = field;
@@ -50,6 +54,9 @@ export function Source({ field }: { field: ReviewField }) {
         </p>
       )}
       {field.corrected && <p className="field-hint">Fundstelle des erkannten Werts „{field.extractedValue ?? "–"}“ – der aktuelle Wert wurde manuell korrigiert.</p>}
+      {source.region && (
+        <PdfPage documentId={source.documentId} region={source.region} label={`Seite ${source.region.page} von ${source.filename}, Fundstelle markiert`} />
+      )}
       <ol className="source-lines">
         {source.lines.map((line) => (
           <li key={line.segmentId} className={line.cited ? "cited" : undefined} aria-current={line.cited ? "true" : undefined}>

@@ -8,6 +8,7 @@ import { requestRowView } from "../row-view";
 import { SAMPLE_EXPLANATION, SAMPLE_LABEL } from "../sample-label";
 import { StatusPill } from "../status-pill";
 import { DONE_MESSAGES, ERROR_MESSAGES, messageFor } from "./messages";
+import { reasonText } from "./reason-label";
 import { displayValue } from "./value-label";
 import { approveAction, confirmNotDuplicateAction, correctFieldAction, rejectAction, rejectAsDuplicateAction } from "./actions";
 import { DocumentList, needsAttention, Source, STATUS_LABEL, StatusBadge } from "./review-parts";
@@ -180,6 +181,7 @@ export default async function RequestPage({
                           <td className="nowrap">
                             <StatusBadge status={field.reviewStatus} />
                             {field.corrected && <div className="field-hint">erkannt: {STATUS_LABEL[field.status]}</div>}
+                            {reasonText(field) && <div className="field-hint field-reason">{reasonText(field)}</div>}
                           </td>
                           <td className="source-col">{field.source ? <Link href={fieldHref(field)}>Quelle anzeigen</Link> : <span className="muted">–</span>}</td>
                           {inReview && (
@@ -276,6 +278,11 @@ export default async function RequestPage({
                   <strong data-testid={selected.itemIndex === null ? undefined : "selected-item-value"}>{displayValue(selected) ?? "–"}</strong>
                   <StatusBadge status={selected.reviewStatus} />
                 </div>
+                {reasonText(selected) && (
+                  <p className="field-reason" data-testid="selected-reason">
+                    {reasonText(selected)}
+                  </p>
+                )}
                 {selected.corrected && (
                   <p className="field-hint">
                     erkannt: {displayValue({ key: selected.key, value: selected.extractedValue }) ?? "–"} ({STATUS_LABEL[selected.status]})

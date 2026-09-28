@@ -31,7 +31,8 @@ stateless and never gets storage credentials (D8); the web app runs on Vercel Ho
 through `GET /api/documents/:id` (same origin, the session cookie – no new route, no public URL),
 renders the cited page to a canvas and lays the stored bounding box over it as a percentage of the
 page size. The pdf.js worker is served from the app's own build output (`new URL(…, import.meta.url)`),
-never from a CDN. `isEvalSupported: false`. The text source view stays below the page: it is the
+never from a CDN. XFA forms stay off; pdf.js 6 evaluates no code from a PDF (no `eval` or
+`new Function` in the build) and its scripting sandbox is never loaded. The text source view stays below the page: it is the
 accessible equivalent of the canvas, and the only view for mail, XLSX, DOCX and PDFs inside an
 Outlook message (the route serves the `.msg`, not the attachment).
 

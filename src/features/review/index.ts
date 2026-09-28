@@ -21,5 +21,5 @@ export {
   type ReviewLineItem,
   type ReviewView,
 } from "./review";
-export { buildSourceView, type SourceLine, type SourceView } from "./source-view";
+export { buildSourceView, type PageRegion, type SourceLine, type SourceView } from "./source-view";
 export { summarizeReview, type ReviewSummary } from "./summary";
