@@ -10,6 +10,7 @@ import { canTransition, getRequest, lockRequest, recordDuplicateDecision, transi
 import { tenantOf, type Tenancy, type TenantTx } from "@/features/tenancy";
 import { buildSourceView, type SourceView, type StoredSegment } from "./source-view";
 import { applicableCorrection, correctionKey, latestCorrections, summarizeReview, type ReviewSummary, type SummaryField } from "./summary";
+import { canonicalUnit } from "./unit";
 
 export const FIELD_LABELS: Record<string, string> = {
   company: "Firma",
@@ -200,7 +201,8 @@ async function lockForReview(tx: TenantTx, requestId: string): Promise<RequestRo
 
 /**
  * Stores a correction and its audit event (old value, new value, user, time) in ONE transaction – for a
- * header field, or with `itemIndex` for a field of an existing line item (#25).
+ * header field, or with `itemIndex` for a field of an existing line item (#25). A unit is stored like
+ * the extraction stores it (#96): „Stk.“ becomes `pcs`; the audit event keeps what was typed.
  */
 export async function correctField(
   tenancy: Tenancy,
@@ -213,7 +215,8 @@ export async function correctField(
   authorize(actor, "requests.process");
   const known = itemIndex === null ? (HEADER_FIELDS as readonly string[]) : (ITEM_FIELDS as readonly string[]);
   if (!known.includes(fieldKey) || (itemIndex !== null && (!Number.isInteger(itemIndex) || itemIndex < 0))) throw new ReviewRefused("unknown_field");
-  const value = newValue === null ? null : newValue.trim().slice(0, 500) || null;
+  const entered = newValue === null ? null : newValue.trim().slice(0, 500) || null;
+  const value = fieldKey === "unit" && entered !== null ? (canonicalUnit(entered) ?? entered) : entered;
   await tenancy.withTenant(actor.companyId, async (tx) => {
     await lockForReview(tx, requestId);
     const run = await latestRun(tx, requestId);
@@ -229,7 +232,13 @@ export async function correctField(
       action: "field.corrected",
       entityType: "request",
       entityId: requestId,
-      data: itemIndex === null ? { field: fieldKey, oldValue, newValue: value } : { field: fieldKey, item: itemIndex, oldValue, newValue: value },
+      data: {
+        field: fieldKey,
+        ...(itemIndex === null ? {} : { item: itemIndex }),
+        oldValue,
+        newValue: value,
+        ...(entered === value ? {} : { entered }),
+      },
     });
   });
 }

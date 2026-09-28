@@ -291,10 +291,10 @@ export default async function RequestPage({
                     Neuer Wert<span className="visually-hidden"> für Position {selected.itemIndex + 1}, {selected.label}</span>
                   </label>
                   <div className="correction-row">
-                    <input id="item-correction" name="value" defaultValue={selected.value ?? ""} maxLength={500} />
+                    <input id="item-correction" name="value" defaultValue={displayValue(selected) ?? ""} maxLength={500} />
                     <button type="submit">Speichern</button>
                   </div>
-                  {selected.key === "unit" && <span className="field-hint">Einheit als ERP-Kürzel: pcs (= Stk.), mm, cm, m, kg oder t.</span>}
+                  {selected.key === "unit" && <span className="field-hint">Übliche Schreibweisen wie „Stück“ oder „Meter“ werden einheitlich gespeichert (Stk., m).</span>}
                   <span className="field-hint">Wird mit altem und neuem Wert, Person und Zeit protokolliert.</span>
                 </form>
               )}
