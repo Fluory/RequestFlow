@@ -6,6 +6,7 @@ import { submitUpload, type IntakeDeps } from "@/features/intake";
 import { markProcessingFailed, processRequestJob, type JobSender } from "@/features/jobs";
 import { countSamples, listSampleLeftoverIds, lockRequest, retireSampleLeftover, type RequestRow } from "@/features/requests";
 import { approveRequest } from "@/features/review";
+import { lockSeedRun } from "./repository";
 import { freshSampleMail, recordedAiClient, SAMPLES, sampleRecording, type Sample } from "./samples";
 
 // While a sample of a purpose is in one of these statuses it still serves that purpose – no new one.
@@ -19,7 +20,13 @@ const STILL_SERVING: Record<Sample["purpose"], readonly RequestRow["status"][]> 
 export interface SampleDeps extends IntakeDeps {
   /** The normal export path (ERP adapter, reviewed values) – the exported sample runs through it. */
   export: ExportDeps;
+  /** How long a run waits for another run of the same company (#93); default 20 s. */
+  seedLockTimeoutMs?: number;
 }
+
+// Below the 30 s `statement_timeout` of pool and role (`src/db/client.ts`, Supabase bootstrap), which would
+// otherwise end the wait first (#99 review).
+const SEED_LOCK_TIMEOUT_MS = 20_000;
 
 const LEFTOVER_REASON = "Beispiel durch einen neuen Lauf ersetzt – das Anlegen war abgebrochen.";
 
@@ -64,16 +71,21 @@ function recordingSender(queue?: JobSender): { sender: JobSender; jobId: () => s
  * the ERP reference without doing anything.
  */
 export async function seedSamples(deps: SampleDeps, actor: Actor): Promise<SeedResult> {
-  const retired = await retireLeftovers(deps, actor);
-  const seeded: SeededSample[] = [];
-  for (const sample of SAMPLES) {
-    const serving = await deps.tenancy.withTenant(actor.companyId, (tx) => countSamples(tx, STILL_SERVING[sample.purpose]));
-    if (serving > 0) continue;
-    const requestId = await createSample(deps, actor, sample);
-    const status = sample.purpose === "exported" ? await approveAndExport(deps, actor, requestId) : "REVIEW";
-    seeded.push({ key: sample.key, requestId, status });
-  }
-  return { seeded, retired };
+  // One run per company at a time (#93): this transaction only holds the lock; every step of the run
+  // commits in its own transaction, as before. A second run waits, then sees the samples in place.
+  return deps.tenancy.withTenant(actor.companyId, async (lock) => {
+    await lockSeedRun(lock, deps.seedLockTimeoutMs ?? SEED_LOCK_TIMEOUT_MS);
+    const retired = await retireLeftovers(deps, actor);
+    const seeded: SeededSample[] = [];
+    for (const sample of SAMPLES) {
+      const serving = await deps.tenancy.withTenant(actor.companyId, (tx) => countSamples(tx, STILL_SERVING[sample.purpose]));
+      if (serving > 0) continue;
+      const requestId = await createSample(deps, actor, sample);
+      const status = sample.purpose === "exported" ? await approveAndExport(deps, actor, requestId) : "REVIEW";
+      seeded.push({ key: sample.key, requestId, status });
+    }
+    return { seeded, retired };
+  });
 }
 
 /**

@@ -10,7 +10,7 @@ import { getActor, type Actor } from "@/features/identity";
 import { QUEUES, ReprocessRefused, reprocessRequest } from "@/features/jobs";
 import { getRequest, lockRequest, transitionRequest } from "@/features/requests";
 import { currentFieldValues, currentLineItemValues, loadReview } from "@/features/review";
-import { RECORDED_MODEL_PREFIX, seedSamples, type SampleDeps } from "@/features/samples";
+import { RECORDED_MODEL_PREFIX, SeedRunBusy, seedSamples, type SampleDeps } from "@/features/samples";
 import { S3BlobStore } from "@/features/storage";
 import { createTenancy, type Tenancy } from "@/features/tenancy";
 import { companyWithAdmin, createStack, type Stack } from "./helpers/stack";
@@ -51,7 +51,7 @@ describe("prepared samples", () => {
     tenancy = createTenancy(stack.database.db);
     storage = new S3BlobStore(loadConfig().storage);
     boss = await createJobQueue(loadConfig().databaseUrl);
-    for (let i = 0; i < 3; i++) actors.push((await getActor(stack.auth, stack.database.db, new Headers({ cookie: (await companyWithAdmin(stack)).cookie })))!);
+    for (let i = 0; i < 5; i++) actors.push((await getActor(stack.auth, stack.database.db, new Headers({ cookie: (await companyWithAdmin(stack)).cookie })))!);
   });
 
   afterAll(async () => {
@@ -184,6 +184,40 @@ describe("prepared samples", () => {
     const events = await tenancy.withTenant(admin.companyId, (tx) => listAuditEvents(tx, "request", failed!.id));
     expect(events.filter((event) => event.action === "request.sample_retired")).toHaveLength(1);
     expect((await samplesOf(admin)).map((sample) => sample.status).sort()).toEqual(["EXPORTED", "REJECTED", "REVIEW"]);
+  });
+
+  it("serializes concurrent runs for one company: each sample once, nothing of the other run rejected (#93)", async () => {
+    const admin = actors[3]!;
+
+    const runs = await Promise.all([seedSamples(deps(), admin), seedSamples(deps(), admin)]);
+
+    expect(runs.flatMap((run) => run.seeded.map(({ key }) => key)).sort()).toEqual(["pumpe-p204", "werk-ost"]);
+    expect(runs.map((run) => run.retired)).toEqual([0, 0]);
+    expect((await samplesOf(admin)).map((sample) => sample.status).sort()).toEqual(["EXPORTED", "REVIEW"]);
+  });
+
+  it("a second run stops with a clear message while the first holds the company too long (#93)", async () => {
+    const admin = actors[4]!;
+    let entered!: () => void;
+    let release!: () => void;
+    const inside = new Promise<void>((resolve) => (entered = resolve));
+    const held = new Promise<void>((resolve) => (release = resolve));
+    // The first run stalls while storing its first original – inside its run, so it holds the company.
+    const slowStorage = Object.assign(Object.create(storage) as S3BlobStore, {
+      put: async (...args: Parameters<S3BlobStore["put"]>) => {
+        entered();
+        await held;
+        return storage.put(...args);
+      },
+    });
+    const first = seedSamples(deps({ storage: slowStorage }), admin);
+    await inside;
+
+    await expect(seedSamples({ ...deps(), seedLockTimeoutMs: 300 }, admin)).rejects.toBeInstanceOf(SeedRunBusy);
+
+    release();
+    expect((await first).seeded.map(({ key }) => key)).toEqual(["werk-ost", "pumpe-p204"]);
+    expect((await samplesOf(admin)).map((sample) => sample.status).sort()).toEqual(["EXPORTED", "REVIEW"]);
   });
 
   it("the database refuses an unknown request source (migration 0019)", async () => {

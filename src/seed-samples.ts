@@ -18,7 +18,8 @@ async function main(): Promise<void> {
   const password = process.env.SEED_PASSWORD;
   if (!password) throw new Error("SEED_PASSWORD is required (the demo admins sign in to seed their company)");
   const config = loadConfig();
-  const database = createDatabase(config.databaseUrl, { max: 2 });
+  // One connection holds the per-company seed lock for the whole run (#93); the steps use the others.
+  const database = createDatabase(config.databaseUrl, { max: 3 });
   const auth = createAuth(database.db, config.auth);
   const storage = new S3BlobStore(config.storage);
   const boss = await createJobQueue(config.databaseUrl);
