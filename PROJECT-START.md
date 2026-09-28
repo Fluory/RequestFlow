@@ -14,7 +14,8 @@
 4. Halte Antworten kurz, strukturiert und entscheidungsorientiert.
 5. Wenn eine Entscheidung sicherheits-, kosten-, daten- oder architekturrelevant ist: Optionen mit Folgen nennen und `decision-needed` markieren.
 
-**Aktueller Status:** `setup-in-progress` (Freigabe 2026-09-22)
+**Aktueller Status:** `foundation-ready` (Freigabe 2026-09-22) – Stand 2026-09-28: Der Pilotumfang (Epics #2, #17, #18) ist
+gemergt und als Release v0.1.0 (#86) veröffentlicht; die Abnahme (Meilenstein M2) steht aus.
 Mögliche Werte: `discovery` | `approved-for-setup` | `setup-in-progress` | `foundation-ready` | `paused`
 
 **Orchestrator:** Fluory
