@@ -23,13 +23,14 @@ test("a visitor finds the prepared samples, clearly labelled, one to review and 
   await expect(reviewRow.getByTestId("request-attention")).toContainText("1 Wert prüfen");
   await expect(reviewRow.getByTestId("request-next-action")).toContainText("Prüfen");
 
-  await reviewRow.getByRole("link", { name: "Anfrage Rohrbogen und Flansche fuer Werk Ost" }).click();
+  // Exact: the row also holds "Prüfen: <subject>" (#77).
+  await reviewRow.getByRole("link", { name: "Anfrage Rohrbogen und Flansche fuer Werk Ost", exact: true }).click();
   await expect(page.getByTestId("sample-notice")).toContainText("Vorbereitetes Beispiel – aufgezeichnete KI-Antwort");
   await expect(page.getByTestId("request-status")).toHaveText("Zur Prüfung");
   await expect(page.getByText(/braucht Aufmerksamkeit|brauchen Aufmerksamkeit/)).toBeVisible();
 
   await page.goto("/requests");
-  await page.getByRole("link", { name: "Anfrage Dichtungssatz fuer Pumpe P-204" }).first().click();
+  await page.getByRole("link", { name: "Anfrage Dichtungssatz fuer Pumpe P-204", exact: true }).first().click();
   await expect(page.getByTestId("sample-notice")).toBeVisible();
   // Exported by the seed, or – when the ERP was not up yet during the setup – by the worker shortly after.
   await expect(async () => {

@@ -29,7 +29,8 @@ test("a clerk reviews a multi-item request, corrects a position and approves it"
   await page.getByRole("button", { name: "Anfrage hochladen" }).click();
   await expect(page.getByRole("status")).toContainText("Anfrage angelegt");
 
-  await page.getByRole("link", { name: subject }).click();
+  // Exact: once in review, the list row also holds "Prüfen: <subject>" (#77).
+  await page.getByRole("link", { name: subject, exact: true }).click();
   await page.waitForURL(/\/requests\/[0-9a-f-]{36}/);
   await expect(async () => {
     await page.reload();
