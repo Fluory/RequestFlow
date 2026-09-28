@@ -10,10 +10,11 @@ name: CI
 
 # No branches filter: stacked PRs on slice branches must be checked too.
 # Explicit types: the defaults (opened, synchronize, reopened) never re-run the PR guard when a draft is
-# marked ready (verify-green rule) or when the description is edited.
+# marked ready (verify-green rule) or when the description is edited; `labeled` starts the full run when
+# `verify-full` is added to an open PR (#89).
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, edited]
+    types: [opened, synchronize, reopened, ready_for_review, edited, labeled]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -34,12 +35,15 @@ jobs:
       - name: Detect doc-only changes
         id: diff
         run: |
-          if git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -qvE '^docs/|\.md$'; then
+          # The label `verify-full` counts as a code change (#89): a release PR changes only Markdown
+          # but must still run verify:full (AGENTS.md).
+          forced="${{ contains(github.event.pull_request.labels.*.name, 'verify-full') }}"
+          if [ "$forced" = "true" ] || git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -qvE '^docs/|\.md$'; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
           fi
-          if git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -qE '^(services/ai|contracts)/'; then
+          if [ "$forced" = "true" ] || git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -qE '^(services/ai|contracts)/'; then
             echo "ai=true" >> "$GITHUB_OUTPUT"
           else
             echo "ai=false" >> "$GITHUB_OUTPUT"
@@ -101,6 +105,11 @@ jobs:
         id: profile
         if: steps.diff.outputs.code == 'true' && hashFiles('package.json') != ''
         run: echo "stage=$(sed -n 's/^[[:space:]]*stage:[[:space:]]*\([a-z]*\).*/\1/p' project-profile.yml | head -1)" >> "$GITHUB_OUTPUT"
+      # verify:full ends with the eval gate (`uv run …`): uv must exist before it, also without AI changes (#90 review).
+      - uses: astral-sh/setup-uv@v10.2.0   # no floating v10 tag exists (verified 2026-09-22)
+        if: hashFiles('services/ai/pyproject.toml') != '' && (steps.diff.outputs.ai == 'true' || (steps.diff.outputs.code == 'true' && hashFiles('package.json') != '' && (steps.profile.outputs.stage == 'production' || contains(github.event.pull_request.labels.*.name, 'verify-full'))))
+        with:
+          enable-cache: true
       - name: Install Playwright Chromium (E2E smoke)
         if: steps.diff.outputs.code == 'true' && hashFiles('package.json') != '' && (steps.profile.outputs.stage == 'production' || contains(github.event.pull_request.labels.*.name, 'verify-full'))
         run: pnpm exec playwright install --with-deps chromium
@@ -113,10 +122,7 @@ jobs:
       - name: Foundation phase (AI service)
         if: steps.diff.outputs.ai == 'true' && hashFiles('services/ai/pyproject.toml') == ''
         run: echo "No services/ai/pyproject.toml – AI service not created yet."
-      - uses: astral-sh/setup-uv@v10.2.0   # no floating v10 tag exists (verified 2026-09-22)
-        if: steps.diff.outputs.ai == 'true' && hashFiles('services/ai/pyproject.toml') != ''
-        with:
-          enable-cache: true
+      # uv is installed above (before verify:full) whenever this section runs.
       - name: AI service verify (ruff, pyright, pytest)
         if: steps.diff.outputs.ai == 'true' && hashFiles('services/ai/pyproject.toml') != ''
         working-directory: services/ai
