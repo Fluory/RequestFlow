@@ -62,8 +62,9 @@ describe("prepared samples", () => {
 
   it("seeds one sample in review and one approved and exported sample; a later delivery of the export job is a no-op", async () => {
     const [admin] = actors as [Actor];
-    const seeded = await seedSamples(deps(), admin);
+    const { seeded, retired } = await seedSamples(deps(), admin);
 
+    expect(retired).toBe(0);
     expect(seeded.map(({ key, status }) => [key, status])).toEqual([
       ["werk-ost", "REVIEW"],
       ["pumpe-p204", "EXPORTED"],
@@ -106,7 +107,7 @@ describe("prepared samples", () => {
     const [admin] = actors as [Actor];
     const before = await samplesOf(admin);
 
-    expect(await seedSamples(deps(), admin)).toEqual([]);
+    expect(await seedSamples(deps(), admin)).toEqual({ seeded: [], retired: 0 });
 
     expect(await samplesOf(admin)).toEqual(before);
   });
@@ -114,7 +115,7 @@ describe("prepared samples", () => {
   it("leaves the export to the queued job when the ERP is unreachable – nothing half-written", async () => {
     const admin = actors[1]!;
 
-    const seeded = await seedSamples(deps({ erpDown: true }), admin);
+    const { seeded } = await seedSamples(deps({ erpDown: true }), admin);
 
     const exported = seeded.find((sample) => sample.key === "pumpe-p204")!;
     expect(exported.status).toBe("APPROVED");
@@ -138,6 +139,20 @@ describe("prepared samples", () => {
     expect(await jobsFor(QUEUES.exportRequest, exported.id)).toBe(1);
   });
 
+  it("keeps an approved sample whose export failed – it is no leftover (#92 review)", async () => {
+    const admin = actors[1]!;
+    const exported = (await samplesOf(admin)).find((sample) => sample.status === "APPROVED")!;
+    await stack.database.pool.query("delete from pgboss.job where name = $1 and singleton_key = $2", [QUEUES.exportRequest, exported.id]);
+    await tenancy.withTenant(admin.companyId, async (tx) =>
+      transitionRequest(tx, (await lockRequest(tx, exported.id))!, "export.failed", { errorStage: "export", errorMessage: "ERP nicht erreichbar." }),
+    );
+
+    const { retired } = await seedSamples(deps(), admin);
+
+    expect(retired).toBe(0);
+    expect(await tenancy.withTenant(admin.companyId, (tx) => getRequest(tx, exported.id))).toMatchObject({ status: "ERROR", errorStage: "export" });
+  });
+
   it("an aborted run leaves the sample in ERROR, not in progress; the next run replaces it; no live reprocess", async () => {
     const admin = actors[2]!;
     const brokenStorage = Object.assign(Object.create(storage) as S3BlobStore, {
@@ -153,11 +168,22 @@ describe("prepared samples", () => {
     // Reprocessing a sample would call the live model – refused.
     await expect(reprocessRequest({ tenancy, boss }, admin, failed!.id)).rejects.toBeInstanceOf(ReprocessRefused);
 
-    const seeded = await seedSamples(deps(), admin);
+    const { seeded, retired } = await seedSamples(deps(), admin);
     expect(seeded.map(({ key, status }) => [key, status])).toEqual([
       ["werk-ost", "REVIEW"],
       ["pumpe-p204", "EXPORTED"],
     ]);
+
+    // #84: the leftover is settled – rejected with a reason and an audit event, never deleted.
+    expect(retired).toBe(1);
+    expect(await tenancy.withTenant(admin.companyId, (tx) => getRequest(tx, failed!.id))).toMatchObject({
+      status: "REJECTED",
+      rejectionReason: "Beispiel durch einen neuen Lauf ersetzt – das Anlegen war abgebrochen.",
+      errorMessage: null,
+    });
+    const events = await tenancy.withTenant(admin.companyId, (tx) => listAuditEvents(tx, "request", failed!.id));
+    expect(events.filter((event) => event.action === "request.sample_retired")).toHaveLength(1);
+    expect((await samplesOf(admin)).map((sample) => sample.status).sort()).toEqual(["EXPORTED", "REJECTED", "REVIEW"]);
   });
 
   it("the database refuses an unknown request source (migration 0019)", async () => {

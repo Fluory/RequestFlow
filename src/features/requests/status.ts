@@ -12,7 +12,8 @@ export type RequestEvent =
   | "reject.duplicate"
   | "export.succeeded"
   | "export.failed"
-  | "reprocess.export";
+  | "reprocess.export"
+  | "sample.retired";
 
 export type ErrorStage = "processing" | "export";
 
@@ -31,6 +32,10 @@ const TRANSITIONS: Record<RequestEvent, Partial<Record<RequestStatus, RequestSta
   "export.succeeded": { APPROVED: "EXPORTED" },
   "export.failed": { APPROVED: "ERROR" },
   "reprocess.export": { ERROR: "APPROVED" },
+  // A prepared sample (#71) left behind by an aborted seed run (#84) – only through
+  // `retireSampleLeftover`, which checks `isSampleLeftover` (sample; NEW, PROCESSING or ERROR from
+  // processing – never an approved sample whose export failed, #92 review).
+  "sample.retired": { NEW: "REJECTED", PROCESSING: "REJECTED", ERROR: "REJECTED" },
 };
 
 export class InvalidTransition extends Error {

@@ -2,6 +2,7 @@ import { and, asc, desc, eq, gte, inArray, or, sql, type SQL } from "drizzle-orm
 import { requests, type RequestStatus } from "@/db/schema";
 import { tenantOf, type TenantTx } from "@/features/tenancy";
 import { parseCursor, REQUEST_PAGE_SIZE } from "./cursor";
+import { isSampleLeftover } from "./sample-leftover";
 import { nextStatus, type RequestEvent } from "./status";
 
 export type RequestRow = typeof requests.$inferSelect;
@@ -164,6 +165,30 @@ export async function countSamples(tx: TenantTx, statuses: readonly RequestStatu
     .from(requests)
     .where(and(eq(requests.source, "sample"), inArray(requests.status, [...statuses])));
   return row?.count ?? 0;
+}
+
+/** Ids of the tenant's samples an aborted seed run left behind (#84) – see `isSampleLeftover`. */
+export async function listSampleLeftoverIds(tx: TenantTx): Promise<string[]> {
+  tenantOf(tx);
+  const rows = await tx
+    .select({ id: requests.id })
+    .from(requests)
+    .where(
+      and(
+        eq(requests.source, "sample"),
+        or(inArray(requests.status, ["NEW", "PROCESSING"]), and(eq(requests.status, "ERROR"), eq(requests.errorStage, "processing"))),
+      ),
+    );
+  return rows.map((row) => row.id);
+}
+
+/**
+ * Settles a sample leftover on a locked row (#84): rejected with `reason`. The rule lives here, not with
+ * the caller (#92 review) – any other request, or a sample that is no leftover, is left alone (null).
+ */
+export async function retireSampleLeftover(tx: TenantTx, row: RequestRow, reason: string): Promise<RequestRow | null> {
+  if (!isSampleLeftover(row)) return null;
+  return transitionRequest(tx, row, "sample.retired", { rejectionReason: reason, errorStage: null, errorMessage: null, nextRetryAt: null });
 }
 
 /** Requests a user created since `since` (upload rate limit, #59 review) – within the tenant. */

@@ -5,6 +5,11 @@ This file records what changes **in the product** – process and session state 
 
 ## [Unreleased]
 
+### Changed
+- `pnpm seed:samples` first settles samples an aborted run left behind (new, in progress, or failed in
+  processing): rejected with a fixed reason and an audit event, never deleted – the list no longer keeps
+  such leftovers. An approved sample whose export failed is kept (#84).
+
 ### Fixed
 - `/api/health` reports the AI service as `starting` instead of `failed` when it does not answer in time –
   on the showcase usually the cold start of the scaled-to-zero container; after 30 s without an answer it

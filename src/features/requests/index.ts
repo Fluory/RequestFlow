@@ -3,6 +3,7 @@ export {
   countRequestsByStatus,
   countRequestsCreatedBy,
   countSamples,
+  listSampleLeftoverIds,
   createRequest,
   findDuplicate,
   getRequest,
@@ -14,9 +15,11 @@ export {
   recordDuplicateDecision,
   recordExportRetry,
   recordProcessingFailure,
+  retireSampleLeftover,
   transitionRequest,
   type NewRequest,
   type RequestRow,
 } from "./repository";
 export { parseCursor, REQUEST_PAGE_SIZE } from "./cursor";
 export { canTransition, InvalidTransition, nextStatus, type ErrorStage, type RequestEvent } from "./status";
+export { isSampleLeftover } from "./sample-leftover";
