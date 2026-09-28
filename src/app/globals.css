@@ -241,6 +241,25 @@ main {
   font-size: 12.5px;
   color: var(--muted);
 }
+/* Start page (#77): the next step leads to the open work or to the prepared sample. */
+.next-step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+}
+.next-step h2 {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.next-step p {
+  margin: 0;
+  flex: 1;
+  min-width: min(280px, 100%);
+}
+
 .tiles {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));

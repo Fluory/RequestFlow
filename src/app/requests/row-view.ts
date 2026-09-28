@@ -36,3 +36,35 @@ export function requestRowView(request: RowRequest, exportRecord: RowExport | un
   }
   return quiet;
 }
+
+export interface NextAction {
+  label: string;
+  /** `todo`: a clerk has to act; `waiting`: the system is working on it. */
+  kind: "todo" | "waiting";
+}
+
+/**
+ * The next work decision per row (#77): what a clerk has to do, or what the system is doing – null when
+ * the request is settled. An undecided possible duplicate comes before its review (#27: approval needs it).
+ */
+export function nextAction(
+  request: RowRequest & { possibleDuplicate: boolean; duplicateDecision: string | null },
+  exportRecord: RowExport | undefined,
+): NextAction | null {
+  const undecidedDuplicate = request.possibleDuplicate && request.duplicateDecision === null;
+  switch (request.status) {
+    case "REVIEW":
+      return { label: undecidedDuplicate ? "Duplikat entscheiden" : "Prüfen", kind: "todo" };
+    case "NEW":
+      if (undecidedDuplicate) return { label: "Duplikat entscheiden", kind: "todo" };
+      return { label: request.errorMessage ? "Wartet auf neuen Versuch" : "Wird ausgewertet", kind: "waiting" };
+    case "PROCESSING":
+      return { label: request.errorMessage ? "Wartet auf neuen Versuch" : "Wird ausgewertet", kind: "waiting" };
+    case "APPROVED":
+      return { label: exportRecord?.lastError ? "Export wird wiederholt" : "Export läuft", kind: "waiting" };
+    case "ERROR":
+      return { label: "Fehler ansehen", kind: "todo" };
+    default:
+      return null;
+  }
+}

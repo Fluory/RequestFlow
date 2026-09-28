@@ -6,6 +6,7 @@ export {
   listSampleLeftoverIds,
   createRequest,
   findDuplicate,
+  findSampleForVisitors,
   getRequest,
   listRequests,
   type RequestFilter,

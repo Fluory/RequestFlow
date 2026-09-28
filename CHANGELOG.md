@@ -6,6 +6,11 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Changed
+- Request list leads with the next work decision: customer, need for review (the same count as the detail
+  page) and the next action ("Prüfen", "Duplikat entscheiden", "Fehler ansehen", "Export läuft"); attempts, last
+  error and next retry move into an expandable diagnosis per row; no sideways scrolling at 1280 px. The start
+  page names the next step – open reviews, failed requests, or the prepared sample. The review page reads the
+  piece unit as "Stk." and no longer repeats the approval message (#77).
 - `pnpm seed:samples` first settles samples an aborted run left behind (new, in progress, or failed in
   processing): rejected with a fixed reason and an audit event, never deleted – the list no longer keeps
   such leftovers. An approved sample whose export failed is kept (#84).

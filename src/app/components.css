@@ -167,8 +167,9 @@ tbody th {
   color: var(--muted);
   padding-bottom: 7px;
 }
+/* Six columns that wrap (#77): no horizontal scrolling at 1280 px; narrower screens scroll inside .table-wrap. */
 .requests-table {
-  min-width: 1080px;
+  min-width: 760px;
 }
 .requests-table td {
   font-size: 13px;
@@ -190,6 +191,42 @@ tbody th {
 }
 tr.row-error {
   background: var(--error-row);
+}
+.requests-table .customer {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.attention-cell,
+.action-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.next-action {
+  font-weight: 600;
+}
+.waiting {
+  color: var(--text-2);
+}
+.diagnosis summary {
+  cursor: pointer;
+  color: var(--text-2);
+}
+.diagnosis dl {
+  margin: 8px 0 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  max-width: 320px;
+}
+.diagnosis dt {
+  color: var(--muted);
+}
+.diagnosis dd {
+  margin: 0;
+  text-wrap: pretty;
 }
 .status-cell {
   display: flex;

@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { extractedFields, extractionRuns, extractionSegments } from "@/db/schema";
 import { tenantOf, type TenantTx } from "@/features/tenancy";
 import type { ExtractResponse } from "./types";
@@ -121,6 +121,25 @@ export async function latestRun(tx: TenantTx, requestId: string) {
   for (const row of rows) if (row.itemIndex !== null) byItem.set(row.itemIndex, [...(byItem.get(row.itemIndex) ?? []), row]);
   const lineItems = [...byItem.entries()].sort(([a], [b]) => a - b).map(([itemIndex, itemFields]) => ({ itemIndex, fields: itemFields }));
   return { run, fields, lineItems };
+}
+
+/**
+ * The latest run per request with all its fields (#77: request list summaries) – one query per table
+ * instead of one `latestRun` per row.
+ */
+export async function latestRunsWithFields(tx: TenantTx, requestIds: readonly string[]) {
+  tenantOf(tx);
+  const result = new Map<string, { createdAt: Date; fields: Array<typeof extractedFields.$inferSelect> }>();
+  if (requestIds.length === 0) return result;
+  const runs = await tx
+    .selectDistinctOn([extractionRuns.requestId], { id: extractionRuns.id, requestId: extractionRuns.requestId, createdAt: extractionRuns.createdAt })
+    .from(extractionRuns)
+    .where(inArray(extractionRuns.requestId, [...requestIds]))
+    .orderBy(extractionRuns.requestId, desc(extractionRuns.createdAt));
+  if (runs.length === 0) return result;
+  const rows = await tx.select().from(extractedFields).where(inArray(extractedFields.runId, runs.map((run) => run.id)));
+  for (const run of runs) result.set(run.requestId, { createdAt: run.createdAt, fields: rows.filter((row) => row.runId === run.id) });
+  return result;
 }
 
 export async function listSegments(tx: TenantTx, runId: string) {

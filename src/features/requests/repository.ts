@@ -167,6 +167,21 @@ export async function countSamples(tx: TenantTx, statuses: readonly RequestStatu
   return row?.count ?? 0;
 }
 
+/** A prepared sample to show a visitor (#77 start page): one in review first, else an exported one. */
+export async function findSampleForVisitors(tx: TenantTx): Promise<{ id: string; subject: string | null; status: RequestStatus } | null> {
+  tenantOf(tx);
+  for (const status of ["REVIEW", "EXPORTED"] as const) {
+    const [row] = await tx
+      .select({ id: requests.id, subject: requests.subject, status: requests.status })
+      .from(requests)
+      .where(and(eq(requests.source, "sample"), eq(requests.status, status)))
+      .orderBy(desc(requests.createdAt))
+      .limit(1);
+    if (row) return row;
+  }
+  return null;
+}
+
 /** Ids of the tenant's samples an aborted seed run left behind (#84) – see `isSampleLeftover`. */
 export async function listSampleLeftoverIds(tx: TenantTx): Promise<string[]> {
   tenantOf(tx);

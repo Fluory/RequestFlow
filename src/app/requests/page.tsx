@@ -4,8 +4,9 @@ import { drainOnPageView } from "@/app/_server/drain";
 import { getRuntime, requestActor } from "@/app/_server/runtime";
 import { listExportRecords } from "@/features/export";
 import { listRequests, parseCursor, type RequestFilter } from "@/features/requests";
+import { listReviewSummaries } from "@/features/review";
 import { reprocessAction } from "./actions";
-import { requestRowView } from "./row-view";
+import { nextAction, requestRowView } from "./row-view";
 import { SAMPLE_LABEL } from "./sample-label";
 import { REQUEST_STATUS_LABEL } from "./status-labels";
 import { StatusPill } from "./status-pill";
@@ -40,7 +41,8 @@ function pageHref(filter: RequestFilter, after?: string): string {
   return query ? `/requests?${query}` : "/requests";
 }
 
-// Request list (#26): status, attempts, last error with its stage, next retry; reprocess for ERROR.
+// Request list (#26, #77): leads with customer, need for review and the next action; attempts, last error
+// with its stage and next retry sit in an expandable diagnosis per row; reprocess for ERROR.
 export default async function RequestsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const actor = await requestActor();
   if (!actor) redirect("/login");
@@ -48,10 +50,11 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
   const query = await searchParams;
   const filter = filterOf(query);
   const after = parseCursor(query.after) ?? undefined;
-  // One page (#48); export records only for the rows of this page.
-  const { requests, nextCursor, firstPage, exports } = await getRuntime().tenancy.withTenant(actor.companyId, async (tx) => {
+  // One page (#48); export records and review summaries only for the rows of this page.
+  const { requests, nextCursor, firstPage, exports, summaries } = await getRuntime().tenancy.withTenant(actor.companyId, async (tx) => {
     const { rows, nextCursor, firstPage } = await listRequests(tx, filter, { after });
-    return { requests: rows, nextCursor, firstPage, exports: await listExportRecords(tx, rows.map((row) => row.id)) };
+    const ids = rows.map((row) => row.id);
+    return { requests: rows, nextCursor, firstPage, exports: await listExportRecords(tx, ids), summaries: await listReviewSummaries(tx, ids) };
   });
   const paged = !firstPage || nextCursor !== null;
   const done = query.done === "reprocessed" ? pick("reprocessed") : undefined;
@@ -93,39 +96,44 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
             {filter.status || filter.possibleDuplicate ? "Keine Anfragen für diesen Filter." : "Noch keine Anfragen. Laden Sie oben eine E-Mail oder Dateien hoch."}
           </p>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap" data-testid="requests-table-wrap">
             <table className="requests-table">
               <thead>
                 <tr>
                   <th scope="col">Eingang</th>
-                  <th scope="col">Betreff</th>
+                  <th scope="col">Kunde und Betreff</th>
+                  <th scope="col">Prüfbedarf</th>
+                  <th scope="col">Nächste Aktion</th>
                   <th scope="col">Status</th>
-                  <th scope="col" className="num">
-                    Versuche
-                  </th>
-                  <th scope="col">Letzter Fehler</th>
-                  <th scope="col">Nächster Versuch</th>
-                  <th scope="col">Duplikat</th>
-                  <th scope="col">
-                    <span className="visually-hidden">Aktion</span>
-                  </th>
+                  <th scope="col">Diagnose</th>
                 </tr>
               </thead>
               <tbody>
                 {requests.map((request) => {
-                  const row = requestRowView(request, exports.get(request.id));
+                  const exportRecord = exports.get(request.id);
+                  const row = requestRowView(request, exportRecord);
+                  const action = nextAction(request, exportRecord);
+                  const summary = summaries.get(request.id);
+                  const subject = request.subject ?? "(ohne Betreff)";
+                  const inReview = request.status === "REVIEW";
                   const duplicate = !request.possibleDuplicate
                     ? null
                     : request.duplicateDecision === "distinct"
-                      ? "als eigenständig geprüft"
+                      ? "Mögliches Duplikat – als eigenständig geprüft"
                       : request.duplicateDecision === "duplicate"
-                        ? "als Duplikat abgelehnt"
-                        : "Entscheidung offen";
+                        ? "Mögliches Duplikat – als Duplikat abgelehnt"
+                        : "Mögliches Duplikat – Entscheidung offen";
+                  const hasDiagnosis = row.attempts > 0 || row.error !== null || row.nextRetryAt !== null || duplicate !== null;
+                  // A sample in ERROR from processing is not reprocessed: that would call the live model (#71).
+                  const canReprocess = request.status === "ERROR" && !(request.source === "sample" && request.errorStage === "processing");
                   return (
                     <tr key={request.id} data-testid={`request-${request.id}`} className={request.status === "ERROR" ? "row-error" : undefined}>
                       <td className="mono">{dateFormat.format(request.createdAt)}</td>
                       <td className="subject">
-                        <Link href={`/requests/${request.id}`}>{request.subject ?? "(ohne Betreff)"}</Link>
+                        <span className="customer" data-testid="request-customer">
+                          {summary?.company ?? <span className="muted">Kunde noch nicht erkannt</span>}
+                        </span>
+                        <Link href={`/requests/${request.id}`}>{subject}</Link>
                         {request.source === "sample" && (
                           <>
                             {" "}
@@ -135,32 +143,83 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                           </>
                         )}
                       </td>
+                      <td data-testid="request-attention">
+                        {inReview && summary ? (
+                          <div className="attention-cell">
+                            {summary.attention > 0 ? (
+                              <span className="pill pill-warn">⚠ {summary.attention === 1 ? "1 Wert prüfen" : `${summary.attention} Werte prüfen`}</span>
+                            ) : (
+                              summary.missing === 0 && <span className="pill pill-success">alles belegt</span>
+                            )}
+                            {summary.missing > 0 && <span className="muted">{summary.missing === 1 ? "1 Angabe fehlt" : `${summary.missing} Angaben fehlen`}</span>}
+                          </div>
+                        ) : (
+                          <span className="muted">–</span>
+                        )}
+                      </td>
+                      <td data-testid="request-next-action">
+                        {action === null ? (
+                          <span className="muted">–</span>
+                        ) : action.kind === "todo" ? (
+                          <div className="action-cell">
+                            <Link href={`/requests/${request.id}`} className="next-action" aria-label={`${action.label}: ${subject}`}>
+                              {action.label}
+                            </Link>
+                            {canReprocess && (
+                              <form action={reprocessAction}>
+                                <input type="hidden" name="requestId" value={request.id} />
+                                <button type="submit" className="btn-small" aria-label={`Erneut verarbeiten: ${subject}`}>
+                                  Erneut verarbeiten
+                                </button>
+                              </form>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="waiting">{action.label}</span>
+                        )}
+                      </td>
                       <td>
                         <div className="status-cell">
                           <StatusPill status={request.status} />
                           {request.status === "ERROR" && row.stage && <span className="stage">Stufe: {STAGE_LABEL[row.stage]}</span>}
                         </div>
                       </td>
-                      <td className="num mono">{row.attempts > 0 ? row.attempts : "–"}</td>
-                      {/* The stage appears once: in the status for ERROR, as a prefix while retrying. */}
-                      <td className="error-text">{row.error ? `${request.status !== "ERROR" && row.stage ? `${STAGE_LABEL[row.stage]}: ` : ""}${row.error}` : "–"}</td>
-                      <td className="mono">{row.nextRetryAt ? dateFormat.format(row.nextRetryAt) : "–"}</td>
                       <td>
-                        {duplicate === "Entscheidung offen" ? (
-                          <span className="pill pill-warn">Mögliches Duplikat – Entscheidung offen</span>
+                        {hasDiagnosis ? (
+                          <details className="diagnosis">
+                            <summary>
+                              Details<span className="visually-hidden"> zu {subject}</span>
+                            </summary>
+                            <dl>
+                              {row.attempts > 0 && (
+                                <>
+                                  <dt>Versuche</dt>
+                                  <dd className="mono">{row.attempts}</dd>
+                                </>
+                              )}
+                              {row.error && (
+                                <>
+                                  {/* The stage appears once: in the status for ERROR, as a prefix while retrying. */}
+                                  <dt>Letzter Fehler</dt>
+                                  <dd>{`${request.status !== "ERROR" && row.stage ? `${STAGE_LABEL[row.stage]}: ` : ""}${row.error}`}</dd>
+                                </>
+                              )}
+                              {row.nextRetryAt && (
+                                <>
+                                  <dt>Nächster Versuch</dt>
+                                  <dd className="mono">{dateFormat.format(row.nextRetryAt)}</dd>
+                                </>
+                              )}
+                              {duplicate && (
+                                <>
+                                  <dt>Duplikat</dt>
+                                  <dd>{duplicate}</dd>
+                                </>
+                              )}
+                            </dl>
+                          </details>
                         ) : (
-                          (duplicate ?? <span className="muted">–</span>)
-                        )}
-                      </td>
-                      <td className="num">
-                        {/* A sample in ERROR from processing is not reprocessed: that would call the live model (#71). */}
-                        {request.status === "ERROR" && !(request.source === "sample" && request.errorStage === "processing") && (
-                          <form action={reprocessAction}>
-                            <input type="hidden" name="requestId" value={request.id} />
-                            <button type="submit" className="btn-small" aria-label={`Erneut verarbeiten: ${request.subject ?? "(ohne Betreff)"}`}>
-                              Erneut verarbeiten
-                            </button>
-                          </form>
+                          <span className="muted">–</span>
                         )}
                       </td>
                     </tr>
