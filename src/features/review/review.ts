@@ -1,14 +1,15 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { fieldCorrections } from "@/db/schema";
 import { recordAudit } from "@/features/audit";
 import { listDocuments, type DocumentRow } from "@/features/documents";
 import { exportLimitViolations, getExportRecord, type ExportRecord } from "@/features/export";
-import { HEADER_FIELDS, ITEM_FIELDS, latestRun, listSegments } from "@/features/extraction";
+import { HEADER_FIELDS, ITEM_FIELDS, latestRun, latestRunsWithFields, listSegments } from "@/features/extraction";
 import { authorize, type Actor } from "@/features/identity";
 import { enqueueRequestExport, type JobSender } from "@/features/jobs";
 import { canTransition, getRequest, lockRequest, recordDuplicateDecision, transitionRequest, type RequestRow } from "@/features/requests";
 import { tenantOf, type Tenancy, type TenantTx } from "@/features/tenancy";
 import { buildSourceView, type SourceView, type StoredSegment } from "./source-view";
+import { applicableCorrection, correctionKey, latestCorrections, summarizeReview, type ReviewSummary, type SummaryField } from "./summary";
 
 export const FIELD_LABELS: Record<string, string> = {
   company: "Firma",
@@ -83,15 +84,10 @@ export class ReviewRefused extends Error {
   }
 }
 
-/** Corrections are per field and – for line items – per position (#25). */
-const correctionKey = (fieldKey: string, itemIndex: number | null) => (itemIndex === null ? fieldKey : `${fieldKey}#${itemIndex}`);
-
 async function currentCorrections(tx: TenantTx, requestId: string) {
   tenantOf(tx);
   const rows = await tx.select().from(fieldCorrections).where(eq(fieldCorrections.requestId, requestId)).orderBy(asc(fieldCorrections.createdAt));
-  const latest = new Map<string, (typeof rows)[number]>();
-  for (const row of rows) latest.set(correctionKey(row.fieldKey, row.itemIndex), row);
-  return latest;
+  return latestCorrections(rows);
 }
 
 /**
@@ -122,8 +118,7 @@ export async function currentLineItemValues(tx: TenantTx, requestId: string): Pr
     const extracted = new Map(item.fields.map((field) => [field.fieldKey, field.value]));
     return Object.fromEntries(
       ITEM_FIELDS.map((key) => {
-        const correction = corrections.get(correctionKey(key, item.itemIndex));
-        const current = correction && correction.createdAt >= extraction.run.createdAt ? correction : undefined;
+        const current = applicableCorrection(corrections.get(correctionKey(key, item.itemIndex)), item.itemIndex, extraction.run.createdAt);
         return [key, current ? current.newValue : (extracted.get(key) ?? null)];
       }),
     );
@@ -143,9 +138,8 @@ export async function loadReview(tenancy: Tenancy, actor: Actor, requestId: stri
     const corrections = await currentCorrections(tx, requestId);
     type FieldRow = (typeof extraction.fields)[number];
     const toReviewField = (key: string, itemIndex: number | null, field: FieldRow | undefined): ReviewField => {
-      const stored = corrections.get(correctionKey(key, itemIndex));
       // Item positions belong to one run: a correction made before a newer run is not mapped onto it.
-      const correction = itemIndex !== null && stored && stored.createdAt < extraction.run.createdAt ? undefined : stored;
+      const correction = applicableCorrection(corrections.get(correctionKey(key, itemIndex)), itemIndex, extraction.run.createdAt);
       const documentSegments = segments.filter((segment) => segment.documentId === field?.documentId) as Array<StoredSegment & { documentId: string }>;
       const view = field?.segmentId && field.quote ? buildSourceView(documentSegments, { segmentId: field.segmentId, quote: field.quote }) : null;
       const document = documents.find((candidate) => candidate.id === field?.documentId);
@@ -176,6 +170,26 @@ export async function loadReview(tenancy: Tenancy, actor: Actor, requestId: stri
     );
     return { request, fields, lineItems, documents, skippedDocuments, documentNotes, exportRecord };
   });
+}
+
+/**
+ * Customer and need for review for the rows of one list page (#77) – the same rules as `loadReview`, in
+ * three queries for the whole page. Runs in the caller's tenant transaction.
+ */
+export async function listReviewSummaries(tx: TenantTx, requestIds: readonly string[]): Promise<Map<string, ReviewSummary>> {
+  tenantOf(tx);
+  const summaries = new Map<string, ReviewSummary>();
+  if (requestIds.length === 0) return summaries;
+  const runs = await latestRunsWithFields(tx, requestIds);
+  const corrections = await tx.select().from(fieldCorrections).where(inArray(fieldCorrections.requestId, [...requestIds]));
+  for (const requestId of requestIds) {
+    const run = runs.get(requestId);
+    summaries.set(
+      requestId,
+      summarizeReview(run ? { createdAt: run.createdAt, fields: run.fields as SummaryField[] } : null, corrections.filter((correction) => correction.requestId === requestId)),
+    );
+  }
+  return summaries;
 }
 
 async function lockForReview(tx: TenantTx, requestId: string): Promise<RequestRow> {
