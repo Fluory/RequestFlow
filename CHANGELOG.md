@@ -5,6 +5,10 @@ This file records what changes **in the product** – process and session state 
 
 ## [Unreleased]
 
+### Changed
+- `pnpm seed:samples` first settles samples an aborted run left in progress or in error: rejected with a
+  fixed reason and an audit event, never deleted – the list no longer keeps such leftovers (#84).
+
 ## [0.1.0] – 2026-09-27
 
 First release: the pilot scope – intake of e-mail and PDF/Excel/Word, AI extraction with sources and

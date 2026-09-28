@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
+import { recordAudit } from "@/features/audit";
 import { exportRequestJob, type ExportDeps } from "@/features/export";
 import type { Actor } from "@/features/identity";
 import { submitUpload, type IntakeDeps } from "@/features/intake";
 import { markProcessingFailed, processRequestJob, type JobSender } from "@/features/jobs";
-import { countSamples, type RequestRow } from "@/features/requests";
+import { countSamples, listSampleIds, lockRequest, transitionRequest, type RequestRow } from "@/features/requests";
 import { approveRequest } from "@/features/review";
 import { freshSampleMail, recordedAiClient, SAMPLES, sampleRecording, type Sample } from "./samples";
 
@@ -18,6 +19,16 @@ const STILL_SERVING: Record<Sample["purpose"], readonly RequestRow["status"][]> 
 export interface SampleDeps extends IntakeDeps {
   /** The normal export path (ERP adapter, reviewed values) – the exported sample runs through it. */
   export: ExportDeps;
+}
+
+// A sample left in one of these states only means an earlier seed run broke off: samples are never queued.
+const LEFTOVER: readonly RequestRow["status"][] = ["NEW", "PROCESSING", "ERROR"];
+const LEFTOVER_REASON = "Beispiel durch einen neuen Lauf ersetzt – das Anlegen war abgebrochen.";
+
+export interface SeedResult {
+  seeded: SeededSample[];
+  /** Leftovers of aborted runs settled as rejected (#84). */
+  retired: number;
 }
 
 export interface SeededSample {
@@ -54,7 +65,8 @@ function recordingSender(queue?: JobSender): { sender: JobSender; jobId: () => s
  * a sample to the live model; and the export job queued by the approval runs right away, so visitors see
  * the ERP reference without doing anything.
  */
-export async function seedSamples(deps: SampleDeps, actor: Actor): Promise<SeededSample[]> {
+export async function seedSamples(deps: SampleDeps, actor: Actor): Promise<SeedResult> {
+  const retired = await retireLeftovers(deps, actor);
   const seeded: SeededSample[] = [];
   for (const sample of SAMPLES) {
     const serving = await deps.tenancy.withTenant(actor.companyId, (tx) => countSamples(tx, STILL_SERVING[sample.purpose]));
@@ -63,7 +75,25 @@ export async function seedSamples(deps: SampleDeps, actor: Actor): Promise<Seede
     const status = sample.purpose === "exported" ? await approveAndExport(deps, actor, requestId) : "REVIEW";
     seeded.push({ key: sample.key, requestId, status });
   }
-  return seeded;
+  return { seeded, retired };
+}
+
+/**
+ * Settles samples an aborted run left behind (#84): through the status machine, with the reason visible
+ * on the request and an audit event – never deleted. Only samples, only states a finished run never leaves.
+ */
+async function retireLeftovers(deps: SampleDeps, actor: Actor): Promise<number> {
+  return deps.tenancy.withTenant(actor.companyId, async (tx) => {
+    let retired = 0;
+    for (const id of await listSampleIds(tx, LEFTOVER)) {
+      const request = await lockRequest(tx, id);
+      if (!request || request.source !== "sample" || !LEFTOVER.includes(request.status)) continue;
+      await transitionRequest(tx, request, "sample.retired", { rejectionReason: LEFTOVER_REASON, errorStage: null, errorMessage: null, nextRetryAt: null });
+      await recordAudit(tx, { actorUserId: actor.userId, action: "request.sample_retired", entityType: "request", entityId: id, data: { from: request.status } });
+      retired++;
+    }
+    return retired;
+  });
 }
 
 async function createSample(deps: SampleDeps, actor: Actor, sample: Sample): Promise<string> {

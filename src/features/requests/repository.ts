@@ -166,6 +166,16 @@ export async function countSamples(tx: TenantTx, statuses: readonly RequestStatu
   return row?.count ?? 0;
 }
 
+/** Ids of the tenant's samples in one of `statuses` (#84: leftovers of an aborted seed run). */
+export async function listSampleIds(tx: TenantTx, statuses: readonly RequestStatus[]): Promise<string[]> {
+  tenantOf(tx);
+  const rows = await tx
+    .select({ id: requests.id })
+    .from(requests)
+    .where(and(eq(requests.source, "sample"), inArray(requests.status, [...statuses])));
+  return rows.map((row) => row.id);
+}
+
 /** Requests a user created since `since` (upload rate limit, #59 review) – within the tenant. */
 export async function countRequestsCreatedBy(tx: TenantTx, userId: string, since: Date): Promise<number> {
   tenantOf(tx);

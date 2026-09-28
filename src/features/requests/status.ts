@@ -12,7 +12,8 @@ export type RequestEvent =
   | "reject.duplicate"
   | "export.succeeded"
   | "export.failed"
-  | "reprocess.export";
+  | "reprocess.export"
+  | "sample.retired";
 
 export type ErrorStage = "processing" | "export";
 
@@ -31,6 +32,10 @@ const TRANSITIONS: Record<RequestEvent, Partial<Record<RequestStatus, RequestSta
   "export.succeeded": { APPROVED: "EXPORTED" },
   "export.failed": { APPROVED: "ERROR" },
   "reprocess.export": { ERROR: "APPROVED" },
+  // A prepared sample (#71) left behind by an aborted seed run – never a decided one (#84). Samples never
+  // have a queued job, so NEW/PROCESSING/ERROR here only means the run broke off; the caller checks the
+  // request is a sample.
+  "sample.retired": { NEW: "REJECTED", PROCESSING: "REJECTED", ERROR: "REJECTED" },
 };
 
 export class InvalidTransition extends Error {

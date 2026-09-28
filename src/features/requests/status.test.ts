@@ -18,11 +18,19 @@ describe("request status machine (ADR-0001: NEW → PROCESSING → REVIEW → AP
     ["NEW", "reject.duplicate", "REJECTED"],
     ["REVIEW", "reject.duplicate", "REJECTED"],
     ["ERROR", "reject.duplicate", "REJECTED"],
+    // A prepared sample left behind by an aborted seed run is settled (#84) – never a decided one.
+    ["NEW", "sample.retired", "REJECTED"],
+    ["PROCESSING", "sample.retired", "REJECTED"],
+    ["ERROR", "sample.retired", "REJECTED"],
   ] as const)("%s --%s--> %s", (from, event, to) => {
     expect(nextStatus(from, event as RequestEvent)).toBe(to);
   });
 
   it.each([
+    ["REVIEW", "sample.retired"],
+    ["APPROVED", "sample.retired"],
+    ["EXPORTED", "sample.retired"],
+    ["REJECTED", "sample.retired"],
     ["REVIEW", "processing.succeeded"],
     ["EXPORTED", "processing.started"],
     ["NEW", "approve"],

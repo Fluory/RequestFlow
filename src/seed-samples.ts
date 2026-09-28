@@ -38,7 +38,8 @@ async function main(): Promise<void> {
       const cookie = login.headers.getSetCookie().map((line) => line.split(";")[0]).join("; ");
       const actor = await getActor(auth, database.db, new Headers({ cookie }));
       if (!actor) throw new Error(`${email} has no company – run pnpm seed:demo first`);
-      const seeded = await seedSamples(deps, actor);
+      const { seeded, retired } = await seedSamples(deps, actor);
+      if (retired > 0) console.log(`${email}: ${retired} leftover sample(s) of an aborted run rejected`);
       console.log(seeded.length === 0 ? `${email}: samples still in place` : `${email}: ${seeded.map((sample) => `${sample.key} → ${sample.status}`).join(", ")}`);
     }
   } finally {
