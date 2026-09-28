@@ -124,8 +124,9 @@ route; if it is not reachable, the export is queued and the next drain retries i
 once with `pnpm samples:record` (`src/features/samples/data/`) – no model call, so the samples work even while the
 model provider is overloaded. List and detail label them „Vorbereitetes Beispiel – aufgezeichnete KI-Antwort“. The
 step is idempotent: repeat it whenever visitors have decided the samples, and it adds only what is missing.
-Samples an aborted run left behind (in progress or in error) are first set to rejected with a fixed reason and
-an audit event – never deleted (#84).
+Samples an aborted run left behind (new, in progress, or in error from processing) are first set to rejected
+with a fixed reason and an audit event – never deleted (#84). An approved sample whose export failed is kept:
+it can be exported again with „Erneut verarbeiten“.
 
 ## 7. Jobs without a worker
 

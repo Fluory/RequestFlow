@@ -4,7 +4,7 @@ import { exportRequestJob, type ExportDeps } from "@/features/export";
 import type { Actor } from "@/features/identity";
 import { submitUpload, type IntakeDeps } from "@/features/intake";
 import { markProcessingFailed, processRequestJob, type JobSender } from "@/features/jobs";
-import { countSamples, listSampleIds, lockRequest, transitionRequest, type RequestRow } from "@/features/requests";
+import { countSamples, listSampleLeftoverIds, lockRequest, retireSampleLeftover, type RequestRow } from "@/features/requests";
 import { approveRequest } from "@/features/review";
 import { freshSampleMail, recordedAiClient, SAMPLES, sampleRecording, type Sample } from "./samples";
 
@@ -21,8 +21,6 @@ export interface SampleDeps extends IntakeDeps {
   export: ExportDeps;
 }
 
-// A sample left in one of these states only means an earlier seed run broke off: samples are never queued.
-const LEFTOVER: readonly RequestRow["status"][] = ["NEW", "PROCESSING", "ERROR"];
 const LEFTOVER_REASON = "Beispiel durch einen neuen Lauf ersetzt – das Anlegen war abgebrochen.";
 
 export interface SeedResult {
@@ -80,15 +78,17 @@ export async function seedSamples(deps: SampleDeps, actor: Actor): Promise<SeedR
 
 /**
  * Settles samples an aborted run left behind (#84): through the status machine, with the reason visible
- * on the request and an audit event – never deleted. Only samples, only states a finished run never leaves.
+ * on the request and an audit event – never deleted. Which samples count is decided in the requests
+ * module (`isSampleLeftover`, re-checked under the row lock).
  */
 async function retireLeftovers(deps: SampleDeps, actor: Actor): Promise<number> {
   return deps.tenancy.withTenant(actor.companyId, async (tx) => {
     let retired = 0;
-    for (const id of await listSampleIds(tx, LEFTOVER)) {
+    for (const id of await listSampleLeftoverIds(tx)) {
       const request = await lockRequest(tx, id);
-      if (!request || request.source !== "sample" || !LEFTOVER.includes(request.status)) continue;
-      await transitionRequest(tx, request, "sample.retired", { rejectionReason: LEFTOVER_REASON, errorStage: null, errorMessage: null, nextRetryAt: null });
+      if (!request) continue;
+      const settled = await retireSampleLeftover(tx, request, LEFTOVER_REASON);
+      if (!settled) continue;
       await recordAudit(tx, { actorUserId: actor.userId, action: "request.sample_retired", entityType: "request", entityId: id, data: { from: request.status } });
       retired++;
     }

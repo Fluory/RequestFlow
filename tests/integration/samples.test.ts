@@ -139,6 +139,20 @@ describe("prepared samples", () => {
     expect(await jobsFor(QUEUES.exportRequest, exported.id)).toBe(1);
   });
 
+  it("keeps an approved sample whose export failed – it is no leftover (#92 review)", async () => {
+    const admin = actors[1]!;
+    const exported = (await samplesOf(admin)).find((sample) => sample.status === "APPROVED")!;
+    await stack.database.pool.query("delete from pgboss.job where name = $1 and singleton_key = $2", [QUEUES.exportRequest, exported.id]);
+    await tenancy.withTenant(admin.companyId, async (tx) =>
+      transitionRequest(tx, (await lockRequest(tx, exported.id))!, "export.failed", { errorStage: "export", errorMessage: "ERP nicht erreichbar." }),
+    );
+
+    const { retired } = await seedSamples(deps(), admin);
+
+    expect(retired).toBe(0);
+    expect(await tenancy.withTenant(admin.companyId, (tx) => getRequest(tx, exported.id))).toMatchObject({ status: "ERROR", errorStage: "export" });
+  });
+
   it("an aborted run leaves the sample in ERROR, not in progress; the next run replaces it; no live reprocess", async () => {
     const admin = actors[2]!;
     const brokenStorage = Object.assign(Object.create(storage) as S3BlobStore, {
