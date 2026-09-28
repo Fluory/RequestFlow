@@ -11,7 +11,7 @@ import { syntheticExtractResponse } from "@/features/extraction/fixtures";
 import { AuthorizationError, getActor, type Actor } from "@/features/identity";
 import { QUEUES } from "@/features/jobs";
 import { createRequest, getRequest, lockRequest, transitionRequest } from "@/features/requests";
-import { approveRequest, correctField, correctionHistory, loadReview, rejectRequest, ReviewRefused } from "@/features/review";
+import { approveRequest, correctField, correctionHistory, listReviewSummaries, loadReview, rejectRequest, ReviewRefused } from "@/features/review";
 import { createTenancy, type Tenancy } from "@/features/tenancy";
 import { companyWithAdmin, createStack, invitedUser, type Stack } from "./helpers/stack";
 
@@ -53,6 +53,27 @@ describe("review: fields beside their source, corrections, approve or reject", (
   afterAll(async () => {
     await boss.stop({ graceful: false });
     await stack.close();
+  });
+
+  // #77: the list's summary tells the same story as the review page – same data, same rules.
+  it("summarizes customer and need for review exactly like the review page counts them", async () => {
+    const uncertain = { value: "KW 48", status: "uncertain" as const, evidence: { segmentId: "s4", quote: "KW 48" }, modelStatus: "uncertain" as const, reason: "calendar_week_only" as const };
+    const { requestId } = await requestInReview(clerk, { requested_delivery_date: uncertain });
+    const { requestId: corrected } = await requestInReview(clerk, { requested_delivery_date: uncertain });
+    await correctField(tenancy, clerk, corrected, "requested_delivery_date", "2026-11-20");
+    await correctField(tenancy, clerk, corrected, "company", "Musterbau Beispiel GmbH & Co. KG");
+
+    const summaries = await tenancy.withTenant(clerk.companyId, (tx) => listReviewSummaries(tx, [requestId, corrected]));
+
+    for (const id of [requestId, corrected]) {
+      const view = (await loadReview(tenancy, clerk, id))!;
+      const attention = [...view.fields, ...view.lineItems.flatMap((item) => item.fields)].filter(
+        (field) => field.reviewStatus === "uncertain" || field.reviewStatus === "unverified",
+      ).length;
+      expect(summaries.get(id)).toMatchObject({ company: view.fields.find((field) => field.key === "company")!.value, attention });
+    }
+    expect(summaries.get(requestId)!.attention).toBeGreaterThan(0);
+    expect(summaries.get(corrected)).toMatchObject({ company: "Musterbau Beispiel GmbH & Co. KG" });
   });
 
   it("shows every field with status and its source (mail line, quote marked)", async () => {

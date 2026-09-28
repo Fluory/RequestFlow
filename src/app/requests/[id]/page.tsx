@@ -8,6 +8,7 @@ import { requestRowView } from "../row-view";
 import { SAMPLE_EXPLANATION, SAMPLE_LABEL } from "../sample-label";
 import { StatusPill } from "../status-pill";
 import { DONE_MESSAGES, ERROR_MESSAGES, messageFor } from "./messages";
+import { displayValue } from "./value-label";
 import { approveAction, confirmNotDuplicateAction, correctFieldAction, rejectAction, rejectAsDuplicateAction } from "./actions";
 import { DocumentList, needsAttention, Source, STATUS_LABEL, StatusBadge } from "./review-parts";
 
@@ -106,7 +107,8 @@ export default async function RequestPage({
           <strong>Abgelehnt:</strong> {request.rejectionReason}
         </p>
       )}
-      {request.status === "APPROVED" && (
+      {/* Right after the approval its own message already says this (#77 note). */}
+      {request.status === "APPROVED" && query.done !== "approved" && (
         <p className="callout callout-info">
           {exportRecord?.lastError
             ? `Export wird wiederholt (${exportRecord.attempts} Versuche bisher): ${exportRecord.lastError}`
@@ -233,9 +235,9 @@ export default async function RequestPage({
                                   href={fieldHref(field)}
                                   className="item-cell"
                                   aria-current={isSelected(field) ? "true" : undefined}
-                                  aria-label={`Position ${item.itemIndex + 1}, ${field.label}: ${field.value ?? "–"}`}
+                                  aria-label={`Position ${item.itemIndex + 1}, ${field.label}: ${displayValue(field) ?? "–"}`}
                                 >
-                                  <span>{field.value ?? "–"}</span>
+                                  <span>{displayValue(field) ?? "–"}</span>
                                   <StatusBadge status={field.reviewStatus} />
                                 </Link>
                               </td>
@@ -271,7 +273,7 @@ export default async function RequestPage({
               </div>
               <div>
                 <div className="panel-value">
-                  <strong data-testid={selected.itemIndex === null ? undefined : "selected-item-value"}>{selected.value ?? "–"}</strong>
+                  <strong data-testid={selected.itemIndex === null ? undefined : "selected-item-value"}>{displayValue(selected) ?? "–"}</strong>
                   <StatusBadge status={selected.reviewStatus} />
                 </div>
                 {selected.corrected && (

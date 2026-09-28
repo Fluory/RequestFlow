@@ -9,9 +9,19 @@ test("a visitor finds the prepared samples, clearly labelled, one to review and 
   await page.getByRole("button", { name: "Anmelden" }).click();
   await expect(page.getByText("Rolle: Sachbearbeitung")).toBeVisible();
 
+  // #77: the start page names the next step – here the open reviews (the sample waits in review).
+  await expect(page.getByTestId("next-step")).toContainText("warte");
+  await expect(page.getByTestId("next-step").getByRole("link", { name: "Jetzt prüfen" })).toBeVisible();
+
+  // #77: the list leads with customer, need for review and next action – without sideways scrolling at 1280 px.
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/requests");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1280);
   const reviewRow = page.getByRole("row", { name: /Anfrage Rohrbogen und Flansche fuer Werk Ost/ }).first();
   await expect(reviewRow.getByTestId("sample-label")).toHaveText("Vorbereitetes Beispiel – aufgezeichnete KI-Antwort");
+  await expect(reviewRow.getByTestId("request-customer")).toHaveText("Beispiel Anlagenbau GmbH");
+  await expect(reviewRow.getByTestId("request-attention")).toContainText("1 Wert prüfen");
+  await expect(reviewRow.getByTestId("request-next-action")).toContainText("Prüfen");
 
   await reviewRow.getByRole("link", { name: "Anfrage Rohrbogen und Flansche fuer Werk Ost" }).click();
   await expect(page.getByTestId("sample-notice")).toContainText("Vorbereitetes Beispiel – aufgezeichnete KI-Antwort");
