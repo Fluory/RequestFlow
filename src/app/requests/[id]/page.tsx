@@ -278,7 +278,7 @@ export default async function RequestPage({
                 </div>
                 {selected.corrected && (
                   <p className="field-hint">
-                    erkannt: {selected.extractedValue ?? "–"} ({STATUS_LABEL[selected.status]})
+                    erkannt: {displayValue({ key: selected.key, value: selected.extractedValue }) ?? "–"} ({STATUS_LABEL[selected.status]})
                   </p>
                 )}
               </div>
@@ -294,6 +294,7 @@ export default async function RequestPage({
                     <input id="item-correction" name="value" defaultValue={selected.value ?? ""} maxLength={500} />
                     <button type="submit">Speichern</button>
                   </div>
+                  {selected.key === "unit" && <span className="field-hint">Einheit als ERP-Kürzel: pcs (= Stk.), mm, cm, m, kg oder t.</span>}
                   <span className="field-hint">Wird mit altem und neuem Wert, Person und Zeit protokolliert.</span>
                 </form>
               )}

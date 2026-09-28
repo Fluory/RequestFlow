@@ -96,7 +96,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
             {filter.status || filter.possibleDuplicate ? "Keine Anfragen für diesen Filter." : "Noch keine Anfragen. Laden Sie oben eine E-Mail oder Dateien hoch."}
           </p>
         ) : (
-          <div className="table-wrap">
+          <div className="table-wrap" data-testid="requests-table-wrap">
             <table className="requests-table">
               <thead>
                 <tr>
@@ -149,7 +149,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                             {summary.attention > 0 ? (
                               <span className="pill pill-warn">⚠ {summary.attention === 1 ? "1 Wert prüfen" : `${summary.attention} Werte prüfen`}</span>
                             ) : (
-                              <span className="pill pill-success">alles belegt</span>
+                              summary.missing === 0 && <span className="pill pill-success">alles belegt</span>
                             )}
                             {summary.missing > 0 && <span className="muted">{summary.missing === 1 ? "1 Angabe fehlt" : `${summary.missing} Angaben fehlen`}</span>}
                           </div>
@@ -187,7 +187,9 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                       <td>
                         {hasDiagnosis ? (
                           <details className="diagnosis">
-                            <summary>Details</summary>
+                            <summary>
+                              Details<span className="visually-hidden"> zu {subject}</span>
+                            </summary>
                             <dl>
                               {row.attempts > 0 && (
                                 <>

@@ -38,7 +38,7 @@ export default async function HomePage() {
     : failed
       ? { href: "/requests?status=ERROR", label: failed === 1 ? "1 Anfrage ist fehlgeschlagen" : `${failed} Anfragen sind fehlgeschlagen`, action: "Fehler ansehen" }
       : sample
-        ? { href: `/requests/${sample.id}`, label: "Keine offene Arbeit – sehen Sie sich den vorbereiteten Musterfall an", action: "Musterfall öffnen" }
+        ? { href: `/requests/${sample.id}`, label: "Nichts wartet auf Ihre Prüfung – sehen Sie sich den vorbereiteten Musterfall an", action: "Musterfall öffnen" }
         : null;
   const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
   const stats = total ? `${counts.REVIEW ?? 0} zur Prüfung · ${counts.ERROR ?? 0} mit Fehler · ${total} insgesamt` : "Noch keine Anfragen";

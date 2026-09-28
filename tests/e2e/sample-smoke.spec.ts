@@ -17,11 +17,18 @@ test("a visitor finds the prepared samples, clearly labelled, one to review and 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/requests");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1280);
+  const tableWrap = page.getByTestId("requests-table-wrap");
+  expect(await tableWrap.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0);
   const reviewRow = page.getByRole("row", { name: /Anfrage Rohrbogen und Flansche fuer Werk Ost/ }).first();
   await expect(reviewRow.getByTestId("sample-label")).toHaveText("Vorbereitetes Beispiel – aufgezeichnete KI-Antwort");
   await expect(reviewRow.getByTestId("request-customer")).toHaveText("Beispiel Anlagenbau GmbH");
   await expect(reviewRow.getByTestId("request-attention")).toContainText("1 Wert prüfen");
   await expect(reviewRow.getByTestId("request-next-action")).toContainText("Prüfen");
+  // The diagnosis opens by keyboard and names its request (#77 review).
+  const diagnosis = reviewRow.getByText("Details zu Anfrage Rohrbogen und Flansche fuer Werk Ost");
+  await diagnosis.focus();
+  await page.keyboard.press("Enter");
+  await expect(reviewRow.getByText("Versuche")).toBeVisible();
 
   // Exact: the row also holds "Prüfen: <subject>" (#77).
   await reviewRow.getByRole("link", { name: "Anfrage Rohrbogen und Flansche fuer Werk Ost", exact: true }).click();
