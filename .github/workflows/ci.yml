@@ -10,10 +10,11 @@ name: CI
 
 # No branches filter: stacked PRs on slice branches must be checked too.
 # Explicit types: the defaults (opened, synchronize, reopened) never re-run the PR guard when a draft is
-# marked ready (verify-green rule) or when the description is edited.
+# marked ready (verify-green rule) or when the description is edited; `labeled` starts the full run when
+# `verify-full` is added to an open PR (#89).
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, edited]
+    types: [opened, synchronize, reopened, ready_for_review, edited, labeled]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -34,7 +35,10 @@ jobs:
       - name: Detect doc-only changes
         id: diff
         run: |
-          if git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -qvE '^docs/|\.md$'; then
+          # The label `verify-full` counts as a code change (#89): a release PR changes only Markdown
+          # but must still run verify:full (AGENTS.md).
+          forced="${{ contains(github.event.pull_request.labels.*.name, 'verify-full') }}"
+          if [ "$forced" = "true" ] || git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -qvE '^docs/|\.md$'; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
