@@ -28,7 +28,7 @@
     "samples:record": "tsx src/samples-record.ts",
     "contract:types": "openapi-typescript contracts/ai-service.openapi.yaml -o src/features/extraction/ai-service.contract.ts && openapi-typescript contracts/erp-export.openapi.yaml -o src/features/export/erp-export.contract.ts",
     "e2e": "playwright test",
-    "evals": "uv run --project services/ai --directory services/ai python -m requestflow_ai.evals --replay"
+    "evals": "uv run --directory services/ai python -m requestflow_ai.evals --replay"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1138.0",
