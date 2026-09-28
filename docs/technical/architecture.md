@@ -12,10 +12,9 @@ approve them, and exports each approved request exactly once to an ERP (mock in 
 It is a TypeScript modular monolith (`web` + `worker` from one codebase) on PostgreSQL, plus the
 AI service. Decisions and rationale: [ADR-0001](../decisions/ADR-0001-pilot-architecture.md).
 
-**Current state (2026-09-23): #3 skeleton, #4 identity/tenancy, #5 intake** – runnable stack, health
-endpoint, invite-only login, companies, `withTenant()` with forced RLS, upload with atomic enqueue
-and duplicate flags, module boundaries enforced. Tables: [data-model.md](data-model.md). Status per module below (`skeleton` = public
-`index.ts` only).
+**Current state (2026-09-28): pilot scope built** – epics #2, #17 and #18 merged, release v0.1.0 (#86): every
+module below except `audit` and `app` (partial) is built; module boundaries are enforced in `verify`. The showcase runs on Vercel + Supabase with
+the AI service as a Vercel container (epic #19). Tables: [data-model.md](data-model.md). Status per module below.
 
 ## Modules
 

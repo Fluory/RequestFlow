@@ -4,7 +4,9 @@ AI-assisted intake of quote requests for industrial sales teams: extract structu
 e-mails and PDF/Excel/Word attachments, review every value **beside its source**, and export each
 approved request **exactly once** to an ERP.
 
-> **Status:** app skeleton – the stack runs and is checked in CI; product features follow issue by issue.
+> **Status:** pilot scope built and released as [v0.1.0](https://github.com/Fluory/RequestFlow/releases/tag/v0.1.0)
+> (2026-09-28); acceptance pending ([roadmap](docs/product/roadmap.md), M2). A synthetic showcase runs on Vercel
+> for invited visitors.
 > **Reference project:** built like a real customer engagement for a mid-sized machine-building
 > company; the customer is fictional and **all data in this repository is synthetic**.
 
@@ -22,10 +24,26 @@ upload (.eml/.msg/PDF/XLSX/DOCX) → parse → extract with evidence → verify 
 - **Tenant isolation:** repository scoping plus forced PostgreSQL row-level security per company.
 - **Measurable AI quality:** an eval set with per-field metrics gates prompt and model changes.
 
+## What runs today
+
+Each line is a merged PR; details in the [CHANGELOG](CHANGELOG.md).
+
+- Invite-only login, companies, user and role management for admins; forced row-level security on every
+  company-data table (schema `app`), guarded by a test (#31, #37, #38)
+- Upload of `.eml`, `.msg`, PDF (scanned pages via OCR when `AI_PDF_OCR=auto`, marked as such), XLSX and DOCX,
+  several files per request; duplicates flagged and decided in the UI (#32, #40, #44)
+- AI extraction of the header fields and line items with a grounding verifier (#33, #39)
+- Review beside the source with a status per value, audited corrections, approve or reject (#35, #42)
+- Exactly-once export of the reviewed values and positions to the ERP mock (#36, #54)
+- Request list led by the next action, with diagnosis, retries and reprocessing, paged (#43, #58, #95)
+- Eval set of 15 synthetic cases as a CI gate (#41); correlated structured logs and health (#45, #56, #88)
+- Showcase: prepared sample requests replayed from recorded AI answers (#83)
+
 ## Architecture
 
 TypeScript modular monolith (Next.js, Node 24, Drizzle, PostgreSQL 17, pg-boss, Better Auth,
-S3 API) plus a stateless Python AI service (FastAPI, docling, Gemini on Vertex AI in the EU).
+S3 API) plus a stateless Python AI service (FastAPI, docling, Gemini on Vertex AI in the EU; the showcase
+uses the Gemini API free tier with synthetic data only – a dated exception, ADR-0001 D11).
 Rationale, alternatives and trade-offs: [ADR-0001](docs/decisions/ADR-0001-pilot-architecture.md).
 
 ## Documentation map
