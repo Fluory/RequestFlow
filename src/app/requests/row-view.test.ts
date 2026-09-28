@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { requestRowView } from "./row-view";
+import { nextAction, requestRowView } from "./row-view";
 
 const base = { status: "NEW", attempts: 0, errorStage: null, errorMessage: null, nextRetryAt: null } as const;
 const later = new Date("2026-09-23T10:00:00Z");
@@ -35,5 +35,32 @@ describe("request list row (#26)", () => {
       });
     }
     expect(requestRowView({ ...base, status: "APPROVED", attempts: 1 }, undefined)).toEqual({ attempts: 1, stage: null, error: null, nextRetryAt: null });
+  });
+});
+
+// #77: the list leads with the next work decision – what a clerk has to do, or what the system is doing.
+describe("next action (#77)", () => {
+  const row = (status: string, extra: Partial<Parameters<typeof nextAction>[0]> = {}) => ({ ...base, status, possibleDuplicate: false, duplicateDecision: null, ...extra });
+
+  it.each([
+    ["REVIEW", {}, { label: "Prüfen", kind: "todo" }],
+    ["REVIEW", { possibleDuplicate: true, duplicateDecision: null }, { label: "Duplikat entscheiden", kind: "todo" }],
+    ["REVIEW", { possibleDuplicate: true, duplicateDecision: "distinct" }, { label: "Prüfen", kind: "todo" }],
+    ["NEW", { possibleDuplicate: true, duplicateDecision: null }, { label: "Duplikat entscheiden", kind: "todo" }],
+    ["ERROR", {}, { label: "Fehler ansehen", kind: "todo" }],
+    ["APPROVED", {}, { label: "Export läuft", kind: "waiting" }],
+    ["NEW", {}, { label: "Wird ausgewertet", kind: "waiting" }],
+    ["PROCESSING", {}, { label: "Wird ausgewertet", kind: "waiting" }],
+    ["PROCESSING", { errorMessage: "Der KI-Dienst ist gerade ausgelastet." }, { label: "Wartet auf neuen Versuch", kind: "waiting" }],
+  ] as const)("%s %o → %o", (status, extra, expected) => {
+    expect(nextAction(row(status, extra as Partial<Parameters<typeof nextAction>[0]>), undefined)).toEqual(expected);
+  });
+
+  it("names a retrying export", () => {
+    expect(nextAction(row("APPROVED"), { attempts: 2, lastError: "ERP nicht erreichbar." })).toEqual({ label: "Export wird wiederholt", kind: "waiting" });
+  });
+
+  it.each(["EXPORTED", "REJECTED"])("has nothing to do for a settled request (%s)", (status) => {
+    expect(nextAction(row(status), undefined)).toBeNull();
   });
 });
