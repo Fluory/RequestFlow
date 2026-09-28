@@ -5,6 +5,12 @@ This file records what changes **in the product** – process and session state 
 
 ## [Unreleased]
 
+## [0.1.0] – 2026-09-27
+
+First release: the pilot scope – intake of e-mail and PDF/Excel/Word, AI extraction with sources and
+uncertainty, review with corrections, exactly-once ERP export, multi-tenancy, audit trail and the public
+showcase with prepared samples.
+
 ### Added
 - Prepared samples for the showcase (`pnpm seed:samples`): per demo company one synthetic request to review
   (with an uncertain and a missing value) and one already approved and exported through the normal path. Their

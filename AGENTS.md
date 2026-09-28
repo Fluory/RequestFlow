@@ -67,7 +67,7 @@ Stages: this card + issue → PR diff + module + tests → neighbouring interfac
 
 ## Skill register (load on demand – not everything up front)
 
-Installed in `.claude/skills/` (core, always): **start-work · finish-work · review-pr · plan-issue**.
+Installed in `.claude/skills/` (core, always): **start-work · finish-work · review-pr · plan-issue**; installed on trigger: **release** (v0.1.0).
 Others exist as templates in `Entwicklungsplan/templates/skills/` and are installed once their trigger occurs:
 `project-start`/`project-plan`/`setup-project` (founding: discovery → plan → setup after approval) · `architecture-decision` · `legacy-audit` · `refactor-module` · `security-review` (from P1) ·
 `ai-eval` (AI/RAG) · `database-migration` (DB) · `infra-change` (infra) · `observability`/`incident` (operations) ·
