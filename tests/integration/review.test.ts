@@ -6,12 +6,23 @@ import { loadConfig } from "@/config/env";
 import { createJobQueue } from "@/db/job-queue-client";
 import { listAuditEvents } from "@/features/audit";
 import { insertDocuments } from "@/features/documents";
+import { buildQuoteRequest } from "@/features/export";
 import { persistExtractionRun } from "@/features/extraction";
 import { syntheticExtractResponse } from "@/features/extraction/fixtures";
 import { AuthorizationError, getActor, type Actor } from "@/features/identity";
 import { QUEUES } from "@/features/jobs";
 import { createRequest, getRequest, lockRequest, transitionRequest } from "@/features/requests";
-import { approveRequest, correctField, correctionHistory, listReviewSummaries, loadReview, rejectRequest, ReviewRefused } from "@/features/review";
+import {
+  approveRequest,
+  correctField,
+  correctionHistory,
+  currentFieldValues,
+  currentLineItemValues,
+  listReviewSummaries,
+  loadReview,
+  rejectRequest,
+  ReviewRefused,
+} from "@/features/review";
 import { createTenancy, type Tenancy } from "@/features/tenancy";
 import { companyWithAdmin, createStack, invitedUser, type Stack } from "./helpers/stack";
 
@@ -197,6 +208,40 @@ describe("review: fields beside their source, corrections, approve or reject", (
       );
     await expect(insertCorrection(-1)).rejects.toMatchObject({ cause: { code: "23514", constraint: "field_corrections_item_index_check" } });
     await expect(insertCorrection(1)).resolves.toBeDefined();
+  });
+
+  it("stores a unit correction like the extraction – „Stk.“ as the ERP unit pcs – and audits what was typed (#96)", async () => {
+    const none = { value: null, status: "missing" as const, evidence: null, modelStatus: "missing" as const, reason: null };
+    const item = (index: number) => ({ index, description: { ...none }, quantity: { ...none }, unit: { ...none }, material: { ...none }, dimensions: { ...none } });
+    const requestId = randomUUID();
+    const documentId = randomUUID();
+    await tenancy.withTenant(clerk.companyId, async (tx) => {
+      await createRequest(tx, { id: requestId, createdBy: clerk.userId });
+      await insertDocuments(tx, [
+        { id: documentId, requestId, filename: "anfrage.eml", contentType: "message/rfc822", kind: "eml", sizeBytes: 10, sha256: "u".repeat(64), storageKey: `${clerk.companyId}/${requestId}/${documentId}` },
+      ]);
+      const row = await transitionRequest(tx, (await lockRequest(tx, requestId))!, "processing.started", { attempts: 1 });
+      await persistExtractionRun(tx, { requestId, jobId: randomUUID(), outcomes: [{ documentId, response: syntheticExtractResponse(documentId, {}, [item(0), item(1)]) }] });
+      await transitionRequest(tx, row, "processing.succeeded");
+    });
+
+    await correctField(tenancy, clerk, requestId, "unit", " Stk. ", 0);
+    await correctField(tenancy, clerk, requestId, "unit", "Rolle", 1);
+    // Typed again as "Stück": the same ERP unit – nothing new to store or audit.
+    await correctField(tenancy, clerk, requestId, "unit", "Stück", 0);
+
+    const units = (await loadReview(tenancy, clerk, requestId))!.lineItems.map((line) => line.fields.find((field) => field.key === "unit")?.value);
+    expect(units).toEqual(["pcs", "Rolle"]);
+    const corrections = (await auditOf(clerk, requestId)).filter((event) => event.action === "field.corrected").map((event) => event.data);
+    expect(corrections).toEqual([
+      { field: "unit", item: 0, oldValue: null, newValue: "pcs", entered: "Stk." },
+      { field: "unit", item: 1, oldValue: null, newValue: "Rolle" },
+    ]);
+
+    await approveRequest({ tenancy, boss }, clerk, requestId);
+    const payload = await tenancy.withTenant(clerk.companyId, async (tx) => buildQuoteRequest(tx, (await getRequest(tx, requestId))!, currentFieldValues, currentLineItemValues));
+    expect(payload.lineItems?.map((line) => line.unit)).toEqual(["pcs", "Rolle"]);
+    await stack.database.pool.query("delete from pgboss.job where name = $1 and singleton_key = $2", [QUEUES.exportRequest, requestId]);
   });
 
   it("keeps failed attachments and skipped OCR pages per document for the review (#23)", async () => {

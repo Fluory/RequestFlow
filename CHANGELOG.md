@@ -6,6 +6,9 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Changed
+- A unit correction is stored like the extraction stores units: „Stk.“, „Stück“ or „Meter“ become the ERP units
+  `pcs` and `m`; other units stay as typed. The correction field shows „Stk.“, and the audit event keeps what
+  was typed (#96).
 - Request list leads with the next work decision: customer, need for review (the same count as the detail
   page) and the next action ("Prüfen", "Duplikat entscheiden", "Fehler ansehen", "Export läuft"); attempts, last
   error and next retry move into an expandable diagnosis per row; no sideways scrolling at 1280 px. The start
