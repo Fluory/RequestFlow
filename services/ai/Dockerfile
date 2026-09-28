@@ -41,10 +41,12 @@ RUN useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin app
 USER 10001
 # <<< shared
 
+# >>> shared: runtime
 # No runtime downloads: models are baked in or not used.
 ENV PATH=/app/.venv/bin:$PATH \
     HF_HUB_OFFLINE=1
 
 EXPOSE 8080
+# <<< shared
 CMD ["uvicorn", "requestflow_ai.api.app:create_app", "--factory", \
      "--host", "0.0.0.0", "--port", "8080", "--no-access-log", "--no-server-header"]
