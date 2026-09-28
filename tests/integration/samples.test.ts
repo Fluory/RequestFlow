@@ -77,6 +77,10 @@ describe("prepared samples", () => {
     expect(statuses).toContain("uncertain");
     expect(statuses).toContain("missing");
     expect(view!.lineItems.length).toBeGreaterThan(0);
+    // #74: the positions come as a PDF, and the uncertain delivery week opens on its page with the box.
+    expect(view!.documents.map((document) => document.filename)).toEqual(["werk-ost.eml", "werk-ost-positionen.pdf"]);
+    const uncertain = view!.fields.find((field) => field.status === "uncertain");
+    expect(uncertain?.source).toMatchObject({ kind: "pdf", filename: "werk-ost-positionen.pdf", region: { page: 1 } });
     // The original is stored like any upload, so "Original öffnen" works.
     expect(new TextDecoder().decode(await storage.get(view!.documents[0]!.storageKey))).toContain("Subject: Anfrage Rohrbogen und Flansche fuer Werk Ost");
 

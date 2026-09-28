@@ -5,6 +5,13 @@ This file records what changes **in the product** – process and session state 
 
 ## [Unreleased]
 
+### Added
+- The review page shows the original PDF page beside the values, with the place the AI read a value from
+  highlighted; selecting another value (mouse or keyboard) moves the highlight. Uncertain, missing and
+  unverified values say why in plain language (e.g. "Kalenderwoche ohne Datum"). The page is rendered in the
+  browser with pdf.js from the protected document download – no third-party request (#74, ADR-0002). The
+  review sample now comes with its position list as a PDF.
+
 ### Changed
 - Request list leads with the next work decision: customer, need for review (the same count as the detail
   page) and the next action ("Prüfen", "Duplikat entscheiden", "Fehler ansehen", "Export läuft"); attempts, last

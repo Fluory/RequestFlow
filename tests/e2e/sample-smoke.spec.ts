@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
 
 // Smoke (#71): the prepared samples from the global setup are labelled in list and detail, the review
-// sample shows why a person must check, and the exported sample carries its ERP reference.
+// sample shows why a person must check – on the original PDF page (#74) – and the exported sample carries
+// its ERP reference.
 test("a visitor finds the prepared samples, clearly labelled, one to review and one exported", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel("E-Mail").fill("sachbearbeitung@musterbau.example.com");
@@ -35,6 +36,22 @@ test("a visitor finds the prepared samples, clearly labelled, one to review and 
   await expect(page.getByTestId("sample-notice")).toContainText("Vorbereitetes Beispiel – aufgezeichnete KI-Antwort");
   await expect(page.getByTestId("request-status")).toHaveText("Zur Prüfung");
   await expect(page.getByText(/braucht Aufmerksamkeit|brauchen Aufmerksamkeit/)).toBeVisible();
+
+  // #74: the uncertain delivery week sits on the original PDF page – rendered, its box highlighted – and
+  // the panel says why in plain language.
+  await page.getByRole("row", { name: /Gewünschter Liefertermin/ }).getByRole("link", { name: "Quelle anzeigen" }).click();
+  const pdfPage = page.getByTestId("pdf-page");
+  await expect(pdfPage).toHaveAttribute("data-state", "rendered");
+  const highlight = page.getByTestId("pdf-highlight");
+  await expect(highlight).toBeVisible();
+  await expect(page.getByTestId("selected-reason")).toContainText("Kalenderwoche ohne Datum");
+  const lineWidth = (await highlight.boundingBox())!.width;
+  // By keyboard to a position's quantity: the highlight moves to that table cell – far narrower than the line.
+  await page.getByRole("link", { name: /^Position 1, Menge:/ }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("selected-item-value")).toHaveText("8");
+  await expect(pdfPage).toHaveAttribute("data-state", "rendered");
+  await expect.poll(async () => (await highlight.boundingBox())?.width ?? lineWidth).toBeLessThan(lineWidth / 3);
 
   await page.goto("/requests");
   await page.getByRole("link", { name: "Anfrage Dichtungssatz fuer Pumpe P-204", exact: true }).first().click();
