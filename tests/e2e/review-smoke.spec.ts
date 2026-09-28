@@ -36,6 +36,14 @@ test("a clerk uploads a request, reviews it beside its source, corrects a value,
   }).toPass({ timeout: 60_000 });
 
   await expect(page.getByTestId("value-contact_person")).toHaveText("Erika Beispiel");
+  // #103: at 1280 px the header fields fit their card – no "Speichern" scrolled out of sight. Measured on the
+  // table's own scroll container: a click would scroll the button into view and never notice.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const fieldsWrap = page.getByTestId("fields-table-wrap");
+  expect(await fieldsWrap.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0);
+  const wrapBox = (await fieldsWrap.boundingBox())!;
+  const saveBox = (await page.getByRole("row", { name: /Firma/ }).getByRole("button", { name: "Speichern" }).boundingBox())!;
+  expect(saveBox.x + saveBox.width).toBeLessThanOrEqual(wrapBox.x + wrapBox.width);
   await page.getByRole("row", { name: /Ansprechpartner/ }).getByRole("link", { name: "Quelle anzeigen" }).click();
   await expect(page.locator("mark")).toHaveText("Erika Beispiel");
 

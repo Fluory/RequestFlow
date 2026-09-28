@@ -123,11 +123,11 @@
 .fields-table .correct input {
   font-size: 13px;
   padding: 6px 8px;
-  width: 11rem;
+  width: 10rem;
 }
-.fields-table .source-col {
+.fields-table .source-link {
+  margin-top: 4px;
   font-size: 13px;
-  white-space: nowrap;
 }
 
 /* Positions */
