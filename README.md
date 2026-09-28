@@ -5,7 +5,7 @@ e-mails and PDF/Excel/Word attachments, review every value **beside its source**
 approved request **exactly once** to an ERP.
 
 > **Status:** pilot scope built and released as [v0.1.0](https://github.com/Fluory/RequestFlow/releases/tag/v0.1.0)
-> (2026-09-27); acceptance pending ([roadmap](docs/product/roadmap.md), M2). A synthetic showcase runs on Vercel
+> (2026-09-28); acceptance pending ([roadmap](docs/product/roadmap.md), M2). A synthetic showcase runs on Vercel
 > for invited visitors.
 > **Reference project:** built like a real customer engagement for a mid-sized machine-building
 > company; the customer is fictional and **all data in this repository is synthetic**.
@@ -29,7 +29,7 @@ upload (.eml/.msg/PDF/XLSX/DOCX) → parse → extract with evidence → verify 
 Each line is a merged PR; details in the [CHANGELOG](CHANGELOG.md).
 
 - Invite-only login, companies, user and role management for admins; forced row-level security on every
-  table, guarded by a test (#31, #37, #38)
+  company-data table (schema `app`), guarded by a test (#31, #37, #38)
 - Upload of `.eml`, `.msg`, PDF (scanned pages via OCR when `AI_PDF_OCR=auto`, marked as such), XLSX and DOCX,
   several files per request; duplicates flagged and decided in the UI (#32, #40, #44)
 - AI extraction of the header fields and line items with a grounding verifier (#33, #39)

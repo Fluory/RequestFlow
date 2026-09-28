@@ -13,7 +13,7 @@ It is a TypeScript modular monolith (`web` + `worker` from one codebase) on Post
 AI service. Decisions and rationale: [ADR-0001](../decisions/ADR-0001-pilot-architecture.md).
 
 **Current state (2026-09-28): pilot scope built** – epics #2, #17 and #18 merged, release v0.1.0 (#86): every
-module below is built; module boundaries are enforced in `verify`. The showcase runs on Vercel + Supabase with
+module below except `audit` and `app` (partial) is built; module boundaries are enforced in `verify`. The showcase runs on Vercel + Supabase with
 the AI service as a Vercel container (epic #19). Tables: [data-model.md](data-model.md). Status per module below.
 
 ## Modules

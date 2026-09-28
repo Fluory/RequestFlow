@@ -25,7 +25,7 @@ This file records what changes **in the product** – process and session state 
   on the showcase usually the cold start of the scaled-to-zero container; after 30 s without an answer it
   reads `failed` again, so a real outage is not hidden (#81).
 
-## [0.1.0] – 2026-09-27
+## [0.1.0] – 2026-09-28
 
 First release: the pilot scope – intake of e-mail and PDF/Excel/Word, AI extraction with sources and
 uncertainty, review with corrections, exactly-once ERP export, multi-tenancy, audit trail and the public
