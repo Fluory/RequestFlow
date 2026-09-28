@@ -17,7 +17,7 @@ This file records what changes **in the product** – process and session state 
 
 ### Fixed
 - Two `pnpm seed:samples` runs for the same company at the same time no longer interfere: the second waits for
-  the first and then finds the samples in place, or stops after a minute with a clear message (#93).
+  the first and then finds the samples in place, or stops after 20 seconds with a clear message (#93).
 - `/api/health` reports the AI service as `starting` instead of `failed` when it does not answer in time –
   on the showcase usually the cold start of the scaled-to-zero container; after 30 s without an answer it
   reads `failed` again, so a real outage is not hidden (#81).

@@ -129,7 +129,7 @@ step is idempotent: repeat it whenever visitors have decided the samples, and it
 Samples an aborted run left behind (new, in progress, or in error from processing) are first set to rejected
 with a fixed reason and an audit event – never deleted (#84). An approved sample whose export failed is kept:
 it can be exported again with „Erneut verarbeiten“. Only one run per company works at a time (#93): a second
-run started meanwhile waits for the first and then finds the samples in place; after a minute it stops with
+run started meanwhile waits for the first and then finds the samples in place; after 20 seconds it stops with
 „Another sample seed run for this company is still in progress“ – run it again later.
 
 ## 7. Jobs without a worker

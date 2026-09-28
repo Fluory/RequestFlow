@@ -9,7 +9,8 @@ export class SeedRunBusy extends Error {
   }
 }
 
-const LOCK_TIMEOUT = "55P03";
+// Waiting ends either way: at our `lock_timeout`, or at a lower `statement_timeout` of pool or role.
+const GAVE_UP = new Set(["55P03", "57014"]);
 
 /**
  * One seed run per company at a time (#93). A transaction-level advisory lock – like the duplicate
@@ -23,7 +24,7 @@ export async function lockSeedRun(tx: TenantTx, timeoutMs: number): Promise<void
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`seed-samples:${tenantOf(tx)}`}, 0))`);
   } catch (error) {
     const code = (error as { code?: unknown; cause?: { code?: unknown } }).cause?.code ?? (error as { code?: unknown }).code;
-    if (code === LOCK_TIMEOUT) throw new SeedRunBusy();
+    if (typeof code === "string" && GAVE_UP.has(code)) throw new SeedRunBusy();
     throw error;
   }
 }

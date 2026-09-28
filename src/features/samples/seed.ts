@@ -20,11 +20,13 @@ const STILL_SERVING: Record<Sample["purpose"], readonly RequestRow["status"][]> 
 export interface SampleDeps extends IntakeDeps {
   /** The normal export path (ERP adapter, reviewed values) – the exported sample runs through it. */
   export: ExportDeps;
-  /** How long a run waits for another run of the same company (#93); default one minute. */
+  /** How long a run waits for another run of the same company (#93); default 20 s. */
   seedLockTimeoutMs?: number;
 }
 
-const SEED_LOCK_TIMEOUT_MS = 60_000;
+// Below the 30 s `statement_timeout` of pool and role (`src/db/client.ts`, Supabase bootstrap), which would
+// otherwise end the wait first (#99 review).
+const SEED_LOCK_TIMEOUT_MS = 20_000;
 
 const LEFTOVER_REASON = "Beispiel durch einen neuen Lauf ersetzt – das Anlegen war abgebrochen.";
 
