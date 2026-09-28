@@ -97,9 +97,10 @@ never its message) and `logger` for records of a library (docling, httpx, uvicor
   with `docker compose logs web worker ai | grep <requestId>`.
 - `/api/health` also reports `dependencies.aiService` and `backlog` (waiting jobs per queue). Both are
   informational and never turn the status into 503 – the AI service is an optional compose profile.
-  `aiService` is `ok` (answered), `failed` (answered with an error or refused the connection) or `starting`
-  (no answer within the probe's time limit – on the showcase usually the cold start of the scaled-to-zero
-  container, which the probe itself triggers; the next probe after the 10 s cache normally reads `ok`, #81).
+  `aiService` is `ok` (answered), `failed` (answered with an error, refused the connection, or no answer for
+  more than 30 s) or `starting` (no answer within the probe's 2 s – on the showcase usually the cold start of
+  the scaled-to-zero container, which the probe itself triggers; once it has started, the next call reads `ok`.
+  A failed or timed-out probe is not cached, #81/#88).
 
 ## Deploy step
 

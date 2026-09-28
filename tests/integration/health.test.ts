@@ -30,6 +30,24 @@ describe("GET /api/health", () => {
     });
   });
 
+  // #81/#88: the real undici abort of pingAiService (AbortSignal.timeout) reads as starting, not failed.
+  it("reports an AI service that does not answer in time as starting", async () => {
+    const server = createServer(() => {
+      // accepts the connection, never answers – like a container still starting
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    try {
+      vi.stubEnv("AI_SERVICE_URL", `http://127.0.0.1:${(server.address() as AddressInfo).port}`);
+      const { status, body } = await callHealth();
+
+      expect(status).toBe(200);
+      expect(body.dependencies).toEqual({ aiService: "starting" });
+    } finally {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
+  });
+
   it("reports the AI service as reachable when its /healthz answers", async () => {
     const server = createServer((request, response) => void response.writeHead(request.url === "/healthz" ? 200 : 404).end('{"status":"ok"}'));
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));

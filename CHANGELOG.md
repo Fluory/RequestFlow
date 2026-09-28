@@ -91,7 +91,8 @@ This file records what changes **in the product** – process and session state 
 
 ### Fixed
 - `/api/health` reports the AI service as `starting` instead of `failed` when it does not answer in time –
-  on the showcase usually the cold start of the scaled-to-zero container (#81).
+  on the showcase usually the cold start of the scaled-to-zero container; after 30 s without an answer it
+  reads `failed` again, so a real outage is not hidden (#81).
 - Processing errors name the actual cause: when the model provider fails (e.g. overloaded), staff read
   "Das KI-Modell des Anbieters war nicht verfügbar (z. B. überlastet)." instead of "Der KI-Dienst ist nicht
   erreichbar."; a busy or disturbed AI service and an unusable model answer have their own texts (#80).

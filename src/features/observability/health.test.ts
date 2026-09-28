@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cachedFor, runHealthChecks } from "./health";
+import { cachedFor, runHealthChecks, withStartupGrace } from "./health";
 
 const ok = async () => {};
 const failing = async () => {
@@ -74,6 +74,40 @@ describe("runHealthChecks", () => {
 
     expect(result.httpStatus).toBe(503);
     expect(result.report).toMatchObject({ status: "degraded", checks: { database: "failed" }, dependencies: { aiService: "starting" } });
+  });
+
+  // #88 review: a dependency that keeps timing out is not starting any more – a cold start takes ~6 s.
+  it("reports a dependency that keeps timing out beyond the grace period as failed, and starting again after an answer", async () => {
+    let clock = 0;
+    let answering = false;
+    const probe = withStartupGrace(
+      async () => {
+        if (!answering) throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+      },
+      30_000,
+      () => clock,
+    );
+    const state = async () => (await runHealthChecks({ database: ok }, { timeoutMs: 100, dependencies: { aiService: probe } })).report.dependencies?.aiService;
+
+    expect(await state()).toBe("starting");
+    clock = 29_999;
+    expect(await state()).toBe("starting");
+    clock = 30_001;
+    expect(await state()).toBe("failed");
+
+    answering = true;
+    expect(await state()).toBe("ok");
+    answering = false;
+    clock = 40_000;
+    expect(await state()).toBe("starting"); // a new cold start gets a new grace period
+  });
+
+  it("does not delay a real error: a refused connection is failed at once", async () => {
+    const probe = withStartupGrace(failing, 30_000, () => 0);
+
+    const result = await runHealthChecks({ database: ok }, { timeoutMs: 100, dependencies: { aiService: probe } });
+
+    expect(result.report.dependencies).toEqual({ aiService: "failed" });
   });
 
   it("times out a hanging gauge as unknown (null) and never leaks error text", async () => {

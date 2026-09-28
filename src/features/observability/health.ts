@@ -9,7 +9,7 @@ export type DependencyResult = CheckResult | "starting";
 export interface HealthReport {
   status: "ok" | "degraded";
   checks: Record<string, CheckResult>;
-  /** Informational (#28): reachable or not – does not change the HTTP status (e.g. the optional AI profile). */
+  /** Informational (#28, #81): ok, failed or starting – does not change the HTTP status (e.g. the optional AI profile). */
   dependencies?: Record<string, DependencyResult>;
   /** Informational (#28): jobs waiting per queue; null when unknown. */
   backlog?: Record<string, number | null>;
@@ -20,8 +20,9 @@ export interface HealthResult {
   report: HealthReport;
 }
 
-// A check fails by throwing or by exceeding the time limit. Error details stay out of the
-// report on purpose: /api/health is reachable without login and must not leak hosts or users.
+// A required check fails by throwing or by exceeding the time limit; an informational dependency that
+// does not answer in time is `starting` (#81). Error details stay out of the report on purpose:
+// /api/health is reachable without login and must not leak hosts or users.
 export async function runHealthChecks(
   checks: Record<string, HealthCheck>,
   options: { timeoutMs: number; dependencies?: Record<string, HealthCheck>; backlog?: Record<string, () => Promise<number>> },
@@ -57,6 +58,29 @@ export async function runHealthChecks(
 }
 
 const TIMED_OUT = Symbol("timed out");
+
+/**
+ * A dependency that keeps timing out is not starting any more (#88 review): a cold start takes about
+ * 6 s, so timeouts for longer than `graceMs` read as failed – a wrong address, a dropped connection or a
+ * hanging service would otherwise show `starting` for ever. An answer (or a real error) ends the period.
+ */
+export function withStartupGrace(check: HealthCheck, graceMs: number, now: () => number = Date.now): HealthCheck {
+  let timingOutSince: number | undefined;
+  return async () => {
+    try {
+      await check();
+      timingOutSince = undefined;
+    } catch (error) {
+      if (!isTimeout(error)) {
+        timingOutSince = undefined;
+        throw error;
+      }
+      timingOutSince ??= now();
+      if (now() - timingOutSince > graceMs) throw new Error("no answer beyond the startup grace period");
+      throw error;
+    }
+  };
+}
 // Our own limit, or the probe's AbortSignal.timeout (a DOMException named TimeoutError).
 const isTimeout = (error: unknown) => error === TIMED_OUT || (error instanceof Error && error.name === "TimeoutError");
 
