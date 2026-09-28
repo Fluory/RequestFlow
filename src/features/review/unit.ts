@@ -1,7 +1,9 @@
 // Units as the ERP expects them (#96). A unit correction folds a known spelling to the canonical unit
-// exactly like the AI service does for extracted values (`canonical_unit` in
-// services/ai/src/requestflow_ai/grounding/values.py); a parity test keeps both tables in step.
-// An unknown unit stays as entered – the ERP contract accepts it as written.
+// like the AI service does for extracted values (`canonical_unit` in
+// services/ai/src/requestflow_ai/grounding/values.py): the same spellings – a parity test keeps both
+// tables in step – and the same normalisation steps for what a single-line field can hold (exotic
+// control or line-break characters may differ). An unknown unit stays as entered – the ERP contract
+// accepts it as written.
 
 /** Canonical unit → spellings, compared normalised and without a trailing dot. */
 export const UNIT_SPELLINGS: Readonly<Record<string, readonly string[]>> = {

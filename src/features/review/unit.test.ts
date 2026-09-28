@@ -17,14 +17,16 @@ describe("canonicalUnit", () => {
     expect(canonicalUnit("")).toBeNull();
   });
 
-  it("uses exactly the spellings of the AI service, so a correction and an extraction never differ", () => {
+  it("uses the same spellings as the AI service, so a correction and an extraction fold units alike", () => {
     const source = readFileSync(new URL("../../../services/ai/src/requestflow_ai/grounding/values.py", import.meta.url), "utf8");
     const block = /_UNIT_SPELLINGS: dict\[str, tuple\[str, \.\.\.\]\] = \{\n([\s\S]*?)\n\}/.exec(source)?.[1];
     expect(block, "the unit table moved – update this test and src/features/review/unit.ts").toBeDefined();
     const python = Object.fromEntries(
       block!.split("\n").map((line) => {
-        const [, canonical, spellings] = /^\s*"(\w+)": \((.*)\),$/.exec(line) ?? [];
-        return [canonical, [...(spellings ?? "").matchAll(/"([^"]+)"/g)].map((match) => match[1])];
+        const parsed = /^\s*"(\w+)": \((.*)\),$/.exec(line);
+        // One entry per line; a reformatted table (e.g. wrapped by ruff) must fail clearly, not as a diff of undefined.
+        if (!parsed) throw new Error(`unexpected line in _UNIT_SPELLINGS – adapt this parser: ${JSON.stringify(line)}`);
+        return [parsed[1], [...parsed[2]!.matchAll(/"([^"]+)"/g)].map((match) => match[1])];
       }),
     );
 
