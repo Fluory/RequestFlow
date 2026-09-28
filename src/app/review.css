@@ -129,6 +129,11 @@
   margin-top: 4px;
   font-size: 13px;
 }
+/* #103: real room at 1280 px – a long unbroken value (an e-mail address) wraps anywhere, and the status cell
+   may wrap its hints and link (the badge itself never wraps), so neither sets a wide minimum for the table. */
+.fields-table .value-cell {
+  overflow-wrap: anywhere;
+}
 
 /* Positions */
 .items-table {
