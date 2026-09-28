@@ -6,7 +6,7 @@ import { submitUpload, type IntakeDeps } from "@/features/intake";
 import { markProcessingFailed, processRequestJob, type JobSender } from "@/features/jobs";
 import { countSamples, listSampleLeftoverIds, lockRequest, retireSampleLeftover, type RequestRow } from "@/features/requests";
 import { approveRequest } from "@/features/review";
-import { freshSampleMail, recordedAiClient, SAMPLES, sampleRecording, type Sample } from "./samples";
+import { freshSampleFiles, recordedAiClient, SAMPLES, sampleRecordings, type Sample } from "./samples";
 
 // While a sample of a purpose is in one of these statuses it still serves that purpose – no new one.
 // Only settled states count (#83 review): a sample left in NEW/PROCESSING/ERROR by an aborted run must
@@ -99,12 +99,12 @@ async function retireLeftovers(deps: SampleDeps, actor: Actor): Promise<number> 
 async function createSample(deps: SampleDeps, actor: Actor, sample: Sample): Promise<string> {
   // Processing is never queued: a queued job could reach the live model.
   const processing = recordingSender();
-  const { requestId } = await submitUpload({ ...deps, boss: processing.sender }, actor, [{ name: sample.filename, bytes: freshSampleMail(sample) }], {
+  const { requestId } = await submitUpload({ ...deps, boss: processing.sender }, actor, freshSampleFiles(sample), {
     source: "sample",
   });
   const job = { id: processing.jobId(), data: { requestId, companyId: actor.companyId } };
   try {
-    const outcome = await processRequestJob({ tenancy: deps.tenancy, storage: deps.storage, ai: recordedAiClient(sampleRecording(sample)) }, job);
+    const outcome = await processRequestJob({ tenancy: deps.tenancy, storage: deps.storage, ai: recordedAiClient(sampleRecordings(sample)) }, job);
     if (outcome !== "processed") throw new Error(`sample ${sample.key} was not processed`);
   } catch (error) {
     // Visible and settled instead of "in progress" forever; reprocessing a sample is refused (no live call).

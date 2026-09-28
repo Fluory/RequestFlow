@@ -272,6 +272,76 @@ td.attention .item-cell {
 .line-text {
   word-break: break-word;
 }
+/* Why a value needs a look (#74) – wraps even inside the nowrap status cell. */
+.field-reason {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--warn-text);
+  white-space: normal;
+  text-wrap: pretty;
+}
+.fields-table .field-reason {
+  min-width: 160px;
+  max-width: 240px;
+}
+
+/* Original PDF page with the cited box (#74, ADR-0002) */
+.pdf-page {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pdf-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.pdf-frame {
+  position: relative;
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--grey-bg);
+}
+.pdf-frame.whole {
+  max-height: none;
+}
+.pdf-frame:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+.pdf-sheet {
+  position: relative;
+  width: fit-content;
+  background: #fff;
+}
+.pdf-sheet canvas {
+  display: block;
+}
+.pdf-highlight {
+  position: absolute;
+  border: 2px solid var(--warn-line);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--mark) 35%, transparent);
+  pointer-events: none;
+}
+.pdf-status {
+  margin: 0;
+  padding: 24px 12px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+@media (forced-colors: active) {
+  .pdf-highlight {
+    border-color: Highlight;
+    background: none;
+  }
+}
 mark {
   background: var(--mark);
   color: var(--text);

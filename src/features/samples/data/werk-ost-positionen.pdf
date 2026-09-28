@@ -1,0 +1,77 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+6 0 obj
+<< /Length 1730 >>
+stream
+BT /F2 14 Tf 56 786 Td (Beispiel Anlagenbau GmbH) Tj ET
+0.35 g BT /F1 9 Tf 56 770 Td (Einkauf \267 Musterstra\337e 1 \267 12345 Musterstadt) Tj ET 0 g
+BT /F2 12 Tf 56 724 Td (Positionsliste zur Anfrage vom 21.09.2026) Tj ET
+BT /F1 10 Tf 56 706 Td (Betreff: Rohrbogen und Flansche f\374r Werk Ost) Tj ET
+0.93 g 50 658 495 22 re f 0 g
+BT /F2 10 Tf 56 665 Td (Pos.) Tj ET
+BT /F2 10 Tf 92 665 Td (Menge) Tj ET
+BT /F2 10 Tf 140 665 Td (Einheit) Tj ET
+BT /F2 10 Tf 196 665 Td (Bezeichnung) Tj ET
+BT /F2 10 Tf 350 665 Td (Abmessung) Tj ET
+BT /F2 10 Tf 460 665 Td (Werkstoff) Tj ET
+BT /F1 10 Tf 56 643 Td (1) Tj ET
+BT /F1 10 Tf 92 643 Td (8) Tj ET
+BT /F1 10 Tf 140 643 Td (Stk.) Tj ET
+BT /F1 10 Tf 196 643 Td (Rohrbogen 90 Grad) Tj ET
+BT /F1 10 Tf 350 643 Td (DN 80) Tj ET
+BT /F1 10 Tf 460 643 Td (P235GH) Tj ET
+BT /F1 10 Tf 56 621 Td (2) Tj ET
+BT /F1 10 Tf 92 621 Td (16) Tj ET
+BT /F1 10 Tf 140 621 Td (Stk.) Tj ET
+BT /F1 10 Tf 196 621 Td (Vorschwei\337flansch) Tj ET
+BT /F1 10 Tf 350 621 Td (DN 80 PN 40) Tj ET
+BT /F1 10 Tf 460 621 Td (1.0460) Tj ET
+BT /F1 10 Tf 56 599 Td (3) Tj ET
+BT /F1 10 Tf 92 599 Td (16) Tj ET
+BT /F1 10 Tf 140 599 Td (Stk.) Tj ET
+BT /F1 10 Tf 196 599 Td (Flachdichtung) Tj ET
+BT /F1 10 Tf 350 599 Td (DN 80 PN 40) Tj ET
+BT /F1 10 Tf 460 599 Td (Graphit) Tj ET
+0.8 w 50 680 m 545 680 l S
+0.4 w 50 658 m 545 658 l S
+0.4 w 50 636 m 545 636 l S
+0.4 w 50 614 m 545 614 l S
+0.8 w 50 592 m 545 592 l S
+BT /F1 10 Tf 56 556 Td (Gew\374nschter Liefertermin: KW 48) Tj ET
+BT /F1 10 Tf 56 538 Td (Bitte nennen Sie Preis und Lieferzeit je Position.) Tj ET
+BT /F1 10 Tf 56 502 Td (Jana Beispiel, Einkauf) Tj ET
+0.45 g BT /F1 8 Tf 56 48 Td (Synthetisches Beispiel f\374r die RequestFlow-Demo \226 keine echten Daten.) Tj ET 0 g
+endstream
+endobj
+7 0 obj
+<< /Title (Positionsliste Werk Ost) /Producer (RequestFlow sample, synthetic) >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000251 00000 n 
+0000000348 00000 n 
+0000000450 00000 n 
+0000002232 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R /Info 7 0 R >>
+startxref
+2328
+%%EOF

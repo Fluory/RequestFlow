@@ -118,3 +118,42 @@ describe("buildSourceView – where a value comes from", () => {
   });
 });
 
+describe("buildSourceView – the place on the rendered PDF page (#74)", () => {
+  const onPage = (page: unknown, bbox: unknown): StoredSegment[] => [
+    { segmentId: "p2-26", position: 0, text: "Gewünschter Liefertermin: KW 48", locator: { kind: "pdf", page, bbox, coordOrigin: "TOPLEFT" } },
+  ];
+  const evidence = { segmentId: "p2-26", quote: "KW 48" };
+
+  it("carries page and box of the cited segment of a PDF document", () => {
+    const view = buildSourceView(onPage(2, { l: 56, t: 278.82, r: 205.49, b: 288.07 }), evidence);
+
+    expect(view?.region).toEqual({ page: 2, bbox: { l: 56, t: 278.82, r: 205.49, b: 288.07 } });
+  });
+
+  it("has none for a mail, a PDF inside an Outlook message (the route serves the .msg) or a box that is not one", () => {
+    expect(buildSourceView(mail, { segmentId: "b2", quote: "KW 42" })?.region).toBeNull();
+    const inMsg: StoredSegment[] = [
+      {
+        segmentId: "m1",
+        position: 0,
+        text: "KW 48",
+        locator: { kind: "msg", part: "attachment", line: null, header: null, attachment: { index: 0, name: "liste.pdf" }, inner: { kind: "pdf", page: 1, bbox: { l: 1, t: 1, r: 9, b: 9 } } },
+      },
+    ];
+    expect(buildSourceView(inMsg, { segmentId: "m1", quote: "KW 48" })?.region).toBeNull();
+
+    const box = { l: 56, t: 278, r: 205, b: 288 };
+    for (const [page, bbox] of [
+      [2, undefined],
+      [2, { ...box, r: 56 }],
+      [2, { ...box, b: 278 }],
+      [2, { ...box, l: "56" }],
+      [2, { ...box, t: Number.NaN }],
+      [0, box],
+      [1.5, box],
+      ["2", box],
+    ] as const) {
+      expect(buildSourceView(onPage(page, bbox), evidence)?.region, JSON.stringify({ page, bbox })).toBeNull();
+    }
+  });
+});
