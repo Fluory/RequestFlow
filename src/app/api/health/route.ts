@@ -3,13 +3,15 @@ import { pingDatabase } from "@/db";
 import { countWaitingJobs } from "@/db/job-queue-client";
 import { pingAiService } from "@/features/extraction";
 import { QUEUES } from "@/features/jobs";
-import { cachedFor, logEvent, runHealthChecks } from "@/features/observability";
+import { cachedFor, logEvent, runHealthChecks, withStartupGrace } from "@/features/observability";
 
 export const dynamic = "force-dynamic";
 
 const CHECK_TIMEOUT_MS = 3_000;
 // Informational parts are cached (public endpoint): at most one AI ping and two counts per 10 s.
 const INFO_TTL_MS = 10_000;
+// Longer than a cold start of the showcase AI container (~6 s): beyond it, no answer means failed (#88).
+const AI_STARTUP_GRACE_MS = 30_000;
 let informational:
   | { aiService: () => Promise<void>; process: () => Promise<number>; exportQueue: () => Promise<number> }
   | undefined;
@@ -21,7 +23,7 @@ export async function GET(): Promise<Response> {
   try {
     const { config, database, storage } = getRuntime();
     informational ??= {
-      aiService: cachedFor(INFO_TTL_MS, () => pingAiService(config.aiService.baseUrl)),
+      aiService: cachedFor(INFO_TTL_MS, withStartupGrace(() => pingAiService(config.aiService.baseUrl), AI_STARTUP_GRACE_MS)),
       process: cachedFor(INFO_TTL_MS, () => countWaitingJobs(database.pool, QUEUES.processRequest)),
       exportQueue: cachedFor(INFO_TTL_MS, () => countWaitingJobs(database.pool, QUEUES.exportRequest)),
     };

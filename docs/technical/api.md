@@ -9,9 +9,10 @@
 |---|---|
 | 200 | `{"status":"ok","checks":{"database":"ok","storage":"ok"},"dependencies":{"aiService":"ok"},"backlog":{"request-process":0,"request-export":0}}` |
 | 503 | `{"status":"degraded","checks":{"<name>":"failed", …}}` – names only, never hosts, users or error text |
+| 200 | `dependencies.aiService`: `ok`, `failed` (answered with an error / refused) or `starting` (no answer within the probe's 2 s – e.g. a cold start, #81; still no answer after 30 s → `failed`, #88); informational, never changes the status |
 | 503 | `{"status":"degraded","checks":{"config":"failed"}}` – invalid configuration (the server log names the variables) |
 
-- Each check has a 3 s time limit; `cache-control: no-store`.
+- Each check has a 3 s time limit (the AI service probe aborts itself after 2 s); `cache-control: no-store`.
 - Cost per call: one `select 1` and one S3 `HeadBucket`; the informational parts (AI-service ping, two
   backlog counts on `pgboss.job`) are cached for 10 s, so they run at most once per window. The backlog
   is summed over all companies (no tenant data, but it shows overall activity to an unauthenticated
