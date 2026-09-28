@@ -73,6 +73,14 @@ creation). The script is all-or-nothing; running it twice fails on "role already
 5. `GET <ai-url>/healthz` → 200. The production URL → `AI_SERVICE_URL` of the web app (§4).
    Instances scale to zero after 5 minutes without traffic (vercel.com/docs/functions/container-images,
    verified 2026-09-27); the first call after that pays a cold start (measured about 5.6 s).
+6. **Builds only when the service changed (#98):** `services/ai/vercel.json` sets an `ignoreCommand` that
+   skips the build unless something under `services/ai/` changed since the last successful deployment
+   (`VERCEL_GIT_PREVIOUS_SHA`, else the parent commit; if git cannot compare, it builds). Every build pushes
+   an image to the project's container registry, which has a maximum number of images on the Hobby plan –
+   when a build fails with `repository has reached the maximum allowed number of images`, prune old images
+   (dashboard: project `requestflow-ai` → Sandboxes → Container Registry, or `vercel vcr image ls dockerfile`
+   and `vercel vcr image rm dockerfile <image-id>`), keeping the image of the current production deployment
+   and one rollback candidate. Deleting an image is permanent.
 
 ## 4. Vercel project
 
