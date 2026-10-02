@@ -182,7 +182,9 @@ export default async function RequestPage({
                             {field.corrected && <div className="field-hint">erkannt: {STATUS_LABEL[field.status]}</div>}
                             {field.source && (
                               <div className="source-link">
-                                <Link href={fieldHref(field)}>Quelle anzeigen</Link>
+                                <Link href={fieldHref(field)}>
+                                  Quelle anzeigen<span className="visually-hidden"> für {field.label}</span>
+                                </Link>
                               </div>
                             )}
                           </td>
