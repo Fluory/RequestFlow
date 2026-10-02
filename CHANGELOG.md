@@ -5,6 +5,11 @@ This file records what changes **in the product** – process and session state 
 
 ## [Unreleased]
 
+### Added
+- Evidence page `docs/product/evidence.md`: eval accuracy per key field (reproducible with `pnpm evals`), the
+  measured state of both sample requests, three key decisions and the limits; handling time marked as not yet
+  measured (#76).
+
 ### Changed
 - A unit correction is stored like the extraction stores units: „Stk.“, „Stück“ or „Meter“ become the ERP units
   `pcs` and `m`; other units stay as typed. The correction field shows „Stk.“, and the audit event keeps what
@@ -32,9 +37,6 @@ uncertainty, review with corrections, exactly-once ERP export, multi-tenancy, au
 showcase with prepared samples.
 
 ### Added
-- Evidence page `docs/product/evidence.md`: eval accuracy per key field (reproducible with `pnpm evals`), the
-  measured state of both sample requests, three key decisions and the limits; handling time marked as not yet
-  measured (#76).
 - Prepared samples for the showcase (`pnpm seed:samples`): per demo company one synthetic request to review
   (with an uncertain and a missing value) and one already approved and exported through the normal path. Their
   extraction replays a recorded AI answer, so they work even while the model provider is overloaded; list and
