@@ -77,7 +77,8 @@ creation). The script is all-or-nothing; running it twice fails on "role already
    skips the build unless something under `services/ai/` changed since the last successful deployment
    (`VERCEL_GIT_PREVIOUS_SHA`, else the parent commit; if git cannot compare, it builds). A skipped build
    ends as `CANCELED`; skipped builds may still count against the plan's deployment limits. A new branch
-   without a successful AI deployment compares only its last commit (since #104 only `main` deploys, see 7). **A redeploy runs the same step:** after changing a variable of
+   without a successful AI deployment compares only its last commit (since #104 only `main` deploys, see
+   step 7). **A redeploy runs the same step:** after changing a variable of
    `requestflow-ai` (§9), redeploy without the Ignored Build Step (untick it in the Redeploy dialog if offered)
    and check that the deployment reaches **Ready** – `CANCELED` means the new value is not active.
    Every build pushes an image to the project's container registry, which has a maximum number of images on
@@ -90,9 +91,11 @@ creation). The script is all-or-nothing; running it twice fails on "role already
    `{ "**": false, "main": true }` – a push to any other branch (every PR) creates **no** `requestflow-ai`
    deployment at all, not even a skipped one, so PRs no longer use up the plan's deployment limits. When
    several patterns match, `true` wins; `**` also covers branch names with `/` (minimatch). A merge to `main`
-   that touches `services/ai/` still deploys production (step 6 decides whether it builds). CI keeps
-   building and smoke-testing the AI image on every Dockerfile or lock change (#79), so no AI preview is
-   needed; the web app's previews keep calling the production AI URL.
+   that touches `services/ai/` still deploys production (step 6 decides whether it builds). The setting gates
+   only deployments triggered by a Git push – a redeploy from the dashboard (§9) still works. No AI preview is
+   needed: CI builds the image and checks `/healthz` on AI-image changes (#79), and web previews do not call
+   the AI service (§4: Preview variables stay empty). The preview protection of step 2 only matters if Git
+   deployments of other branches are ever switched back on.
 
 ## 4. Vercel project
 
