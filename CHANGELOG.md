@@ -24,6 +24,8 @@ This file records what changes **in the product** – process and session state 
   such leftovers. An approved sample whose export failed is kept (#84).
 
 ### Fixed
+- The review page's header fields fit their card at 1280 px: „Quelle anzeigen“ moved under the status, so the
+  „Speichern“ button of a correction is no longer scrolled out of sight (#103).
 - Two `pnpm seed:samples` runs for the same company at the same time no longer interfere: the second waits for
   the first and then finds the samples in place, or stops after 20 seconds with a clear message (#93).
 - `/api/health` reports the AI service as `starting` instead of `failed` when it does not answer in time –

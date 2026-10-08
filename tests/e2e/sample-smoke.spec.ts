@@ -35,6 +35,14 @@ test("a visitor finds the prepared samples, clearly labelled, one to review and 
   await expect(page.getByTestId("sample-notice")).toContainText("Vorbereitetes Beispiel – aufgezeichnete KI-Antwort");
   await expect(page.getByTestId("request-status")).toHaveText("Zur Prüfung");
   await expect(page.getByText(/braucht Aufmerksamkeit|brauchen Aufmerksamkeit/)).toBeVisible();
+  // #103: at 1280 px the header fields fit their card. Werk Ost carries the long e-mail address that pushed
+  // "Speichern" out of sight; measured on the table's own scroll container – a click would scroll the button
+  // into view and never notice.
+  const fieldsWrap = page.getByTestId("fields-table-wrap");
+  expect(await fieldsWrap.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0);
+  const wrapBox = (await fieldsWrap.boundingBox())!;
+  const saveBox = (await page.getByRole("row", { name: /^E-Mail/ }).getByRole("button", { name: "Speichern" }).boundingBox())!;
+  expect(saveBox.x + saveBox.width).toBeLessThanOrEqual(wrapBox.x + wrapBox.width);
 
   await page.goto("/requests");
   await page.getByRole("link", { name: "Anfrage Dichtungssatz fuer Pumpe P-204", exact: true }).first().click();
