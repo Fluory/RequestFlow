@@ -1,0 +1,142 @@
+/*
+ * Public case study (#75): a reading page on the pilot design tokens (globals.css). Reading width ~70
+ * characters; screenshots framed like the app's cards; numbered steps because the flow is a real sequence.
+ */
+.case-study {
+  max-width: 960px;
+  gap: 40px;
+}
+.cs-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 8px;
+}
+.cs-brand {
+  align-self: flex-start;
+}
+.cs-eyebrow {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.case-study h1 {
+  font-size: clamp(26px, 4vw, 34px);
+  line-height: 1.2;
+  max-width: 28ch;
+  text-wrap: balance;
+}
+.cs-lede {
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--text-2);
+  max-width: 68ch;
+}
+.cs-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+}
+.cs-note,
+.cs-synthetic {
+  font-size: 14px;
+  color: var(--muted);
+  max-width: 68ch;
+}
+.cs-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid var(--rule);
+  padding-top: 24px;
+}
+.cs-section h2 {
+  font-size: 19px;
+}
+.cs-section p,
+.cs-section li {
+  line-height: 1.6;
+  max-width: 70ch;
+}
+.cs-section ul {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cs-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 24px 40px;
+}
+.cs-split > div {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.cs-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 16px;
+}
+.cs-steps li {
+  counter-increment: step;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.cs-steps li::before {
+  content: counter(step);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--brand);
+}
+.cs-shots {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.cs-shots figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cs-shots img {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.cs-shots figcaption {
+  font-size: 14px;
+  color: var(--text-2);
+  max-width: 70ch;
+}
+.cs-section .cs-links {
+  list-style: none;
+  padding-left: 0;
+}
+.cs-foot {
+  font-size: 13px;
+  color: var(--muted);
+  border-top: 1px solid var(--rule);
+  padding-top: 16px;
+}
