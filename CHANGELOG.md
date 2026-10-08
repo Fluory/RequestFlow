@@ -5,6 +5,11 @@ This file records what changes **in the product** – process and session state 
 
 ## [Unreleased]
 
+### Added
+- Evidence page `docs/product/evidence.md`: eval accuracy per key field (reproducible with `pnpm evals`), the
+  measured state of both sample requests, three key decisions and the limits; handling time marked as not yet
+  measured (#76).
+
 ### Changed
 - A unit correction is stored like the extraction stores units: „Stk.“, „Stück“ or „Meter“ become the ERP units
   `pcs` and `m`; other units stay as typed. The correction field shows „Stk.“, and the audit event keeps what
