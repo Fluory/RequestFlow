@@ -5,6 +5,19 @@ This file records what changes **in the product** – process and session state 
 
 ## [Unreleased]
 
+### Security
+- Next.js 16.3.8 (SSRF in image optimization and five moderate/low advisories), `sharp` 0.35.5 and
+  `source-map-js` 1.2.2; the unfixed `braces` advisory of the lint tooling is a dated exception in the
+  architecture map (#115).
+
+### Added
+- Public case study page `/case-study` (no login, static content, no data access): problem and target group,
+  what the AI does and what the person decides, the four steps up to the exactly-once ERP export, screenshots of
+  the prepared samples and the limits; linked from the start page for visitors without an account (#75).
+- Evidence page `docs/product/evidence.md`: eval accuracy per key field (reproducible with `pnpm evals`), the
+  measured state of both sample requests, three key decisions and the limits; handling time marked as not yet
+  measured (#76).
+
 ### Changed
 - The AI service's Vercel project builds only when something under `services/ai/` changed: fewer images in its
   container registry and fewer builds. A redeploy after changing its variables must not be skipped (runbook §3.6) (#98).
@@ -23,6 +36,8 @@ This file records what changes **in the product** – process and session state 
   such leftovers. An approved sample whose export failed is kept (#84).
 
 ### Fixed
+- The review page's header fields fit their card at 1280 px: „Quelle anzeigen“ moved under the status, so the
+  „Speichern“ button of a correction is no longer scrolled out of sight (#103).
 - Two `pnpm seed:samples` runs for the same company at the same time no longer interfere: the second waits for
   the first and then finds the samples in place, or stops after 20 seconds with a clear message (#93).
 - `/api/health` reports the AI service as `starting` instead of `failed` when it does not answer in time –

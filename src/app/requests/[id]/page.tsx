@@ -156,14 +156,14 @@ export default async function RequestPage({
                 <h2 id="fields-heading" className="card-title">
                   Erkannte Angaben
                 </h2>
-                <div className="table-wrap">
+                <div className="table-wrap" data-testid="fields-table-wrap">
                   <table className="fields-table">
                     <thead>
                       <tr>
                         <th scope="col">Feld</th>
                         <th scope="col">Wert</th>
-                        <th scope="col">Status</th>
-                        <th scope="col">Quelle</th>
+                        {/* #103: the source link sits under the status – a fifth column pushed "Speichern" out of the card at 1280 px. */}
+                        <th scope="col">Status und Quelle</th>
                         {inReview && <th scope="col">Korrektur</th>}
                       </tr>
                     </thead>
@@ -171,17 +171,23 @@ export default async function RequestPage({
                       {fields.map((field) => (
                         <tr key={field.key} className={isSelected(field) ? "selected" : needsAttention(field) ? "attention" : undefined}>
                           <th scope="row">{field.label}</th>
-                          <td data-testid={`value-${field.key}`}>
+                          <td className="value-cell" data-testid={`value-${field.key}`}>
                             {field.value === null ? <span className="muted">–</span> : <Link href={fieldHref(field)} className="value-link" aria-current={isSelected(field) ? "true" : undefined}>
                                 {field.value}
                               </Link>}
                             {field.corrected && <div className="field-hint">erkannt: {field.extractedValue ?? "–"}</div>}
                           </td>
-                          <td className="nowrap">
+                          <td className="status-source">
                             <StatusBadge status={field.reviewStatus} />
                             {field.corrected && <div className="field-hint">erkannt: {STATUS_LABEL[field.status]}</div>}
+                            {field.source && (
+                              <div className="source-link">
+                                <Link href={fieldHref(field)}>
+                                  Quelle anzeigen<span className="visually-hidden"> für {field.label}</span>
+                                </Link>
+                              </div>
+                            )}
                           </td>
-                          <td className="source-col">{field.source ? <Link href={fieldHref(field)}>Quelle anzeigen</Link> : <span className="muted">–</span>}</td>
                           {inReview && (
                             <td className="correct">
                               <form action={correctFieldAction} className="inline-form">

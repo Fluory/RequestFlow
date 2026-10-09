@@ -36,7 +36,8 @@ test("a clerk uploads a request, reviews it beside its source, corrects a value,
   }).toPass({ timeout: 60_000 });
 
   await expect(page.getByTestId("value-contact_person")).toHaveText("Erika Beispiel");
-  await page.getByRole("row", { name: /Ansprechpartner/ }).getByRole("link", { name: "Quelle anzeigen" }).click();
+  // Each source link names its field for screen readers (#105 review).
+  await page.getByRole("link", { name: "Quelle anzeigen für Ansprechpartner" }).click();
   await expect(page.locator("mark")).toHaveText("Erika Beispiel");
 
   const companyRow = page.getByRole("row", { name: /Firma/ });
