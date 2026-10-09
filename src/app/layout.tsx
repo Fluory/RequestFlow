@@ -13,6 +13,7 @@ import "@fontsource/ibm-plex-mono/latin-500.css";
 import "./globals.css";
 import "./components.css";
 import "./review.css";
+import "./case-study.css";
 
 export const metadata: Metadata = {
   title: "RequestFlow",
