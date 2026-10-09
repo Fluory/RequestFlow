@@ -73,6 +73,20 @@ creation). The script is all-or-nothing; running it twice fails on "role already
 5. `GET <ai-url>/healthz` → 200. The production URL → `AI_SERVICE_URL` of the web app (§4).
    Instances scale to zero after 5 minutes without traffic (vercel.com/docs/functions/container-images,
    verified 2026-09-27); the first call after that pays a cold start (measured about 5.6 s).
+6. **Builds only when the service changed (#98):** `services/ai/vercel.json` sets an `ignoreCommand` that
+   skips the build unless something under `services/ai/` changed since the last successful deployment
+   (`VERCEL_GIT_PREVIOUS_SHA`, else the parent commit; if git cannot compare, it builds). A skipped build
+   ends as `CANCELED`; skipped builds may still count against the plan's deployment limits. A new branch
+   without a successful AI deployment compares only its last commit, so an AI preview may be missing there
+   (production is not affected). **A redeploy runs the same step:** after changing a variable of
+   `requestflow-ai` (§9), redeploy without the Ignored Build Step (untick it in the Redeploy dialog if offered)
+   and check that the deployment reaches **Ready** – `CANCELED` means the new value is not active.
+   Every build pushes an image to the project's container registry, which has a maximum number of images on
+   the Hobby plan – when a build fails with `repository has reached the maximum allowed number of images`,
+   prune old images (dashboard: project `requestflow-ai` → Sandboxes → Container Registry, or
+   `vercel vcr image ls dockerfile --project requestflow-ai` and
+   `vercel vcr image rm dockerfile <image-id> --project requestflow-ai`), keeping the image of the current
+   production deployment and one rollback candidate. Deleting an image is permanent.
 
 ## 4. Vercel project
 
@@ -165,12 +179,14 @@ run started meanwhile waits for the first and then finds the samples in place; a
   pause the Supabase project.
 - Code: Vercel "Instant Rollback" to the previous deployment. Migrations are forward-only
   (`docs/technical/operations.md` → Rollback); roll back code only to a version that knows the schema.
-- Rotate a leaked secret in its settings page, then redeploy (Vercel reads variables at deploy time).
+- Rotate a leaked secret in its settings page, then redeploy (Vercel reads variables at deploy time). For
+  `requestflow-ai` the redeploy must not be skipped by the Ignored Build Step (§3 step 6): check it is **Ready**.
 - Pause the AI service: pause the Vercel project `requestflow-ai`; uploads then end in a visible
   processing error with retries instead of reaching the model.
 - When the Gemini free-tier exception expires (ADR-0001 D11 amendment 2026-09-26, at the latest
   2026-10-31): delete the key in Google AI Studio, remove `GEMINI_API_KEY` and `AI_ALLOW_GEMINI_API_DEV`
-  from `requestflow-ai`, then switch to the paid tier or Vertex `eu` (§3 step 4) and redeploy.
+  from `requestflow-ai`, then switch to the paid tier or Vertex `eu` (§3 step 4) and redeploy – **Ready**, not
+  skipped (§3 step 6).
 - Remove the showcase completely: delete both Vercel projects (`requestflow`, `requestflow-ai`) and the
   Supabase project – all data is synthetic, nothing has to be kept.
 
