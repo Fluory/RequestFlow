@@ -5,6 +5,11 @@ This file records what changes **in the product** – process and session state 
 
 ## [Unreleased]
 
+### Security
+- Next.js 16.3.8 (SSRF in image optimization and five moderate/low advisories), `sharp` 0.35.5 and
+  `source-map-js` 1.2.2; the unfixed `braces` advisory of the lint tooling is a dated exception in the
+  architecture map (#115).
+
 ### Added
 - Public case study page `/case-study` (no login, static content, no data access): problem and target group,
   what the AI does and what the person decides, the four steps up to the exactly-once ERP export, screenshots of
