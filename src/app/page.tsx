@@ -20,6 +20,10 @@ export default async function HomePage() {
             <p>
               <Link href="/login">Anmelden</Link> · <Link href="/signup">Konto mit Einladung anlegen</Link>
             </p>
+            {/* #75: visitors without an account find the public case study here. */}
+            <p>
+              <Link href="/case-study">So funktioniert RequestFlow – Fallstudie lesen</Link>
+            </p>
           </div>
           <p className="auth-foot">Pilot – alle Daten sind synthetisch.</p>
         </div>

@@ -5,8 +5,9 @@ e-mails and PDF/Excel/Word attachments, review every value **beside its source**
 approved request **exactly once** to an ERP.
 
 > **Status:** pilot scope built and released as [v0.1.0](https://github.com/Fluory/RequestFlow/releases/tag/v0.1.0)
-> (2026-09-28); acceptance pending ([roadmap](docs/product/roadmap.md), M2). A synthetic showcase runs on Vercel
-> for invited visitors.
+> (2026-09-28); acceptance pending ([roadmap](docs/product/roadmap.md), M2). A synthetic showcase runs on Vercel:
+> the **[case study](https://requestflow-doc-edit.vercel.app/case-study)** is public (German, no login), the
+> [app](https://requestflow-doc-edit.vercel.app) itself is open to invited visitors.
 > **Reference project:** built like a real customer engagement for a mid-sized machine-building
 > company; the customer is fictional and **all data in this repository is synthetic**.
 
@@ -24,6 +25,10 @@ upload (.eml/.msg/PDF/XLSX/DOCX) → parse → extract with evidence → verify 
 - **Tenant isolation:** repository scoping plus forced PostgreSQL row-level security per company.
 - **Measurable AI quality:** an eval set with per-field metrics gates prompt and model changes.
 
+![Review page of the prepared sample "Werk Ost": the delivery date was given only as a calendar week, so it is marked "unsicher"; the cited line is highlighted in the source on the right](public/case-study/review.png)
+
+*Review beside the source – prepared sample, synthetic data.*
+
 ## What runs today
 
 Each line is a merged PR; details in the [CHANGELOG](CHANGELOG.md).
@@ -38,6 +43,7 @@ Each line is a merged PR; details in the [CHANGELOG](CHANGELOG.md).
 - Request list led by the next action, with diagnosis, retries and reprocessing, paged (#43, #58, #95)
 - Eval set of 15 synthetic cases as a CI gate (#41); correlated structured logs and health (#45, #56, #88)
 - Showcase: prepared sample requests replayed from recorded AI answers (#83)
+- Public case study `/case-study`: problem, flow, sample screenshots and limits – no login, no data access (#75)
 
 ## Architecture
 
@@ -89,3 +95,4 @@ green CI, and is never merged by its author. The process follows the fluory-syst
 KI-gestützte Erfassung von Angebotsanfragen: Daten aus E-Mails und Anhängen extrahieren, jede
 Angabe neben ihrer Fundstelle prüfen und freigegebene Anfragen genau einmal ans ERP übergeben.
 Referenzprojekt mit fiktivem Kunden – alle Daten sind synthetisch.
+Öffentliche Fallstudie: [requestflow-doc-edit.vercel.app/case-study](https://requestflow-doc-edit.vercel.app/case-study).

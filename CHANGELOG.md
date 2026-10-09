@@ -11,6 +11,9 @@ This file records what changes **in the product** – process and session state 
   architecture map (#115).
 
 ### Added
+- Public case study page `/case-study` (no login, static content, no data access): problem and target group,
+  what the AI does and what the person decides, the four steps up to the exactly-once ERP export, screenshots of
+  the prepared samples and the limits; linked from the start page for visitors without an account (#75).
 - Evidence page `docs/product/evidence.md`: eval accuracy per key field (reproducible with `pnpm evals`), the
   measured state of both sample requests, three key decisions and the limits; handling time marked as not yet
   measured (#76).
