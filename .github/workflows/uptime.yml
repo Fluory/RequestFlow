@@ -1,0 +1,64 @@
+# External uptime monitor for the showcase (#110). Calls GET /api/health every 15 minutes from outside
+# the deployment. A red run is the alert: GitHub notifies the repository owner about failed workflow runs.
+# Fails on: timeout, non-200, or status != "ok". `dependencies.aiService` "starting" (cold start of the
+# scaled-to-zero AI container) is only reported, never a failure. See docs/technical/operations.md.
+
+name: Uptime
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      SHOWCASE_URL: ${{ vars.SHOWCASE_URL || 'https://requestflow-doc-edit.vercel.app' }}
+    steps:
+      - name: Check /api/health
+        run: |
+          set -uo pipefail
+          out="$(mktemp)"
+          code="$(curl -sS --max-time 20 --retry 2 --retry-delay 5 --retry-all-errors \
+            -o "$out" -w '%{http_code}' "${SHOWCASE_URL%/}/api/health")" || code="000"
+          {
+            echo "### Showcase health"
+            echo
+            echo "HTTP status: \`$code\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$code" != "200" ]; then
+            echo "::error::/api/health answered HTTP $code (000 = timeout or no connection)"
+            echo "Result: **DOWN**" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          if ! jq -e . "$out" > /dev/null 2>&1; then
+            echo "::error::/api/health did not return JSON"
+            echo "Result: **DOWN** (no JSON)" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          {
+            echo
+            echo "| Figure | Value |"
+            echo "|---|---|"
+            jq -r '"| status | \(.status) |",
+                   "| database | \(.checks.database // "n/a") |",
+                   "| storage | \(.checks.storage // "n/a") |",
+                   "| aiService | \(.dependencies.aiService // "n/a") |",
+                   "| waiting: request-process | \(.backlog["request-process"] // "n/a") |",
+                   "| waiting: request-export | \(.backlog["request-export"] // "n/a") |"' "$out"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$(jq -r '.status' "$out")" != "ok" ]; then
+            echo "::error::/api/health status is not ok"
+            echo "Result: **DEGRADED**" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "Result: **OK**" >> "$GITHUB_STEP_SUMMARY"
