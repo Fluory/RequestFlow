@@ -55,6 +55,7 @@ Deliberately accepted risks – without an entry here a deviation counts as a de
 | `.msg` uploads checked by OLE signature only | Structure check of Outlook messages needs a CFB parser; files are served only as attachments with `nosniff` and parsed later by the stateless AI service | Fluory | with #23 (MSG parsing) |
 | Gemini API free-tier key on the showcase (#67) | Orchestrator decision 2026-09-26 (ADR-0001 D11 amendment): no GCP for now. Google's terms require paid services for API clients offered to users in the EEA and allow human review of free-tier content, so the showcase stays invite-only for the orchestrator, synthetic data only, demo banner on | Fluory | before anyone else gets a demo account, at the latest 2026-10-31 – then paid tier (same key with billing) or Vertex `eu` |
 | Gemini API free tier for local development | Synthetic data only; never showcase (except the #67 row above until its expiry) or customer data (D8) | Fluory | when a Vertex development budget exists |
+| Audit ignore for `braces` GHSA-vfj7-8cjw-p6xm (`package.json` → `pnpm.auditConfig.ignoreGhsas`, #115) | No patched version exists (2026-10-09). Reached only through lint tooling (`eslint-config-next` → `fast-glob` → `micromatch`), not in the production tree (`pnpm why braces --prod` is empty); the risk is a stack-exhaustion DoS of a local lint run on crafted glob patterns | Fluory | as soon as a patched `braces` or a `fast-glob`/`micromatch` without it is released, at the latest 2026-12-31 |
 
 ## Data flow
 
