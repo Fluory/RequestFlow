@@ -11,6 +11,9 @@ This file records what changes **in the product** – process and session state 
   architecture map (#115).
 
 ### Added
+- Uptime monitor for the showcase: a scheduled GitHub Actions workflow calls `/api/health` every 15 minutes and turns red
+  on timeout, non-200 or `status != "ok"` (the owner gets GitHub's failed-run notification); database, storage,
+  AI service and waiting jobs appear in the job summary; runbook in `docs/technical/operations.md` (#110).
 - Public case study page `/case-study` (no login, static content, no data access): problem and target group,
   what the AI does and what the person decides, the four steps up to the exactly-once ERP export, screenshots of
   the prepared samples and the limits; linked from the start page for visitors without an account (#75).

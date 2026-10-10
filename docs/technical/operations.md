@@ -140,6 +140,26 @@ company still ends up without one, an operator re-invites an admin with `bootstr
 endpoints are disabled except `set-active` (404) – every change goes through the audited module. The
 `user.invited` audit event stores the role only; the invitation id points to the e-mail.
 
+## Uptime monitor (showcase)
+
+| Item | Value |
+|---|---|
+| Monitor | GitHub Actions workflow `.github/workflows/uptime.yml` – calls `GET <SHOWCASE_URL>/api/health` from outside the deployment |
+| Target | repository variable `SHOWCASE_URL`, default `https://requestflow-doc-edit.vercel.app` |
+| Interval | every 15 minutes (cron; GitHub may delay scheduled runs by a few minutes), plus manual start (`workflow_dispatch`) |
+| Check | 20 s timeout, 2 retries; red run on timeout, non-200, non-JSON or `status != "ok"` |
+| Alert recipient | role Orchestrator – GitHub's failed-workflow notification to the repository owner (check the notification settings: Actions → "Send notifications for failed workflows only"); no address is stored in the repo |
+| Key figures | job summary of every run: `database`, `storage`, `aiService`, waiting jobs `request-process` / `request-export` |
+
+- `aiService: starting` is the cold start of the scaled-to-zero AI container: shown, never an alert.
+  `failed` is shown too but does not turn the run red (informational, see "Logs and correlation").
+- On an alert: open the failed run, read the HTTP status and the summary table, then follow
+  [Frequent failures](#frequent-failures) (`storage`, `config`); HTTP `000`/5xx without a body means the
+  Vercel deployment itself is down – check the latest deployment, then [Rollback](#rollback).
+- Test of the alert: start the workflow with a wrong `SHOWCASE_URL` variable (or pause the target) once and
+  confirm the notification; reset the variable afterwards.
+- Out of scope: error-rate alerts from log aggregation, monitoring of a customer environment.
+
 ## Frequent failures
 
 | Symptom | Cause | Action |
