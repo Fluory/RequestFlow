@@ -21,6 +21,8 @@ This file records what changes **in the product** – process and session state 
 ### Changed
 - The AI service's Vercel project builds only when something under `services/ai/` changed: fewer images in its
   container registry and fewer builds. A redeploy after changing its variables must not be skipped (runbook §3.6) (#98).
+- The AI service project deploys only from `main`: pull-request branches create no AI deployment at all, so
+  they no longer use up the Vercel plan's deployment limits (runbook §3.7) (#104).
 - A unit correction is stored like the extraction stores units: „Stk.“, „Stück“ or „Meter“ become the ERP units
   `pcs` and `m`; other units stay as typed. The correction field shows „Stk.“, and the audit event keeps what
   was typed (#96).
