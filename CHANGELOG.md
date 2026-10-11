@@ -39,6 +39,8 @@ This file records what changes **in the product** – process and session state 
   such leftovers. An approved sample whose export failed is kept (#84).
 
 ### Fixed
+- AI service deployments from `main` no longer end as Error when the last deployed commit is missing from
+  Vercel's shallow clone: the Ignored Build Step now builds on any git error instead of failing (#119).
 - The review page's header fields fit their card at 1280 px: „Quelle anzeigen“ moved under the status, so the
   „Speichern“ button of a correction is no longer scrolled out of sight (#103).
 - Two `pnpm seed:samples` runs for the same company at the same time no longer interfere: the second waits for
