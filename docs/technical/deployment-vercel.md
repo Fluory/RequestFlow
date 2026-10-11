@@ -75,7 +75,9 @@ creation). The script is all-or-nothing; running it twice fails on "role already
    verified 2026-09-27); the first call after that pays a cold start (measured about 5.6 s).
 6. **Builds only when the service changed (#98):** `services/ai/vercel.json` sets an `ignoreCommand` that
    skips the build unless something under `services/ai/` changed since the last successful deployment
-   (`VERCEL_GIT_PREVIOUS_SHA`, else the parent commit; if git cannot compare, it builds). A skipped build
+   (`VERCEL_GIT_PREVIOUS_SHA`, else the parent commit). Vercel skips only on exit 0 and fails the deployment on
+   any code other than 0 or 1, so every git error (e.g. the previous commit is not in the shallow clone) is mapped
+   to exit 1 and the service builds (#119). A skipped build
    ends as `CANCELED`; skipped builds may still count against the plan's deployment limits. A new branch
    without a successful AI deployment compares only its last commit (since #104 only `main` deploys, see
    step 7). **A redeploy runs the same step:** after changing a variable of
