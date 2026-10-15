@@ -25,12 +25,14 @@ All queries are read-only and run **per company** in its tenant context, like th
 inside a transaction with `set_config('app.company_id', '<company id>', true)` (forced row-level security,
 [ADR-0001 D7](../decisions/ADR-0001-pilot-architecture.md#d7--authorization-and-tenant-isolation--challenged-application-level-vs-rls)).
 They return counts and durations only – no document content, no personal data. Sample requests
-(`source = 'sample'`) are excluded. `:from` / `:to` bound the reporting period.
+(`source = 'sample'`) are excluded – for the M2 acceptance walk on the showcase, which uses only the
+synthetic samples, drop the `source` filter. `:from` / `:to` bound the reporting period.
 
 ### S1 – Header fields correct without correction
 
 Share of header fields that the model marked `found` in the latest run and that nobody corrected before
-approval, per key field. A correction means the clerk changed the value – so a `found` value was wrong or
+approval, per key field. A correction counts only if it changed the value (a save with the same value does
+not); it means the clerk changed the value – so a `found` value was wrong or
 incomplete. Only approved or exported requests count (the review is finished).
 
 ```sql
@@ -43,6 +45,7 @@ SELECT f.field_key,
        round(100.0 * count(*) FILTER (WHERE NOT EXISTS (
          SELECT 1 FROM app.field_corrections c
          WHERE c.request_id = f.request_id AND c.field_key = f.field_key AND c.item_index IS NULL
+           AND c.new_value IS DISTINCT FROM f.value
        )) / count(*), 1) AS correct_without_correction_pct
 FROM app.extracted_fields f
 JOIN latest l ON l.id = f.run_id
@@ -66,21 +69,24 @@ from today's process. Until then no time saving is claimed.
 ### S3 – Export failures and double exports
 
 A failure is a request that ended in `ERROR` at the export stage after all retries (audit `request.failed`,
-written once per final failure). A double export cannot be stored: `request_exports` has one row per
+written once per final failure). A request that is reprocessed by hand and fails again is one request
+with two failure events – the query reports both. A double export cannot be stored: `request_exports` has one row per
 request (unique `request_id`) and the export runs under a row lock with an idempotency key
 ([ADR-0001 D9](../decisions/ADR-0001-pilot-architecture.md#d9--external-integrations)), proven by the
 integration tests on every PR. The second query is the cross-check – it must return 0.
 
 ```sql
-SELECT date_trunc('week', created_at) AS week, count(*) AS export_failures
-FROM app.audit_events
-WHERE action = 'request.failed' AND data->>'stage' = 'export'
-  AND created_at >= :from AND created_at < :to
+SELECT date_trunc('week', a.created_at) AS week,
+       count(DISTINCT a.entity_id) AS requests_with_export_failure, count(*) AS failure_events
+FROM app.audit_events a JOIN app.requests r ON r.id = a.entity_id
+WHERE a.action = 'request.failed' AND a.data->>'stage' = 'export' AND r.source = 'upload'
+  AND a.created_at >= :from AND a.created_at < :to
 GROUP BY 1 ORDER BY 1;
 
 SELECT count(*) AS requests_exported_more_than_once
-FROM (SELECT entity_id FROM app.audit_events WHERE action = 'request.exported'
-      GROUP BY entity_id HAVING count(*) > 1) AS d;
+FROM (SELECT a.entity_id FROM app.audit_events a JOIN app.requests r ON r.id = a.entity_id
+      WHERE a.action = 'request.exported' AND r.source = 'upload'
+      GROUP BY a.entity_id HAVING count(*) > 1) AS d;
 ```
 
 ### S4 – Model cost per request
@@ -103,6 +109,8 @@ FROM (SELECT ru.request_id, sum(ru.total_tokens) AS tokens
 
 From the upload (`requests.created_at`) to the first successful extraction (audit `request.extracted`):
 queue wait, retries and the AI call together. `extraction_runs.latency_ms` is the AI service's share.
+Requests that never reached review (processing `ERROR`) have no end point and are not in the p95 – read
+them from S3's sibling: `count(*)` of `request.failed` with `data->>'stage' = 'processing'`.
 
 ```sql
 SELECT count(*) AS requests,
@@ -126,6 +134,8 @@ WHERE ru.latency_ms IS NOT NULL
 - **Where:** the queries above, run against the pilot database per company; results are copied as
   aggregates (counts, percentages, seconds) – never row data.
 - **Verified:** all six queries ran on 2026-10-15 against a database built from the migrations up to
-  `0019_request_source_check.sql` (local PostgreSQL 16, as `app_rw` with the tenant context set), seeded with
+  `0019_request_source_check.sql` (local PostgreSQL 16 – the stack runs 17, the queries use nothing version-specific – as `app_rw` with
+the tenant context set), seeded with
   synthetic rows for two companies; each returned the expected value – the second company's rows, sample
-  requests and fields of an older run were excluded.
+  requests and fields of an older run were excluded. The queries have no automated test: after a
+schema change to these tables, run them again.
