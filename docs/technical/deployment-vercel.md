@@ -184,6 +184,9 @@ run started meanwhile waits for the first and then finds the samples in place; a
 
 ## 9. Switch off and roll back
 
+In an incident, follow `docs/technical/operations.md` → Incident first (validate, assess, the GDPR
+question, then the smallest switch); the switches below are its toolbox.
+
 - Pause the showcase: remove `CRON_SECRET` and set `JOB_DRAIN_INLINE=false` (route → 404, no drains), or
   pause the Supabase project.
 - Code: Vercel "Instant Rollback" to the previous deployment. Migrations are forward-only
