@@ -160,6 +160,73 @@ endpoints are disabled except `set-active` (404) – every change goes through t
   confirm the notification; reset the variable afterwards.
 - Out of scope: error-rate alerts from log aggregation, monitoring of a customer environment.
 
+## Incident
+
+An incident is an unplanned event that endangers data, availability or correctness: a leaked secret,
+data of one company visible to another, exports to the wrong place, a showcase that is down or
+answering errors. Routine failures with a known cure stay in "Frequent failures" below.
+
+**Steps, in this order** (whoever notices it starts; the orchestrator decides and closes):
+
+1. **Validate.** Reproduce or confirm from logs (`requestId` correlation, "Logs and correlation"). Note
+   the time it started, when it was noticed and what was observed – facts only.
+2. **Assess the damage.** Which companies, requests, accounts, secrets; since when; still ongoing?
+   Then answer the fixed question below.
+3. **Contain** with the smallest switch that stops the damage (table below) – before searching for the
+   cause.
+4. **Open an issue** (label `security` if data or a secret is involved) with the facts from 1–3, without
+   secrets, document content or personal data; for a security finding in a public repo, use a private
+   GitHub security advisory instead.
+5. **Fix** on its own branch (`claude/fix-…`) through the normal PR route – with a **regression test**
+   that fails without the fix. **No auto-merge and no direct push to `main` during an incident**; a human
+   merges.
+6. **Lift the containment** only after the fix is deployed and checked (health, the reproduction from
+   step 1).
+7. **Postmortem** only for a relevant incident (personal data affected, data of another company visible,
+   double export, or more than 4 h unavailable): in the issue – timeline, cause, what stopped it, what
+   prevents it next time; no blame.
+
+**Fixed question: are personal data affected?** (GDPR Art. 33) Personal data here are user accounts
+(name, e-mail – also on the showcase), and on a customer system the contents of requests and
+attachments (names, phone numbers, e-mail addresses of the customer's contacts). If the answer is
+"yes" or "not sure":
+
+- The clock starts when the breach becomes known: the controller notifies the competent supervisory
+  authority **within 72 hours** unless the breach is unlikely to result in a risk to the persons
+  (Art. 33 (1)); record the reasoning either way (Art. 33 (5)), in the issue.
+- On a customer system the **customer is the controller** and RequestFlow's operator the processor:
+  inform the customer's contact **without undue delay** (Art. 33 (2)) so their 72 hours can be met;
+  the DPA names the route.
+- Supervisory authority and contact route: **to be named by the orchestrator / customer** – for the
+  reference project the showcase holds no customer data; the orchestrator, as controller for the
+  showcase accounts, notifies the authority responsible for their place of business. *(Placeholder –
+  fill in name, web form/address and the internal contact before the first customer system.)*
+- If there is a high risk to the persons, they are informed too (Art. 34) – the controller decides.
+
+**Switches of this system** (showcase on Vercel + Supabase; local Docker in brackets):
+
+| Situation | Switch | Effect |
+|---|---|---|
+| AI token leaked or misused | Rotate `AI_SERVICE_TOKEN` in **both** Vercel projects (`requestflow-ai` and `requestflow`), redeploy both – AI project **Ready**, not skipped (`deployment-vercel.md` §3 step 6) | old token gets 401 at the AI service. A 401 is not retried: a request processed while the two projects disagree goes to `ERROR` at once – reprocess it („Erneut verarbeiten“) after both carry the new token |
+| Stop all background processing | Remove `CRON_SECRET` and set `JOB_DRAIN_INLINE=false`, redeploy (`docker compose stop worker`) | drain route → 404, no jobs run; uploads stay `Neu`, approvals wait – nothing is lost (pg-boss keeps the jobs) |
+| Stop calls to the model | Pause the Vercel project `requestflow-ai` (`docker compose stop ai`); provider key: delete it at the provider | no document leaves the system; requests retry (unreachable / 503) and end in `ERROR` once the attempts are used up – „nothing lost“ means: reprocess them after the pause |
+| A user account is misused | `/users` → "Deaktivieren" (an admin of the same company) | all sessions of the account end at once; reactivation is possible. Refused for one's own account and for the company's last active admin – then use "Data at risk" below |
+| A bad deployment | Vercel "Instant Rollback" to the previous deployment (only to a version that knows the current schema – migrations are forward-only, see "Rollback") | previous code serves within seconds |
+| Data at risk, cause unclear | Pause the Supabase project | the whole showcase is down (health `database: failed`); data stays as it is |
+| ERP exports go wrong | "Stop all background processing" (above); do not remove `ERP_BASE_URL` – it falls back to the local mock address | approved requests wait in `Freigegeben`; when draining resumes, each is exported once (idempotency key + unique export row, ADR-0001 D9) |
+
+**Tabletop (2026-10-15, synthetic incident "AI token leaked in a public issue comment"):** 1. validated
+– the comment shows a ≥ 24-character value starting like the token in the Vercel settings; 2. damage
+– the token lets a caller send documents to `/v1/extract` and spend model quota, it gives no access to
+the database or storage (the AI service holds neither, ADR-0001 D8), so no stored data are exposed;
+personal data: none affected through this token → no notification, reasoning recorded; 3. contain –
+rotate `AI_SERVICE_TOKEN` in both projects, redeploy, check `requestflow-ai` **Ready**, then one synthetic upload reaches *Zur Prüfung*
+(`/api/health` `aiService: ok` does not prove it – the probe calls the open `/healthz` without a token);
+reprocess any request that went to `ERROR` in between; delete the comment; 4. issue with time and the rotated variable's name; 5. fix – none in
+code; follow-up: secret scanning on comments; 7. no postmortem (not a relevant incident). Gaps found: the
+AI token row first claimed retries (corrected: a 401 is not retried) and the health check does not prove
+the rotation (replaced by a synthetic upload); the authority placeholder above must be filled before a customer system.
+
 ## Frequent failures
 
 | Symptom | Cause | Action |

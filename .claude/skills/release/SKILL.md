@@ -13,6 +13,7 @@ description: Prüft die Release-Bereitschaft vor einer Auslieferung. Verwenden b
 - Migrationen geprüft (/database-migration gelaufen)?
 - Offene `security`- oder `decision-needed`-Issues?
 - Rollback-Weg vorhanden und geprobt?
+- Incident-Ablauf und Notschalter bekannt (`docs/technical/operations.md` → Incident)?
 - Staging-Smoke-Test bestanden?
 - Monitoring/Alerts bereit; Monitoring-Check nach Deploy eingeplant?
 
