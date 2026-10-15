@@ -207,10 +207,10 @@ attachments (names, phone numbers, e-mail addresses of the customer's contacts).
 
 | Situation | Switch | Effect |
 |---|---|---|
-| AI token leaked or misused | Rotate `AI_SERVICE_TOKEN` in **both** Vercel projects (`requestflow-ai` and `requestflow`), redeploy both – AI project **Ready**, not skipped (`deployment-vercel.md` §3 step 6) | old token gets 401 at the AI service; until the web app has the new value, uploads end in a visible processing error with retries |
+| AI token leaked or misused | Rotate `AI_SERVICE_TOKEN` in **both** Vercel projects (`requestflow-ai` and `requestflow`), redeploy both – AI project **Ready**, not skipped (`deployment-vercel.md` §3 step 6) | old token gets 401 at the AI service. A 401 is not retried: a request processed while the two projects disagree goes to `ERROR` at once – reprocess it („Erneut verarbeiten“) after both carry the new token |
 | Stop all background processing | Remove `CRON_SECRET` and set `JOB_DRAIN_INLINE=false`, redeploy (`docker compose stop worker`) | drain route → 404, no jobs run; uploads stay `Neu`, approvals wait – nothing is lost (pg-boss keeps the jobs) |
-| Stop calls to the model | Pause the Vercel project `requestflow-ai` (`docker compose stop ai`); provider key: delete it at the provider | no document leaves the system; requests end in a visible processing error with retries |
-| A user account is misused | `/users` → "Deaktivieren" (an admin of the same company) | all sessions of the account end at once; reactivation is possible |
+| Stop calls to the model | Pause the Vercel project `requestflow-ai` (`docker compose stop ai`); provider key: delete it at the provider | no document leaves the system; requests retry (unreachable / 503) and end in `ERROR` once the attempts are used up – „nothing lost“ means: reprocess them after the pause |
+| A user account is misused | `/users` → "Deaktivieren" (an admin of the same company) | all sessions of the account end at once; reactivation is possible. Refused for one's own account and for the company's last active admin – then use "Data at risk" below |
 | A bad deployment | Vercel "Instant Rollback" to the previous deployment (only to a version that knows the current schema – migrations are forward-only, see "Rollback") | previous code serves within seconds |
 | Data at risk, cause unclear | Pause the Supabase project | the whole showcase is down (health `database: failed`); data stays as it is |
 | ERP exports go wrong | "Stop all background processing" (above); do not remove `ERP_BASE_URL` – it falls back to the local mock address | approved requests wait in `Freigegeben`; when draining resumes, each is exported once (idempotency key + unique export row, ADR-0001 D9) |
@@ -220,10 +220,12 @@ attachments (names, phone numbers, e-mail addresses of the customer's contacts).
 – the token lets a caller send documents to `/v1/extract` and spend model quota, it gives no access to
 the database or storage (the AI service holds neither, ADR-0001 D8), so no stored data are exposed;
 personal data: none affected through this token → no notification, reasoning recorded; 3. contain –
-rotate `AI_SERVICE_TOKEN` in both projects, redeploy, check `requestflow-ai` **Ready** and `/api/health`
-`aiService: ok`; delete the comment; 4. issue with time and the rotated variable's name; 5. fix – none in
-code; follow-up: secret scanning on comments; 7. no postmortem (not a relevant incident). Gap found: none
-in the switches; the authority placeholder above must be filled before a customer system.
+rotate `AI_SERVICE_TOKEN` in both projects, redeploy, check `requestflow-ai` **Ready**, then one synthetic upload reaches *Zur Prüfung*
+(`/api/health` `aiService: ok` does not prove it – the probe calls the open `/healthz` without a token);
+reprocess any request that went to `ERROR` in between; delete the comment; 4. issue with time and the rotated variable's name; 5. fix – none in
+code; follow-up: secret scanning on comments; 7. no postmortem (not a relevant incident). Gaps found: the
+AI token row first claimed retries (corrected: a 401 is not retried) and the health check does not prove
+the rotation (replaced by a synthetic upload); the authority placeholder above must be filled before a customer system.
 
 ## Frequent failures
 
