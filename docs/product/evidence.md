@@ -3,6 +3,7 @@
 > Issue #76 (epic #19). Figures instead of adjectives. **Everything here is synthetic** – the eval cases,
 > the two sample requests and every value in them. Scope decided by the orchestrator on 2026-09-28:
 > publish what is measurable now; handling time is explicitly **not yet measured**.
+> The signals tracked during the pilot, with targets and queries: [metrics](metrics.md) (#113).
 
 ## 1. Extraction quality per key field (eval gate)
 

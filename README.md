@@ -60,6 +60,7 @@ Rationale, alternatives and trade-offs: [ADR-0001](docs/decisions/ADR-0001-pilot
 | Decisions | [docs/decisions/](docs/decisions/INDEX.md) |
 | Project brief, roadmap | [docs/product/](docs/product/project-brief.md) |
 | Evidence: measured figures (synthetic) | [docs/product/evidence.md](docs/product/evidence.md) |
+| Metrics: pilot success signals and how they are measured | [docs/product/metrics.md](docs/product/metrics.md) |
 | Customer proposal (German) | [docs/product/pilot-vorschlag.md](docs/product/pilot-vorschlag.md) |
 | Discovery and approvals (German) | [PROJECT-START.md](PROJECT-START.md) |
 | Working rules for humans and agents | [AGENTS.md](AGENTS.md) |
