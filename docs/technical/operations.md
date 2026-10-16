@@ -160,6 +160,68 @@ endpoints are disabled except `set-active` (404) – every change goes through t
   confirm the notification; reset the variable afterwards.
 - Out of scope: error-rate alerts from log aggregation, monitoring of a customer environment.
 
+## Backup and restore (showcase)
+
+Issue #108. Production (customer environment) uses managed PostgreSQL with PITR (ADR-0001 → production
+path); this section covers only the showcase database on Supabase (ADR-0001 D11 amendment 2026-09-24).
+
+**What backs it up.** Supabase backs up Pro/Team/Enterprise projects daily (Pro: last 7 days); a Free
+project has no automatic backup, and Supabase recommends regular exports. Database backups never contain
+Storage objects. So the showcase needs its own export, whatever the plan:
+
+| Item | Value |
+|---|---|
+| What | `pg_dump -Fc` of the schemas `app`, `identity`, `drizzle` (migration state) and `pgboss` (waiting jobs) – not the Supabase-managed schemas |
+| As whom | a dedicated read-only role `backup_reader` (Supabase's recommendation): `LOGIN BYPASSRLS`, `pg_read_all_data`, `default_transaction_read_only = on`; created once by the orchestrator as `postgres`, password in the password manager. **Not** `app_owner`: with forced RLS and `NOBYPASSRLS` its `pg_dump` fails ("query would be affected by row-level security policy") – by design (ADR-0001 D7) |
+| How often | weekly and before every migration on the showcase |
+| Kept | the last 4 exports |
+| Where | encrypted (e.g. `age` or the password manager's file vault) in the orchestrator's storage – **never** in the repository, CI artifacts or a shared drive: an export holds every company's data and the user accounts (names, e-mail addresses – personal data, also on the showcase) |
+| Client | `pg_dump` / `pg_restore` of the server's major version (showcase: PostgreSQL 17) or newer |
+
+```bash
+pg_dump "postgresql://backup_reader.<project-ref>@<pooler-host>:5432/postgres" -Fc \
+  -n app -n identity -n drizzle -n pgboss -f requestflow-showcase-<date>.dump
+```
+
+`backup_reader` can read every row of every company – it is as sensitive as the `postgres` password and
+is used for nothing else. Status: **not set up yet** (account action, orchestrator).
+
+**Documents bucket: not backed up.** `requestflow-documents` (Supabase Storage) is outside the export.
+After a restore, rows in `app.documents` may point to missing objects: the original download answers 404,
+reprocessing such a request fails. Acceptable for the showcase (synthetic data only): sample requests are
+rebuilt with `pnpm seed:samples`, other uploads are lost. A customer system needs versioned object storage
+(production path).
+
+**Restore – always into a separate, empty database, never over the showcase:**
+
+1. Create the target (a new Supabase project, or a local PostgreSQL) and run
+   `scripts/supabase-bootstrap.sql` there as `postgres` – the dump keeps the owners, so `app_owner` and
+   `app_rw` (both `NOBYPASSRLS`) must exist first.
+2. `pg_restore -d "<target as postgres>" --exit-on-error requestflow-showcase-<date>.dump`
+3. `pnpm setup:deploy` against the target – the migrations are a no-op, the job queues are confirmed.
+4. Check, source vs. target: `select count(*) from drizzle.__drizzle_migrations`, row counts of
+   `app.requests` and `identity."user"`, `pgboss.job`; the RLS guard (`TABLE_SECURITY_QUERY` +
+   `tenantIsolationViolations` from `src/features/tenancy`) reports no violation; `app_rw` sees 0 rows of
+   `app.requests` without a company context.
+
+**Rehearsal protocol (2026-10-16, local PostgreSQL 16 – not the showcase).** Source: a database built
+with the real migration runner (20 migrations) and `installJobQueues`, synthetic rows for two companies
+(11 requests, 3 users, 1 waiting job). Steps 1–4 as above, roles pre-existing in the same cluster. Result:
+
+| Check | Source | Restored |
+|---|---|---|
+| migrations | 20 | 20 (still 20 after `setup:deploy` steps) |
+| `app.requests` / `identity."user"` / `pgboss.job` | 11 / 3 / 1 | 11 / 3 / 1 |
+| tables not owned by `app_owner` (`app`, `identity`, `pgboss`) | 0 | 0 |
+| RLS guard violations (8 `app` tables) | none | none |
+| `app_owner` / `app_rw` superuser or BYPASSRLS | no / no | no / no |
+| `app_rw` without / with company A context | 0 / 7 | 0 / 7 |
+
+Dump and restore took about 1 s (96 KB). `pg_dump` as `app_owner` failed as expected; as `backup_reader`
+it exported all 27 data sections, and the role could not write (`cannot execute INSERT in a read-only
+transaction`). **Still open:** one rehearsal against the showcase itself (export via the pooler, restore
+into a separate project) once `backup_reader` exists – record date, duration and the same table here.
+
 ## Frequent failures
 
 | Symptom | Cause | Action |
