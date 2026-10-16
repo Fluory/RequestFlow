@@ -183,7 +183,7 @@ recording first); Vertex AI list prices are not confirmed here. On the free tier
 exception ends, at the latest 2026-10-31) the cost is 0 – only the quota counts.
 
 **What bounds the cost – and what does not.** The upload caps bound the number of calls, not their size:
-`UPLOAD_MAX_PER_HOUR` (showcase: 20 per person) × `UPLOAD_MAX_FILES` (showcase: 3) = at most 60 calls per
+`UPLOAD_MAX_PER_HOUR` (runbook example for the showcase: 20 per person) × `UPLOAD_MAX_FILES` (showcase: 3) = at most 60 calls per
 person and hour – about 1.90 USD per hour at the worst figure above, so 10 USD after about 5 hours of
 uploading without pause. The model call itself has **no output limit and no input-size limit** (no
 `max_output_tokens`; the document text goes in whole, up to the 20 MB file cap), so one large document can
