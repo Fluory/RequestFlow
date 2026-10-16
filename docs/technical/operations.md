@@ -172,7 +172,7 @@ Storage objects. So the showcase needs its own export, whatever the plan:
 | Item | Value |
 |---|---|
 | What | `pg_dump -Fc` of the schemas `app`, `identity`, `drizzle` (migration state) and `pgboss` (waiting jobs) – not the Supabase-managed schemas |
-| As whom | a dedicated read-only role `backup_reader` (Supabase's recommendation): `LOGIN BYPASSRLS`, `pg_read_all_data`, `default_transaction_read_only = on`; created once by the orchestrator as `postgres`, password in the password manager. **Not** `app_owner`: with forced RLS and `NOBYPASSRLS` its `pg_dump` fails ("query would be affected by row-level security policy") – by design (ADR-0001 D7) |
+| As whom | a dedicated read-only role `backup_reader` ([Supabase's recommendation](https://supabase.com/docs/guides/troubleshooting/pg_dump-fails-with-query-would-be-affected-by-row-level-security-policy-1d5783)): `LOGIN BYPASSRLS`, `pg_read_all_data`, `default_transaction_read_only = on`; created once by the orchestrator as `postgres`, password in the password manager. Read-only because it holds **no write grants** – `default_transaction_read_only` is only a safety net a session could switch off. **Not** `app_owner`: with forced RLS and `NOBYPASSRLS` its `pg_dump` fails ("query would be affected by row-level security policy") – by design (ADR-0001 D7) |
 | How often | weekly and before every migration on the showcase |
 | Kept | the last 4 exports |
 | Where | encrypted (e.g. `age` or the password manager's file vault) in the orchestrator's storage – **never** in the repository, CI artifacts or a shared drive: an export holds every company's data and the user accounts (names, e-mail addresses – personal data, also on the showcase) |
@@ -197,16 +197,21 @@ rebuilt with `pnpm seed:samples`, other uploads are lost. A customer system need
 1. Create the target (a new Supabase project, or a local PostgreSQL) and run
    `scripts/supabase-bootstrap.sql` there as `postgres` – the dump keeps the owners, so `app_owner` and
    `app_rw` (both `NOBYPASSRLS`) must exist first.
-2. `pg_restore -d "<target as postgres>" --exit-on-error requestflow-showcase-<date>.dump`
-3. `pnpm setup:deploy` against the target – the migrations are a no-op, the job queues are confirmed.
-4. Check, source vs. target: `select count(*) from drizzle.__drizzle_migrations`, row counts of
+2. Where `postgres` is not a superuser (Supabase), it must be allowed to act as the owners, or
+   `pg_restore` stops at `ALTER SCHEMA app OWNER TO app_owner` ("must be able to SET ROLE"):
+   `GRANT app_owner, app_rw TO postgres;` – and `REVOKE app_owner, app_rw FROM postgres;` after step 3.
+3. `pg_restore -d "<target as postgres>" --exit-on-error requestflow-showcase-<date>.dump`
+4. `pnpm setup:deploy` with `MIGRATION_DATABASE_URL` **and** the storage variables (`S3_*`) pointing at
+   the target – never with the showcase's environment loaded, or it runs against the showcase and its
+   bucket. The migrations are a no-op, the job queues are confirmed.
+5. Check, source vs. target: `select count(*) from drizzle.__drizzle_migrations`, row counts of
    `app.requests` and `identity."user"`, `pgboss.job`; the RLS guard (`TABLE_SECURITY_QUERY` +
    `tenantIsolationViolations` from `src/features/tenancy`) reports no violation; `app_rw` sees 0 rows of
    `app.requests` without a company context.
 
 **Rehearsal protocol (2026-10-16, local PostgreSQL 16 – not the showcase).** Source: a database built
 with the real migration runner (20 migrations) and `installJobQueues`, synthetic rows for two companies
-(11 requests, 3 users, 1 waiting job). Steps 1–4 as above, roles pre-existing in the same cluster. Result:
+(11 requests, 3 users, 1 waiting job). Steps 1, 3–5 as above (as a superuser, roles pre-existing in the same cluster). Result:
 
 | Check | Source | Restored |
 |---|---|---|
@@ -219,8 +224,13 @@ with the real migration runner (20 migrations) and `installJobQueues`, synthetic
 
 Dump and restore took about 1 s (96 KB). `pg_dump` as `app_owner` failed as expected; as `backup_reader`
 it exported all 27 data sections, and the role could not write (`cannot execute INSERT in a read-only
-transaction`). **Still open:** one rehearsal against the showcase itself (export via the pooler, restore
-into a separate project) once `backup_reader` exists – record date, duration and the same table here.
+transaction`). Step 2 was checked separately with a non-superuser
+restoring role: without membership in `app_owner`/`app_rw` the restore stopped at the first `OWNER TO`;
+with it (and without `BYPASSRLS`) the restore was complete – 20 migrations, 11 / 3 / 1 rows, all tables owned
+by `app_owner`, RLS guard without violation, `app_rw` 0 / 7. **Still open:** step 1 on an empty
+target (the bootstrap script on a new project) and one rehearsal against the showcase itself (export via
+the pooler, restore into a separate project) once `backup_reader` exists – record date, duration and the
+same table here.
 
 ## Frequent failures
 
