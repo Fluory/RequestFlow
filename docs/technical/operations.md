@@ -162,20 +162,25 @@ endpoints are disabled except `set-active` (404) – every change goes through t
 
 ## AI cost
 
-Issue #109. Every processed document is **one** model call (`process-request.ts`: one call per
-document of a request; `.msg` attachments travel inside their document). Tokens are recorded per run
+Issue #109. Every processed document is **one** model call per attempt (`process-request.ts`: one call
+per document of a request; `.msg` attachments travel inside their document). A failed attempt repeats
+the calls: an invalid or failed model answer (`model_output_invalid`, `model_error`) is retryable, and
+the processing job then runs again – up to **6 attempts** (`retryLimit: 5`, `queues.ts`) – calling the
+model again for **every** document of the request, including those that already succeeded. A paid but
+unusable answer can thus be billed up to 6 times per document, plus each manual reprocess ("Erneut verarbeiten"). Tokens are recorded per run
 (`extraction_runs.total_tokens`, per document in `extraction_runs.documents`); the query for cost per
-request is signal S4 of the pilot metrics page (`docs/product/metrics.md`, #113).
+request is signal S4 of the pilot metrics page (`docs/product/metrics.md`, pending in #121). Tokens are
+stored only for a successful run, so calls of failed attempts are **not** in these figures.
 
 **Cost per document (estimate, 2026-10-16).** Formula: `input_tokens × input price + (total_tokens −
 input_tokens) × output price` – the difference is output **plus thinking** tokens, which Google bills at
 the output price. Token source: the two sample recordings (`src/features/samples/data/*.recording.json`,
 `gemini-3.5-flash`, prompt `extract_v2`). Prices per 1M tokens, Gemini API standard (paid) tier:
 
-| Price basis | Input / output (USD) | „Pumpe P204“ (1,280 in / 3,242 out) | „Werk Ost“ (1,281 in / 2,277 out) |
+| Price basis | Input / output (USD) | "Pumpe P204" (1,280 in / 3,242 out) | "Werk Ost" (1,281 in / 2,277 out) |
 |---|---|---|---|
 | `gemini-3.5-flash` – **unconfirmed**: Google's pricing page (updated 2026-10-15) no longer lists it; figure from third-party price lists | 1.50 / 9.00 | 0.031 | 0.022 |
-| `gemini-3.6-flash` (Google's recommended successor), until 2026-12-31 | 0.75 / 3.75 | 0.013 | 0.010 |
+| `gemini-3.6-flash` (Google's recommended successor), until 2026-12-31 | 0.75 / 3.75 | 0.013 | 0.009 |
 | `gemini-3.6-flash` from 2027-01-01 | 1.50 / 7.50 | 0.026 | 0.019 |
 
 Assumptions: the same token counts for 3.6 (not measured – a model change runs the eval gate and a new
@@ -183,15 +188,15 @@ recording first); Vertex AI list prices are not confirmed here. On the free tier
 exception ends, at the latest 2026-10-31) the cost is 0 – only the quota counts.
 
 **What bounds the cost – and what does not.** The upload caps bound the number of calls, not their size:
-`UPLOAD_MAX_PER_HOUR` (runbook example for the showcase: 20 per person) × `UPLOAD_MAX_FILES` (showcase: 3) = at most 60 calls per
-person and hour – about 1.90 USD per hour at the worst figure above, so 10 USD after about 5 hours of
-uploading without pause. The model call itself has **no output limit and no input-size limit** (no
+`UPLOAD_MAX_PER_HOUR` (runbook example for the showcase: 20 per person) × `UPLOAD_MAX_FILES` (showcase: 3) = at most 60 documents per
+person and hour – about 1.90 USD per hour at the worst figure above (10 EUR after roughly 5 hours of
+uploading without pause), and up to 6 times that while answers keep failing (360 calls per hour). The model call itself has **no output limit and no input-size limit** (no
 `max_output_tokens`; the document text goes in whole, up to the 20 MB file cap), so one large document can
 cost far more than the samples – follow-up #123 (cap output tokens and document text per call).
 
 **Monthly limits** (proposed – the orchestrator confirms them when setting up the budget):
 
-| Environment | Limit / month | ≈ document calls at the worst figure | Basis |
+| Environment | Limit / month | ≈ document calls at the worst figure (1 EUR counted as 1 USD – conservative) | Basis |
 |---|---|---|---|
 | Showcase (invite-only, one person) | 10 EUR | ~320 | brief → Risks ("10 €/month GCP budget alert") |
 | Pilot (3–5 test users) | 50 EUR | ~1,600 | assumption: 5 users × ~15 documents per working day × 21 days ≈ 1,575; reviewed after the first month |
