@@ -79,6 +79,9 @@ failure at any step ─► retry with backoff ─► dead letter ─► requests
 | Vertex AI (`eu` endpoint, gemini-3.5-flash) | extraction | showcase + customer; local dev may use the Gemini free tier with synthetic data |
 | ERP | export target | pilot: `erp-mock`; contract `contracts/erp-export.openapi.yaml` |
 
+AI cost per document, monthly limits (showcase 10 EUR, pilot 50 EUR, proposed) and what happens at the limit:
+[operations.md → AI cost](operations.md#ai-cost) (#109).
+
 No secrets in this document; every variable is documented in `.env.example`.
 
 ## Database roles
