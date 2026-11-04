@@ -6,6 +6,10 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Security
+- `better-auth` / `@better-auth/drizzle-adapter` 1.7.7 (two critical/high advisories, incl. sign-in as another
+  user via the OAuth proxy), Next.js 16.4.1 (Server Actions DoS and a critical advisory), `zod` 4.6.6 and `vite`
+  8.3.4 as a direct dev dependency (it was an auto-installed peer of `vitest`); oldest patched releases, each
+  at least two weeks old (#126).
 - Next.js 16.3.8 (SSRF in image optimization and five moderate/low advisories), `sharp` 0.35.5 and
   `source-map-js` 1.2.2; the unfixed `braces` advisory of the lint tooling is a dated exception in the
   architecture map (#115).
