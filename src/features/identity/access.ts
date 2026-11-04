@@ -23,6 +23,13 @@ export const organizationRoles = {
     team: [],
     ac: ["read"],
   }),
+  guest: organizationAc.newRole({
+    organization: [],
+    member: [],
+    invitation: [],
+    team: [],
+    ac: ["read"],
+  }),
 };
 
 // The organization plugin serves the data model (companies, members, invitations) and `set-active`

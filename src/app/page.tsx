@@ -2,14 +2,17 @@ import Link from "next/link";
 import { Brand } from "@/app/_components/app-header";
 import { getRuntime, requestActor } from "@/app/_server/runtime";
 import { countRequestsByStatus, findSampleForVisitors } from "@/features/requests";
+import { startGuestAction } from "./guest/actions";
 
 export const dynamic = "force-dynamic";
 
 // Start page (#52, design prototype A): entry tiles; the request tile shows what needs work. #77: a
 // "next step" leads to the open work, or – when there is none – to the prepared sample (#71).
-export default async function HomePage() {
+export default async function HomePage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const actor = await requestActor();
   if (!actor) {
+    const guests = getRuntime().config.guests.enabled;
+    const busy = (await searchParams).guest === "busy";
     return (
       <main className="auth">
         <div className="auth-inner">
@@ -17,6 +20,14 @@ export default async function HomePage() {
           <div className="card">
             <h1>RequestFlow</h1>
             <p className="muted">Angebotsanfragen erfassen, neben der Quelle prüfen und genau einmal ans ERP übergeben.</p>
+            {/* #126: a guest company of its own with the prepared samples – no account needed. */}
+            {guests && (
+              <form action={startGuestAction} className="guest-start">
+                <button type="submit" className="btn-primary">Ohne Anmeldung ausprobieren</button>
+                <p className="muted">Sie bekommen eine eigene Demo-Firma mit vorbereiteten Musteranfragen.</p>
+              </form>
+            )}
+            {busy && <p role="alert">Die Demo ist heute stark gefragt – bitte später erneut versuchen.</p>}
             <p>
               <Link href="/login">Anmelden</Link> · <Link href="/signup">Konto mit Einladung anlegen</Link>
             </p>

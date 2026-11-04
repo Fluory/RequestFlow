@@ -11,6 +11,12 @@ This file records what changes **in the product** – process and session state 
   architecture map (#115).
 
 ### Added
+- Guest access on the showcase: "Ohne Anmeldung ausprobieren" on the start page creates a demo company of its own
+  with the prepared samples and signs the visitor in as `guest`. Guests review, correct, approve and export the
+  samples but never start a live model call: own uploads and reprocessing an extraction need the new permission
+  `requests.ingest`, enforced in the intake and jobs modules. On by default with `DEMO_MODE`
+  (`GUEST_ACCESS`), at most `GUEST_MAX_PER_DAY` (default 200) guest companies per 24 h; the session cookie
+  works inside an embedding iframe (`SameSite=None; Secure; Partitioned`) (#126).
 - Uptime monitor for the showcase: a scheduled GitHub Actions workflow calls `/api/health` every 15 minutes and turns red
   on timeout, non-200 or `status != "ok"` (the owner gets GitHub's failed-run notification); database, storage,
   AI service and waiting jobs appear in the job summary; runbook in `docs/technical/operations.md` (#110).

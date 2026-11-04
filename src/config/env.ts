@@ -52,6 +52,10 @@ const schema = z.object({
   CRON_SECRET: optional(z.string().min(24)),
   JOB_DRAIN_INLINE: flag,
   DEMO_MODE: flag,
+  // Guest access (#126): "Ohne Anmeldung ausprobieren" on the start page. Unset → on exactly when DEMO_MODE
+  // is. At most GUEST_MAX_PER_DAY guest companies per 24 h.
+  GUEST_ACCESS: z.preprocess((value) => (value === "" ? undefined : value), z.enum(["true", "false"]).optional()),
+  GUEST_MAX_PER_DAY: z.coerce.number().int().positive().max(10_000).default(200),
 });
 
 const LOCAL_PLACEHOLDER_SECRETS = new Set(["local-dev-only-secret-change-me-0123456789"]);
@@ -99,6 +103,7 @@ export interface AppConfig {
     drainInline: boolean;
   };
   demoMode: boolean;
+  guests: { enabled: boolean; maxPerDay: number };
 }
 
 // Errors list variable names only – values may be secrets and end up in logs.
@@ -156,5 +161,6 @@ export function loadConfig(source: Record<string, string | undefined> = process.
     },
     jobs: { cronSecret: env.CRON_SECRET, drainInline: env.JOB_DRAIN_INLINE === "true" },
     demoMode: env.DEMO_MODE === "true",
+    guests: { enabled: (env.GUEST_ACCESS ?? env.DEMO_MODE) === "true", maxPerDay: env.GUEST_MAX_PER_DAY },
   };
 }

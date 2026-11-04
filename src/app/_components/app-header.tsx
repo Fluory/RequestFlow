@@ -6,7 +6,7 @@ import { logEvent } from "@/features/observability";
 import { SignOutButton } from "./auth-form";
 import { NavLink } from "./nav-link";
 
-export const ROLE_LABEL = { admin: "Administration", clerk: "Sachbearbeitung" } as const;
+export const ROLE_LABEL = { admin: "Administration", clerk: "Sachbearbeitung", guest: "Gast (Demo)" } as const;
 
 async function signedIn(): Promise<{ actor: Actor; companyName: string | undefined } | null> {
   try {

@@ -471,3 +471,14 @@ button.btn-small {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* Start page: guest access (#126) */
+.guest-start {
+  display: grid;
+  justify-items: start;
+  gap: 0.4rem;
+  margin: 1rem 0;
+}
+.guest-start p {
+  margin: 0;
+}

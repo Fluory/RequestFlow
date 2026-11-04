@@ -25,6 +25,8 @@ export async function reprocessRequest(deps: { tenancy: Tenancy; boss: JobSender
     // A sample's extraction is a recording (#71): processing it again would call the live model.
     if (request.source === "sample" && request.errorStage === "processing") throw new ReprocessRefused();
     const stage = request.errorStage;
+    // Processing again calls the live model – not for guests (#126); an export retry does not.
+    if (stage === "processing") authorize(actor, "requests.ingest");
     await transitionRequest(tx, request, stage === "export" ? "reprocess.export" : "reprocess.processing", { errorStage: null, errorMessage: null, nextRetryAt: null });
     if (stage === "export") await enqueueRequestExport(deps.boss, tx, requestId);
     else await enqueueRequestProcessing(deps.boss, tx, requestId);
