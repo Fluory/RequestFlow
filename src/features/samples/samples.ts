@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { parseExtractResponse, type AiServiceClient, type ExtractResponse } from "@/features/extraction";
 
 // Prepared showcase cases (#71): synthetic mails whose AI answer was recorded once
@@ -16,7 +17,12 @@ export const SAMPLES: readonly Sample[] = [
   { key: "pumpe-p204", filename: "pumpe-p204.eml", purpose: "exported" },
 ];
 
-const dataFile = (name: string) => new URL(`./data/${name}`, import.meta.url);
+// Resolved from the project root, not from `import.meta.url`: in a Next build the bundler rewrites
+// `new URL("./data/…", import.meta.url)` to a public `/_next/static/media/…` URL that does not exist on the
+// server's file system, so the guest start found no samples. `next.config.ts` traces this folder into the
+// server output (`outputFileTracingIncludes`); scripts and tests run from the project root as well.
+export const SAMPLE_DATA_DIR = join("src", "features", "samples", "data");
+const dataFile = (name: string) => join(process.cwd(), SAMPLE_DATA_DIR, name);
 
 export const recordingFile = (sample: Sample) => dataFile(`${sample.key}.recording.json`);
 
