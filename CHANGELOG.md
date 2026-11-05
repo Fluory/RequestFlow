@@ -6,11 +6,21 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Security
+- `better-auth` / `@better-auth/drizzle-adapter` 1.7.7 (two critical/high advisories, incl. sign-in as another
+  user via the OAuth proxy), Next.js 16.4.1 (Server Actions DoS and a critical advisory), `zod` 4.6.6 and `vite`
+  8.3.4 as a direct dev dependency (it was an auto-installed peer of `vitest`); oldest patched releases, each
+  at least two weeks old (#126).
 - Next.js 16.3.8 (SSRF in image optimization and five moderate/low advisories), `sharp` 0.35.5 and
   `source-map-js` 1.2.2; the unfixed `braces` advisory of the lint tooling is a dated exception in the
   architecture map (#115).
 
 ### Added
+- Guest access on the showcase: "Ohne Anmeldung ausprobieren" on the start page creates a demo company of its own
+  with the prepared samples and signs the visitor in as `guest`. Guests review, correct, approve and export the
+  samples but never start a live model call: own uploads and reprocessing an extraction need the new permission
+  `requests.ingest`, enforced in the intake and jobs modules. On by default with `DEMO_MODE`
+  (`GUEST_ACCESS`), at most `GUEST_MAX_PER_DAY` (default 200) guest companies per 24 h; the session cookie
+  works inside an embedding iframe (`SameSite=None; Secure; Partitioned`) (#126).
 - Uptime monitor for the showcase: a scheduled GitHub Actions workflow calls `/api/health` every 15 minutes and turns red
   on timeout, non-200 or `status != "ok"` (the owner gets GitHub's failed-run notification); database, storage,
   AI service and waiting jobs appear in the job summary; runbook in `docs/technical/operations.md` (#110).

@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import { currentActor, getRuntime } from "@/app/_server/runtime";
-import { AuthorizationError, changeUserRole, COMPANY_ROLES, LastAdminError, SelfDeactivation, setUserActive, UserNotInCompany } from "@/features/identity";
+import { AuthorizationError, changeUserRole, LastAdminError, SelfDeactivation, setUserActive, STAFF_ROLES, UserNotInCompany } from "@/features/identity";
 
 // Server actions of the user management page (#30). Each resolves the actor from the session; the
 // identity module authorizes again next to the data (security rule: never only hidden UI). A clerk
@@ -39,7 +39,7 @@ function targetOf(formData: FormData): string {
 export async function changeRoleAction(formData: FormData): Promise<void> {
   const actor = await actorOrLogin();
   const target = targetOf(formData);
-  const role = z.enum(COMPANY_ROLES).safeParse(formData.get("role"));
+  const role = z.enum(STAFF_ROLES).safeParse(formData.get("role"));
   if (!role.success) redirect("/users?error=input");
   await guarded(() => changeUserRole(getRuntime().database.db, actor, target, role.data), "role_changed");
 }

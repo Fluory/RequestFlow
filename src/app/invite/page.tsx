@@ -4,11 +4,11 @@ import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import { CopyButton } from "@/app/_components/copy-button";
 import { currentActor, getRuntime, requestActor } from "@/app/_server/runtime";
-import { authorize, AuthorizationError, inviteUser, COMPANY_ROLES, type Actor } from "@/features/identity";
+import { authorize, AuthorizationError, inviteUser, STAFF_ROLES, type Actor } from "@/features/identity";
 
 export const dynamic = "force-dynamic";
 
-const inviteInput = z.object({ email: z.email().max(254), role: z.enum(COMPANY_ROLES) });
+const inviteInput = z.object({ email: z.email().max(254), role: z.enum(STAFF_ROLES) });
 
 // The page passes the per-request cached actor (shared with the app header); the action reads its own.
 async function adminOrNotFound(actor: Actor | null): Promise<Actor> {

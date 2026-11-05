@@ -124,6 +124,8 @@ separate Supabase project. Add every secret (`DATABASE_URL`, the S3 keys, `BETTE
 | `CRON_SECRET` | `openssl rand -base64 32` – Vercel Cron sends it as `Authorization: Bearer …` |
 | `JOB_DRAIN_INLINE` | `true` |
 | `DEMO_MODE` | `true` |
+| `GUEST_ACCESS` | optional – unset follows `DEMO_MODE`: "Ohne Anmeldung ausprobieren" creates a guest company with the samples (no uploads, no live model calls, #126) |
+| `GUEST_MAX_PER_DAY` | optional, default `200` – guest companies per 24 h (abuse guard) |
 | `UPLOAD_MAX_PER_HOUR` | e.g. `20` – uploads per person and hour (every upload starts paid AI calls); **required** with `APP_ENV=showcase` |
 
 `.env.example` documents every variable. `MIGRATION_DATABASE_URL` and `SEED_PASSWORD` are **not** set on

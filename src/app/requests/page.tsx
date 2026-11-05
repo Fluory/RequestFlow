@@ -66,7 +66,14 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
       {done && <p role="status">{done}</p>}
       {error && <p role="alert">{error}</p>}
       <section className="card card-pad" aria-label="Anfrage hochladen">
-        <UploadForm />
+        {actor.role === "guest" ? (
+          // #126: uploads would start paid model calls – guests work with the prepared samples.
+          <p className="muted" data-testid="guest-upload-note">
+            Im Demo-Zugang sind eigene Uploads gesperrt. Probieren Sie die vorbereiteten Musteranfragen unten aus: prüfen, korrigieren, freigeben.
+          </p>
+        ) : (
+          <UploadForm />
+        )}
       </section>
       <section className="card" aria-label="Anfragenliste">
         <form method="get" aria-label="Filter" className="toolbar">

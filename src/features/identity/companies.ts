@@ -29,10 +29,13 @@ async function systemInviterId(db: Database): Promise<string> {
   return row.id;
 }
 
-/** Operator action (seed script): a new company plus the invitation for its first admin. */
+/**
+ * Operator action (seed script): a new company plus the invitation for its first admin. The guest access
+ * (#126) uses it with `role: "guest"` for the single member of a guest company.
+ */
 export async function bootstrapCompany(
   db: Database,
-  input: { name: string; slug: string; adminEmail: string },
+  input: { name: string; slug: string; adminEmail: string; role?: CompanyRole },
 ): Promise<{ company: Company; invitationId: string }> {
   const inviterId = await systemInviterId(db);
   return db.transaction(async (tx) => {
@@ -43,7 +46,7 @@ export async function bootstrapCompany(
     if (!company) throw new Error("company insert returned no row");
     const [invitation] = await tx
       .insert(schema.invitation)
-      .values({ organizationId: company.id, email: lower(input.adminEmail), role: "admin", status: "pending", expiresAt: expiry(), inviterId })
+      .values({ organizationId: company.id, email: lower(input.adminEmail), role: input.role ?? "admin", status: "pending", expiresAt: expiry(), inviterId })
       .returning({ id: schema.invitation.id });
     if (!invitation) throw new Error("invitation insert returned no row");
     return { company, invitationId: invitation.id };
@@ -57,7 +60,8 @@ export async function inviteUser(
   input: { email: string; role: CompanyRole },
 ): Promise<{ invitationId: string }> {
   authorize(actor, "users.invite");
-  if (!isCompanyRole(input.role)) throw new Error("unknown role");
+  // `guest` exists only for guest companies (#126) – never invited by an admin.
+  if (!isCompanyRole(input.role) || input.role === "guest") throw new Error("unknown role");
   const email = lower(input.email);
   return createTenancy(db).withTenant(actor.companyId, async (tx) => {
     // Re-inviting replaces a pending invitation of the same company.

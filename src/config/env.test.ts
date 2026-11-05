@@ -108,6 +108,22 @@ describe("loadConfig", () => {
     expect(loadConfig({ ...showcase, UPLOAD_MAX_PER_HOUR: "20" }).upload.maxPerHour).toBe(20);
   });
 
+  describe("guest access (#126)", () => {
+    it("follows DEMO_MODE unless GUEST_ACCESS is set; empty counts as unset", () => {
+      expect(loadConfig(valid).guests).toEqual({ enabled: false, maxPerDay: 200 });
+      expect(loadConfig({ ...valid, DEMO_MODE: "true" }).guests.enabled).toBe(true);
+      expect(loadConfig({ ...valid, DEMO_MODE: "true", GUEST_ACCESS: "false" }).guests.enabled).toBe(false);
+      expect(loadConfig({ ...valid, GUEST_ACCESS: "true" }).guests.enabled).toBe(true);
+      expect(loadConfig({ ...valid, DEMO_MODE: "true", GUEST_ACCESS: "" }).guests.enabled).toBe(true);
+    });
+
+    it("reads GUEST_MAX_PER_DAY and refuses non-positive values, naming only the variable", () => {
+      expect(loadConfig({ ...valid, GUEST_MAX_PER_DAY: "25" }).guests.maxPerDay).toBe(25);
+      expect(() => loadConfig({ ...valid, GUEST_MAX_PER_DAY: "0" })).toThrow(/GUEST_MAX_PER_DAY/);
+      expect(() => loadConfig({ ...valid, GUEST_ACCESS: "yes" })).toThrow(/GUEST_ACCESS/);
+    });
+  });
+
   describe("serverless job drain and demo mode (#59)", () => {
     // Values that fit one processing job into the drain function (60 s × 3 files).
     const fits = { AI_SERVICE_TIMEOUT_MS: "60000", UPLOAD_MAX_FILES: "3" };

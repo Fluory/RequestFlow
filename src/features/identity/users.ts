@@ -92,7 +92,8 @@ export async function listCompanyUsers(db: Database, actor: Actor): Promise<{ us
 }
 
 export async function changeUserRole(db: Database, actor: Actor, userId: string, role: CompanyRole): Promise<void> {
-  if (!isCompanyRole(role)) throw new Error("unknown role");
+  // `guest` exists only for guest companies (#126) – never assigned by an admin.
+  if (!isCompanyRole(role) || role === "guest") throw new Error("unknown role");
   await manage(db, actor, userId, { userId, role }, async (tx, before) => {
     if (before.role === role) return null;
     await tx

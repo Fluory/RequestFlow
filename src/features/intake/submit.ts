@@ -43,7 +43,8 @@ export async function submitUpload(
   /** `sample` (#71): a prepared showcase case, marked in the same transaction as the request. */
   options: { source?: "upload" | "sample" } = {},
 ): Promise<SubmittedRequest> {
-  authorize(actor, "requests.process");
+  // An upload goes to the live model; a sample replays a recording (#71) – guests may only do the latter (#126).
+  authorize(actor, options.source === "sample" ? "requests.process" : "requests.ingest");
   if (files.length === 0) throw new UploadRejected("Bitte mindestens eine Datei auswählen.");
   if (files.length > deps.limits.maxFiles) throw new UploadRejected(`Höchstens ${deps.limits.maxFiles} Dateien pro Anfrage.`);
 
