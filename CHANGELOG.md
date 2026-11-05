@@ -5,6 +5,10 @@ This file records what changes **in the product** – process and session state 
 
 ## [Unreleased]
 
+### Fixed
+- The guest start on Vercel now creates the samples: the sample files are read from the project root and traced
+  into the server output instead of being rewritten to a public static URL by the bundler (#128).
+
 ### Security
 - `better-auth` / `@better-auth/drizzle-adapter` 1.7.7 (two critical/high advisories, incl. sign-in as another
   user via the OAuth proxy), Next.js 16.4.1 (Server Actions DoS and a critical advisory), `zod` 4.6.6 and `vite`
