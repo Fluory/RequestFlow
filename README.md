@@ -6,10 +6,18 @@ approved request **exactly once** to an ERP.
 
 > **Status:** pilot scope built and released as [v0.1.0](https://github.com/Fluory/RequestFlow/releases/tag/v0.1.0)
 > (2026-09-28); acceptance pending ([roadmap](docs/product/roadmap.md), M2). A synthetic showcase runs on Vercel:
-> the **[case study](https://requestflow-doc-edit.vercel.app/case-study)** is public (German, no login), the
-> [app](https://requestflow-doc-edit.vercel.app) itself is open to invited visitors.
+> the **[case study](https://requestflow-doc-edit.vercel.app/case-study)** is public (German, no login), and the
+> [app](https://requestflow-doc-edit.vercel.app) can be tried without an account: "Ohne Anmeldung ausprobieren"
+> creates a demo company of your own with prepared sample requests (uploads are disabled for guests).
 > **Reference project:** built like a real customer engagement for a mid-sized machine-building
 > company; the customer is fictional and **all data in this repository is synthetic**.
+
+## Why a business would want this
+
+A sales assistant who types quantities, materials and delivery dates from e-mails and PDFs into the ERP
+spends hours a week on copying, and one wrong digit becomes a wrong quote. RequestFlow does the copying and
+shows **where in the document each value came from**, so the person only checks and approves. Nothing reaches
+the ERP without that approval, and nothing reaches it twice.
 
 ## What it does (pilot scope)
 
@@ -96,3 +104,9 @@ KI-gestützte Erfassung von Angebotsanfragen: Daten aus E-Mails und Anhängen ex
 Angabe neben ihrer Fundstelle prüfen und freigegebene Anfragen genau einmal ans ERP übergeben.
 Referenzprojekt mit fiktivem Kunden – alle Daten sind synthetisch.
 Öffentliche Fallstudie: [requestflow-doc-edit.vercel.app/case-study](https://requestflow-doc-edit.vercel.app/case-study).
+
+---
+
+Built by [Florian Hein](https://final-portfolio-website-ten.vercel.app/en/) in Heilbronn, Germany. I build software
+prototypes for companies, from a document or workflow that eats time to something your team can try in a few
+weeks. Case study on my website: [RequestFlow](https://final-portfolio-website-ten.vercel.app/en/work/requestflow/).
