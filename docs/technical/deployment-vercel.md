@@ -128,6 +128,7 @@ separate Supabase project. Add every secret (`DATABASE_URL`, the S3 keys, `BETTE
 | `GUEST_MAX_PER_DAY` | optional, default `200` – guest companies per 24 h (abuse guard; checked atomically in the database) |
 | `GUEST_MAX_PER_CLIENT_PER_DAY` | optional, default `3` – guest companies per 24 h and client address (keyed by `AUTH_IP_HEADERS`; only an HMAC of the address is stored) |
 | `GUEST_RETENTION_HOURS` | optional, default `24` (max. 720) – every guest company is deleted completely after this time (queue `guest-purge`, run by every drain round) |
+| `FRAME_ANCESTORS` | optional – space-separated https origins that may embed the showcase in an iframe (e.g. the portfolio site, `https://<portfolio-domain>`). Unset → embedding is refused (`frame-ancestors 'none'`, `X-Frame-Options: DENY`). Read at **build** time: redeploy after a change |
 | `UPLOAD_MAX_PER_HOUR` | e.g. `20` – uploads per person and hour (every upload starts paid AI calls); **required** with `APP_ENV=showcase` |
 
 `.env.example` documents every variable. `MIGRATION_DATABASE_URL` and `SEED_PASSWORD` are **not** set on

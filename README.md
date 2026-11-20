@@ -8,7 +8,8 @@ approved request **exactly once** to an ERP.
 > (2026-09-28); acceptance pending ([roadmap](docs/product/roadmap.md), M2). A synthetic showcase runs on Vercel:
 > the **[case study](https://requestflow-doc-edit.vercel.app/case-study)** is public (German, no login), and the
 > [app](https://requestflow-doc-edit.vercel.app) can be tried without an account: "Ohne Anmeldung ausprobieren"
-> creates a demo company of your own with prepared sample requests (uploads are disabled for guests).
+> creates a demo company of your own with prepared sample requests (uploads are disabled for guests; the demo
+> company is deleted completely after 24 h). Impressum and Datenschutz are linked in the footer of every page.
 > **Reference project:** built like a real customer engagement for a mid-sized machine-building
 > company; the customer is fictional and **all data in this repository is synthetic**.
 

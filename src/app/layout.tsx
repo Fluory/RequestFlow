@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { getRuntime } from "./_server/runtime";
 import { AppHeader } from "./_components/app-header";
 import { DemoBanner } from "./_components/demo-banner";
+import { SiteFooter } from "./_components/site-footer";
 // Self-hosted IBM Plex (Latin subset, only the weights the design uses) – no third-party requests.
 import "@fontsource/ibm-plex-sans/latin-400.css";
 import "@fontsource/ibm-plex-sans/latin-500.css";
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <DemoBanner enabled={demoMode()} />
         <AppHeader />
         {children}
+        <SiteFooter />
       </body>
     </html>
   );
