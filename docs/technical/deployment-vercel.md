@@ -204,6 +204,29 @@ run started meanwhile waits for the first and then finds the samples in place; a
 - Remove the showcase completely: delete both Vercel projects (`requestflow`, `requestflow-ai`) and the
   Supabase project – all data is synthetic, nothing has to be kept.
 
+## 10. Fast Origin Transfer budget
+
+Vercel Hobby includes 10 GB of Fast Origin Transfer per month: "Data sent between the CDN and Vercel
+Functions", counted on request and response bytes, for Functions, Middleware, Blob and the Data Cache (ISR)
+(vercel.com/docs/manage-cdn-usage, read 2026-11-20). A CDN cache hit does not invoke the function.
+
+What causes it here: there is no middleware/proxy. Every page is a Function (`ƒ` in the build output – the
+root layout reads the session for the header), and so are `/api/*`, server actions (the guest start, uploads:
+the whole uploaded file counts as incoming bytes) and document downloads (`/api/documents/:id` streams the
+original through the Function; it stays that way – private bucket, no public or signed URLs, ADR-0001 D5).
+The uptime workflow calls `/api/health` (< 2 kB) every 15 minutes. There is no polling in the review UI.
+
+Measured 2026-11-20 on a local production build (`next start`, gzip/br, body + headers): `/` 3.7 kB,
+`/case-study` 9.2 kB, `/login` 3.6 kB, `/impressum` 5.7 kB, `/datenschutz` 8.2 kB – a public visit of these
+five pages is about 30 kB, i.e. roughly 300,000 such visits before 10 GB (estimate; signed-in pages, uploads
+and downloads come on top, depending on file size). Confirm real numbers in Vercel → Usage → Fast Origin
+Transfer, per project. Re-measure: `curl -s -o /dev/null -H 'Accept-Encoding: br, gzip' -w '%{size_download} %{size_header}\n' <url>`.
+
+Two rules for future changes:
+1. No middleware/proxy without a `matcher` limited to the paths that need it (never static files, icons, fonts).
+2. No client-side polling of Functions and no large bytes through a Function unless protection requires it –
+   cache public responses (`s-maxage`) instead of `no-store` where nothing session-specific is in them.
+
 ## Known limits
 
 - The ERP mock keeps its idempotency store in memory **per function instance**, so its replay answer
