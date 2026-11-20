@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("next/server", async (original) => ({ ...(await original<typeof import("next/server")>()), after: vi.fn() }));
 const runtime = { drainInline: true };
 vi.mock("./runtime", () => ({
-  getRuntime: () => ({ config: { jobs: { drainInline: runtime.drainInline } }, tenancy: {}, storage: {} }),
+  getRuntime: () => ({ config: { jobs: { drainInline: runtime.drainInline } }, tenancy: {}, storage: {}, database: { db: {} } }),
   getJobClient: async () => ({}),
 }));
 const round = { processing: { processed: 0, failed: 0, deadLettered: 0 }, exports: { exported: 0, failed: 0, deadLettered: 0 } };

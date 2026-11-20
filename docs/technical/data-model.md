@@ -115,6 +115,13 @@ as the change.
 | `member` | user ↔ company, company role `admin`/`clerk`; unique `user_id` (one company per user) | internal | membership + role |
 | `invitation` | e-mail, company, role, status, expiry, inviter; the random `id` is the sign-up token (link) | personal (staff) | invite-only sign-up |
 | `rate_limit` | key (IP + path), counter | personal (IP) | built-in rate limit, database storage |
+| `guest_admission` | guest company (PK, FK `ON DELETE CASCADE`), HMAC-SHA-256 of the client address (keyed with `BETTER_AUTH_SECRET`), created at; own schema file `src/db/schema/guests.ts` | personal (pseudonymous) | atomic daily guest cap + per-client brake; deleted with the guest company |
+
+Guest companies (slug `guest-…`) are deleted completely after `GUEST_RETENTION_HOURS` (default 24 h): the
+`app` rows through `app.purge_guest_company(uuid)` (SECURITY DEFINER, only inside the company's own tenant
+context and only for guest companies – the only way the append-only tables lose rows), the stored documents,
+then organization, membership, invitation, admission and the guest user with session and account (ADR-0001 D7
+amendment 2026-11-20).
 
 A system user `system@requestflow.invalid` (no password account, no membership) is the inviter of each
 company's first admin; it can never obtain a session.
@@ -124,6 +131,7 @@ company's first admin; it can never obtain a session.
 ```text
 identity.organization 1─n identity.member n─1 identity.user 1─n identity.session / identity.account
 identity.organization 1─n identity.invitation
+identity.organization 1─0..1 identity.guest_admission   (guest companies only)
 identity.organization 1─n app.requests            (company_id)
 app.requests      1─n app.documents           (request_id, company_id)
 app.requests      0─1 app.requests            (duplicate_of_id, company_id)

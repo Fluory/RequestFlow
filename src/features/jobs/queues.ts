@@ -8,9 +8,15 @@ export const QUEUES = {
   processRequestDead: "request-process-dead",
   exportRequest: "request-export",
   exportRequestDead: "request-export-dead",
+  purgeGuest: "guest-purge",
 } as const;
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];
+
+/** Guest retention (ADR-0001 D7 amendment 2026-11-20): one job per expired guest company. */
+export interface GuestPurgeJob {
+  companyId: string;
+}
 
 export interface RequestJob {
   requestId: string;
@@ -43,4 +49,7 @@ export const QUEUE_DEFINITIONS: Array<Queue> = [
     expireInSeconds: 60 * 15,
     deadLetter: QUEUES.exportRequestDead,
   },
+  // Guest retention: retried with backoff; a job that still fails is picked up again by the next sweep
+  // (`exclusive` blocks a second job only while one is queued or active).
+  { name: QUEUES.purgeGuest, policy: "exclusive", retryLimit: 5, retryDelay: 60, retryBackoff: true, retryDelayMax: 60 * 30, expireInSeconds: 60 * 5, retentionSeconds: 60 * 60 * 24 * 7 },
 ];

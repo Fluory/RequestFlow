@@ -125,7 +125,9 @@ separate Supabase project. Add every secret (`DATABASE_URL`, the S3 keys, `BETTE
 | `JOB_DRAIN_INLINE` | `true` |
 | `DEMO_MODE` | `true` |
 | `GUEST_ACCESS` | optional – unset follows `DEMO_MODE`: "Ohne Anmeldung ausprobieren" creates a guest company with the samples (no uploads, no live model calls, #126) |
-| `GUEST_MAX_PER_DAY` | optional, default `200` – guest companies per 24 h (abuse guard) |
+| `GUEST_MAX_PER_DAY` | optional, default `200` – guest companies per 24 h (abuse guard; checked atomically in the database) |
+| `GUEST_MAX_PER_CLIENT_PER_DAY` | optional, default `3` – guest companies per 24 h and client address (keyed by `AUTH_IP_HEADERS`; only an HMAC of the address is stored) |
+| `GUEST_RETENTION_HOURS` | optional, default `24` (max. 720) – every guest company is deleted completely after this time (queue `guest-purge`, run by every drain round) |
 | `UPLOAD_MAX_PER_HOUR` | e.g. `20` – uploads per person and hour (every upload starts paid AI calls); **required** with `APP_ENV=showcase` |
 
 `.env.example` documents every variable. `MIGRATION_DATABASE_URL` and `SEED_PASSWORD` are **not** set on

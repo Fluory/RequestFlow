@@ -31,3 +31,9 @@ export async function listDocuments(tx: TenantTx, requestId: string): Promise<Do
   tenantOf(tx);
   return tx.select().from(documents).where(eq(documents.requestId, requestId)).orderBy(asc(documents.createdAt), asc(documents.filename));
 }
+
+/** Storage keys of all documents of the tenant – the guest retention deletes these objects (#126 follow-up). */
+export async function listStorageKeys(tx: TenantTx): Promise<string[]> {
+  tenantOf(tx);
+  return (await tx.select({ key: documents.storageKey }).from(documents)).map((row) => row.key);
+}

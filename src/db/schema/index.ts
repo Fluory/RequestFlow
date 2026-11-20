@@ -2,3 +2,4 @@
 // forced RLS). Migrations in ../migrations are generated from here plus hand-written SQL.
 export * from "./auth";
 export * from "./app";
+export * from "./guests";

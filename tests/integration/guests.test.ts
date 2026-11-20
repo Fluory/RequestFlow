@@ -5,13 +5,13 @@ import { loadConfig } from "@/config/env";
 import { createJobQueue } from "@/db/job-queue-client";
 import { createErpMock, MemoryMockStore } from "@/features/erp-mock";
 import { createErpClient } from "@/features/export";
-import { AuthorizationError, createGuestAccount, getActor, getCompany, GuestLimitReached, GUEST_SLUG_PREFIX, inviteUser, type Actor } from "@/features/identity";
+import { AuthorizationError, createGuestAccount, getActor, getCompany, GuestClientLimitReached, GuestLimitReached, GUEST_SLUG_PREFIX, inviteUser, type Actor } from "@/features/identity";
 import { submitUpload } from "@/features/intake";
 import { currentFieldValues, currentLineItemValues } from "@/features/review";
 import { seedSamples, type SampleDeps } from "@/features/samples";
 import { S3BlobStore } from "@/features/storage";
 import { createTenancy, type Tenancy } from "@/features/tenancy";
-import { companyWithAdmin, createStack, type Stack } from "./helpers/stack";
+import { companyWithAdmin, createStack, unique, type Stack } from "./helpers/stack";
 
 // Guest access of the showcase (#126) against real Postgres, Better Auth, pg-boss and S3: a guest gets a
 // company of its own through the invite-only path, sees only its own data, may work on the prepared
@@ -55,7 +55,7 @@ describe("guest access", () => {
   });
 
   it("creates a guest company of its own with a signed-in guest member and the prepared samples", async () => {
-    const { actor, setCookies } = await createGuestAccount(stack.database.db, stack.auth, { maxPerDay: 10_000 });
+    const { actor, setCookies } = await createGuestAccount(stack.database.db, stack.auth, { maxPerDay: 10_000, maxPerClient: 10_000, clientKey: unique("client") });
 
     expect(actor.role).toBe("guest");
     expect(setCookies.some((line) => line.includes("session_token"))).toBe(true);
@@ -71,8 +71,8 @@ describe("guest access", () => {
   });
 
   it("keeps guests apart: another company and another guest see none of the guest's requests", async () => {
-    const first = await createGuestAccount(stack.database.db, stack.auth, { maxPerDay: 10_000 });
-    const second = await createGuestAccount(stack.database.db, stack.auth, { maxPerDay: 10_000 });
+    const first = await createGuestAccount(stack.database.db, stack.auth, { maxPerDay: 10_000, maxPerClient: 10_000, clientKey: unique("client") });
+    const second = await createGuestAccount(stack.database.db, stack.auth, { maxPerDay: 10_000, maxPerClient: 10_000, clientKey: unique("client") });
     await seedSamples(deps(), first.actor);
 
     expect(first.actor.companyId).not.toBe(second.actor.companyId);
@@ -81,7 +81,7 @@ describe("guest access", () => {
   });
 
   it("refuses own uploads of a guest (they would start live model calls), staff still upload", async () => {
-    const { actor: guest } = await createGuestAccount(stack.database.db, stack.auth, { maxPerDay: 10_000 });
+    const { actor: guest } = await createGuestAccount(stack.database.db, stack.auth, { maxPerDay: 10_000, maxPerClient: 10_000, clientKey: unique("client") });
     await expect(submitUpload({ tenancy, storage, boss, limits: loadConfig().upload }, guest, [pdf()])).rejects.toBeInstanceOf(AuthorizationError);
     expect(await requestsOf(guest.companyId)).toEqual([]);
 
@@ -95,7 +95,33 @@ describe("guest access", () => {
   });
 
   it("stops creating guests above the daily cap", async () => {
-    await createGuestAccount(stack.database.db, stack.auth, { maxPerDay: 10_000 });
-    await expect(createGuestAccount(stack.database.db, stack.auth, { maxPerDay: 1 })).rejects.toBeInstanceOf(GuestLimitReached);
+    await createGuestAccount(stack.database.db, stack.auth, { maxPerDay: 10_000, maxPerClient: 10_000, clientKey: unique("client") });
+    await expect(createGuestAccount(stack.database.db, stack.auth, { maxPerDay: 1, maxPerClient: 10_000, clientKey: unique("client") })).rejects.toBeInstanceOf(GuestLimitReached);
+  });
+
+  const admissionsToday = async () =>
+    ((await stack.database.db.execute(sql`select count(*)::int as n from identity.guest_admission where created_at > now() - interval '24 hours'`)).rows[0] as { n: number }).n;
+
+  it("holds the daily cap under concurrent starts: never more guests than the cap (atomic in the database)", async () => {
+    const maxPerDay = (await admissionsToday()) + 2;
+    const results = await Promise.allSettled(
+      Array.from({ length: 6 }, () => createGuestAccount(stack.database.db, stack.auth, { maxPerDay, maxPerClient: 10_000, clientKey: unique("client") })),
+    );
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(2);
+    const refused = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+    expect(refused).toHaveLength(4);
+    expect(refused.every((result) => result.reason instanceof GuestLimitReached)).toBe(true);
+    expect(await admissionsToday()).toBe(maxPerDay);
+  });
+
+  it("brakes a single client: at most maxPerClient guests per client and 24 h, others still get in", async () => {
+    const clientKey = unique("client");
+    const start = (key: string) => createGuestAccount(stack.database.db, stack.auth, { maxPerDay: 10_000, maxPerClient: 2, clientKey: key });
+    const results = await Promise.allSettled([start(clientKey), start(clientKey), start(clientKey), start(clientKey)]);
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(2);
+    expect(results.filter((result) => result.status === "rejected" && result.reason instanceof GuestClientLimitReached)).toHaveLength(2);
+    await expect(start(unique("client"))).resolves.toHaveProperty("actor");
   });
 });

@@ -5,6 +5,8 @@
   the drafted recommendation (full TypeScript); the draft recommendation is kept as alternative 1 in D8
 - **Amendment 2026-09-24 (D11, also touches D3/D5):** the showcase uses Supabase Postgres + Supabase
   Storage instead of Neon + R2 – see "Amendment 2026-09-24" at the end of D11
+- **Amendment 2026-11-20 (D7, touches D4):** guest companies of the showcase are deleted after a retention
+  period – see "Amendment 2026-11-20" at the end of D7
 - **Amendment 2026-09-26 (D11, touches D8):** AI service as a container on Vercel and a Gemini API free-tier
   key for the invite-only showcase as a temporary exception – see "Amendment 2026-09-26" at the end of D11
 - **Deciders:** Fluory (orchestrator) · drafted by a Claude session
@@ -396,6 +398,28 @@ the pilot can carry.
 **Pilot cost.** About 1 day. *Heuristic.*
 **Revisit when** there are many tenants with differing retention or residency needs → schema or
 database per tenant.
+
+### Amendment 2026-11-20 – retention of guest companies (safer default taken without an owner decision)
+
+**Problem.** The public guest access (#126) creates a company with sample documents per click and never
+deleted it; the append-only grants (audit events, corrections, export rows) made a deletion impossible for
+the runtime role.
+
+**Decision.** A guest company is deleted completely `GUEST_RETENTION_HOURS` after its creation (default 24 h,
+at most 720): stored documents first, then every `app` row and the identity rows in one tenant transaction.
+The `app` rows go through one database function `app.purge_guest_company(uuid)` (owner `app_owner`,
+SECURITY DEFINER, `EXECUTE` for `app_rw` only) that refuses to run outside the company's own tenant context
+or for a company whose slug is not `guest-…`; forced RLS still applies inside it. Outside this function the
+append-only grants are unchanged. The work runs on pg-boss (queue `guest-purge`, one job per company,
+singletonKey = company, retries with backoff) – every drain round of the worker and of the serverless drain
+sweeps for expired guests (D4: pg-boss stays the only queue). Staff companies are never touched.
+Guest starts are admitted atomically (transaction-level advisory lock around check and insert) with a daily
+cap and a per-client brake (`GUEST_MAX_PER_CLIENT_PER_DAY`, default 3) keyed by an HMAC of the client address.
+
+**Why this default.** It keeps the least data: 24 h covers a visit; a returning guest simply starts a new
+demo. Switching back to longer retention is one variable. **Proof:** `tests/integration/guest-retention.test.ts`
+(every `app` table empty for the purged company, objects gone, identity rows gone, younger guest and staff
+company untouched, function refuses foreign tenant context and staff companies).
 
 ---
 

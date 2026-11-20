@@ -110,7 +110,7 @@ describe("loadConfig", () => {
 
   describe("guest access (#126)", () => {
     it("follows DEMO_MODE unless GUEST_ACCESS is set; empty counts as unset", () => {
-      expect(loadConfig(valid).guests).toEqual({ enabled: false, maxPerDay: 200 });
+      expect(loadConfig(valid).guests).toEqual({ enabled: false, maxPerDay: 200, maxPerClient: 3, retentionHours: 24 });
       expect(loadConfig({ ...valid, DEMO_MODE: "true" }).guests.enabled).toBe(true);
       expect(loadConfig({ ...valid, DEMO_MODE: "true", GUEST_ACCESS: "false" }).guests.enabled).toBe(false);
       expect(loadConfig({ ...valid, GUEST_ACCESS: "true" }).guests.enabled).toBe(true);
@@ -121,6 +121,14 @@ describe("loadConfig", () => {
       expect(loadConfig({ ...valid, GUEST_MAX_PER_DAY: "25" }).guests.maxPerDay).toBe(25);
       expect(() => loadConfig({ ...valid, GUEST_MAX_PER_DAY: "0" })).toThrow(/GUEST_MAX_PER_DAY/);
       expect(() => loadConfig({ ...valid, GUEST_ACCESS: "yes" })).toThrow(/GUEST_ACCESS/);
+    });
+
+    it("reads the per-client brake and the retention period, refusing values outside their bounds", () => {
+      expect(loadConfig({ ...valid, GUEST_MAX_PER_CLIENT_PER_DAY: "5", GUEST_RETENTION_HOURS: "48" }).guests).toMatchObject({ maxPerClient: 5, retentionHours: 48 });
+      expect(() => loadConfig({ ...valid, GUEST_MAX_PER_CLIENT_PER_DAY: "0" })).toThrow(/GUEST_MAX_PER_CLIENT_PER_DAY/);
+      expect(() => loadConfig({ ...valid, GUEST_RETENTION_HOURS: "0" })).toThrow(/GUEST_RETENTION_HOURS/);
+      // At most 30 days: guest data must not pile up indefinitely.
+      expect(() => loadConfig({ ...valid, GUEST_RETENTION_HOURS: "721" })).toThrow(/GUEST_RETENTION_HOURS/);
     });
   });
 
