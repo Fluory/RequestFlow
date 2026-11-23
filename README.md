@@ -1,44 +1,67 @@
-# RequestFlow
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/title-dark.svg">
+  <img src="docs/readme/title-light.svg" width="100%" alt="RequestFlow – quote requests, reviewed beside their source, exported exactly once. Portfolio project by Florian Hein.">
+</picture>
 
-AI-assisted intake of quote requests for industrial sales teams: extract structured data from
-e-mails and PDF/Excel/Word attachments, review every value **beside its source**, and export each
-approved request **exactly once** to an ERP.
+> **Portfolio project** by [Florian Hein](https://final-portfolio-website-ten.vercel.app/en/): a reference project,
+> built like a real customer engagement for a mid-sized machine-building company. The customer is fictional and
+> **all data in this repository is synthetic**. Not a product for sale. No licence has been chosen yet (all rights reserved).
 
-> **Status:** pilot scope built and released as [v0.1.0](https://github.com/Fluory/RequestFlow/releases/tag/v0.1.0)
-> (2026-09-28); acceptance pending ([roadmap](docs/product/roadmap.md), M2). A synthetic showcase runs on Vercel:
-> the **[case study](https://requestflow-doc-edit.vercel.app/case-study)** is public (German, no login), and the
-> [app](https://requestflow-doc-edit.vercel.app) can be tried without an account: "Ohne Anmeldung ausprobieren"
-> creates a demo company of your own with prepared sample requests (uploads are disabled for guests; the demo
-> company is deleted completely after 24 h). Impressum and Datenschutz are linked in the footer of every page.
-> **Reference project:** built like a real customer engagement for a mid-sized machine-building
-> company; the customer is fictional and **all data in this repository is synthetic**.
+RequestFlow reads quote requests – an e-mail plus PDF, Excel or Word attachments – and turns them into structured
+fields, each linked to the passage it was quoted from. A person reviews and approves every request, and each
+approved request is exported to the ERP exactly once.
 
-## Why a business would want this
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/hero-dark.webp">
+  <img src="docs/readme/hero-light.webp" width="100%" alt="Animation: a request mail arrives, four values leave their source lines and stay linked to them, the delivery date is marked uncertain, a person approves, one export reaches the ERP and a repeated delivery gets the same reference.">
+</picture>
 
-A sales assistant who types quantities, materials and delivery dates from e-mails and PDFs into the ERP
-spends hours a week on copying, and one wrong digit becomes a wrong quote. RequestFlow does the copying and
-shows **where in the document each value came from**, so the person only checks and approves. Nothing reaches
-the ERP without that approval, and nothing reaches it twice.
+<sub>Motion graphic drawn with three.js and timed with GSAP, texts from the prepared sample "Werk Ost" – synthetic.</sub>
 
-## What it does (pilot scope)
+## Try it in the demo
 
-```text
-upload (.eml/.msg/PDF/XLSX/DOCX) → parse → extract with evidence → verify grounding
-  → review & correct beside the source → approve / reject → idempotent export to the ERP (mock)
-```
+The showcase on Vercel has a guest entry: "Ohne Anmeldung ausprobieren" creates a demo company of your own
+with two prepared sample requests (their AI answer was recorded once and is replayed). Guests cannot upload;
+the guest company is deleted completely after 24 hours (the default `GUEST_RETENTION_HOURS`). The pictures below are recordings of the app itself,
+running locally on synthetic data.
 
-- **No invented data:** the model must quote its source; a deterministic verifier checks that the
-  quote exists in the cited segment – otherwise the value is flagged for review.
-- **Nothing lost, nothing doubled:** jobs are enqueued in the same database transaction as the
-  status change; the export uses an idempotency key, a unique export record and a row lock.
+**1 – Review every value beside its source.** "Quelle anzeigen" highlights the cited line in the original
+mail. The delivery date was only given as a calendar week, so it is marked *unsicher*.
+
+<img src="docs/readme/review.webp" width="100%" alt="Recording: the guest entry, the prepared sample 'Werk Ost', and the source view highlighting first the contact person, then the calendar week of the delivery date.">
+
+**2 – Approve, and the export happens once.** After *Freigeben* the worker sends the request to the ERP
+(a mock in the pilot) with an idempotency key; the page shows the reference the ERP returned.
+
+<img src="docs/readme/export.webp" width="100%" alt="Recording: Freigeben on the sample, then status Exportiert with the ERP reference.">
+
+**3 – Upload your own mail (with an account).** For staff accounts the upload starts processing in the
+background. This recording uses the AI stub of the end-to-end tests instead of the model, so the values are the
+stub's – the flow, the screens and the source links are the app's.
+
+<img src="docs/readme/upload.webp" width="100%" alt="Recording: a staff user uploads an .eml file, the request appears in the list, the review page shows the extracted fields and highlights their source lines.">
+
+## How it works
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/pipeline-dark.svg">
+  <img src="docs/readme/pipeline-light.svg" width="100%" alt="Pipeline: upload, parse, extract with a quote, verify the quote, review beside the source, approve, export exactly once.">
+</picture>
+
+- **No invented data:** the model must quote its source; a deterministic verifier checks that the quote exists
+  in the cited segment. Only then is a value *belegt* (found) – otherwise it is flagged for the review.
+- **Nothing lost, nothing doubled:** jobs are enqueued in the same database transaction as the status change;
+  the export uses an idempotency key, a unique export record and a row lock.
 - **Tenant isolation:** repository scoping plus forced PostgreSQL row-level security per company.
-- **Measurable AI quality:** an eval set with per-field metrics gates prompt and model changes.
+- **Measurable AI quality:** an eval set of 15 synthetic cases with per-field metrics gates prompt and model
+  changes in CI (replay mode).
 
-![Review page of the prepared sample "Werk Ost": the delivery date was given only as a calendar week, so it is marked "unsicher"; the cited line is highlighted in the source on the right](public/case-study/review.png)
+Honest limits of the pilot: the ERP is a mock with the contract in `contracts/erp-export.openapi.yaml`; the
+quality figures come from synthetic cases only ([evidence](docs/product/evidence.md)); the Vertex AI adapter is
+tested against recorded responses, a live call is unverified; acceptance by the (fictional) customer is pending
+([roadmap](docs/product/roadmap.md), M2). Details per module: [architecture map](docs/technical/architecture.md).
 
-*Review beside the source – prepared sample, synthetic data.*
-
-## What runs today
+### What runs today
 
 Each line is a merged PR; details in the [CHANGELOG](CHANGELOG.md).
 
@@ -51,29 +74,19 @@ Each line is a merged PR; details in the [CHANGELOG](CHANGELOG.md).
 - Exactly-once export of the reviewed values and positions to the ERP mock (#36, #54)
 - Request list led by the next action, with diagnosis, retries and reprocessing, paged (#43, #58, #95)
 - Eval set of 15 synthetic cases as a CI gate (#41); correlated structured logs and health (#45, #56, #88)
-- Showcase: prepared sample requests replayed from recorded AI answers (#83)
-- Public case study `/case-study`: problem, flow, sample screenshots and limits – no login, no data access (#75)
+- Showcase: prepared sample requests replayed from recorded AI answers (#83); guest access with a daily cap and
+  complete deletion after 24 h (#126)
+- Public case study `/case-study` (German, no login, no data access) (#75); Impressum and Datenschutz in the
+  footer of every page
 
-## Architecture
+### Architecture
 
-TypeScript modular monolith (Next.js, Node 24, Drizzle, PostgreSQL 17, pg-boss, Better Auth,
-S3 API) plus a stateless Python AI service (FastAPI, docling, Gemini on Vertex AI in the EU; the showcase
-uses the Gemini API free tier with synthetic data only – a dated exception, ADR-0001 D11).
-Rationale, alternatives and trade-offs: [ADR-0001](docs/decisions/ADR-0001-pilot-architecture.md).
+TypeScript modular monolith (Next.js, Node 24, Drizzle, PostgreSQL 17, pg-boss, Better Auth, S3 API) plus a
+stateless Python AI service (FastAPI, docling, Gemini on Vertex AI in the EU; the showcase uses the Gemini API
+free tier with synthetic data only – a dated exception, ADR-0001 D11). Rationale, alternatives and trade-offs:
+[ADR-0001](docs/decisions/ADR-0001-pilot-architecture.md).
 
-## Documentation map
-
-| Topic | Where |
-|---|---|
-| Architecture map and exceptions register | [docs/technical/architecture.md](docs/technical/architecture.md) |
-| Decisions | [docs/decisions/](docs/decisions/INDEX.md) |
-| Project brief, roadmap | [docs/product/](docs/product/project-brief.md) |
-| Evidence: measured figures (synthetic) | [docs/product/evidence.md](docs/product/evidence.md) |
-| Customer proposal (German) | [docs/product/pilot-vorschlag.md](docs/product/pilot-vorschlag.md) |
-| Discovery and approvals (German) | [PROJECT-START.md](PROJECT-START.md) |
-| Working rules for humans and agents | [AGENTS.md](AGENTS.md) |
-
-## Getting started
+## Run it locally
 
 Requirements: Docker, Node 24 with corepack (`corepack enable` → pnpm 9.15.9).
 
@@ -90,21 +103,59 @@ pnpm install
 docker compose up -d postgres storage
 pnpm setup:deploy               # migrations as app_owner + bucket (needs the .env.example variables)
 pnpm dev
-pnpm verify                     # lint, types, unit + integration tests, architecture check, build, audit
 ```
 
-## How this repository is run
+The AI service (`services/ai`, Python 3.13 with `uv`) needs model credentials for live extraction; without them,
+the prepared samples and the end-to-end tests (AI stub) still run.
 
-Every change starts as an issue, lands through a pull request with a plain-language summary and a
-green CI, and is never merged by its author. The process follows the fluory-system rulebook
-(guard hooks in `.claude/`, docs and PR guards in `scripts/`).
+## Tests
+
+| Command | What it covers |
+|---|---|
+| `pnpm verify` | lint, types, **294 unit tests** (34 files), **158 integration tests** (21 files) against real PostgreSQL and S3 storage – tenant isolation and exactly-once export on every PR –, the architecture check (dependency-cruiser), the build and `pnpm audit` |
+| `pnpm e2e` | **5 browser flows** against the built app, the real worker and an AI stub: upload → review → correct → approve → export; a multi-item request; the prepared samples; the case study; security headers under the CSP |
+| `pnpm evals` | the AI eval gate over **15 synthetic cases** in replay mode |
+| `uv run --project services/ai pytest` | **452 tests** of the AI service (parsing, extraction, grounding, normalisers, API); 2 more need the docling layout and OCR models (`AI_TEST_DOCLING_MODELS=1`) |
+| `scripts/doku-check.sh` | the documentation guard (CI and every session end) |
+
+`pnpm verify:full` runs `verify`, the browser flows and the eval gate. Counts as of the last run on this branch.
+
+## Deploy
+
+The showcase runs on Vercel (app and AI service as two projects) with Supabase Postgres and Supabase Storage.
+It is not a one-click import: the database roles, the S3 bucket, the secrets and the AI service come first. The
+runbook with every step and variable is [docs/technical/deployment-vercel.md](docs/technical/deployment-vercel.md);
+in short: create the Supabase project and roles, deploy `services/ai` as a container project, import this
+repository in Vercel (*Add New → Project → Import*; framework, region and cron come from `vercel.json`), set the
+variables of §4 for Production, run the first migration and the smoke check.
+
+## Project status
+
+Pilot scope built and released as [v0.1.0](https://github.com/Fluory/RequestFlow/releases/tag/v0.1.0)
+(2026-09-28); acceptance pending. Public case study: [/case-study](https://requestflow-doc-edit.vercel.app/case-study),
+app: [requestflow-doc-edit.vercel.app](https://requestflow-doc-edit.vercel.app). Not included: a real ERP
+connection, a mailbox connector (requests are uploaded), production operation with customer data.
+
+| Topic | Where |
+|---|---|
+| Architecture map and exceptions register | [docs/technical/architecture.md](docs/technical/architecture.md) |
+| Decisions | [docs/decisions/](docs/decisions/INDEX.md) |
+| Project brief, roadmap | [docs/product/](docs/product/project-brief.md) |
+| Evidence: measured figures (synthetic) | [docs/product/evidence.md](docs/product/evidence.md) |
+| Customer proposal (German) | [docs/product/pilot-vorschlag.md](docs/product/pilot-vorschlag.md) |
+| Discovery and approvals (German) | [PROJECT-START.md](PROJECT-START.md) |
+| Working rules for humans and agents | [AGENTS.md](AGENTS.md) |
+| README pictures and how they are recorded | [docs/readme/](docs/readme/) |
+
+Every change starts as an issue, lands through a pull request with a plain-language summary and a green CI,
+and is never merged by its author. The process follows the fluory-system rulebook (guard hooks in `.claude/`,
+docs and PR guards in `scripts/`).
 
 ## Kurzfassung (Deutsch)
 
-KI-gestützte Erfassung von Angebotsanfragen: Daten aus E-Mails und Anhängen extrahieren, jede
-Angabe neben ihrer Fundstelle prüfen und freigegebene Anfragen genau einmal ans ERP übergeben.
-Referenzprojekt mit fiktivem Kunden – alle Daten sind synthetisch.
-Öffentliche Fallstudie: [requestflow-doc-edit.vercel.app/case-study](https://requestflow-doc-edit.vercel.app/case-study).
+KI-gestützte Erfassung von Angebotsanfragen: Daten aus E-Mails und Anhängen extrahieren, jede Angabe neben
+ihrer Fundstelle prüfen und freigegebene Anfragen genau einmal ans ERP übergeben. Portfolio-Projekt von
+Florian Hein – ein Referenzprojekt mit fiktivem Kunden, alle Daten sind synthetisch, kein Produkt zum Kauf.
 
 ---
 
