@@ -21,7 +21,7 @@ async function main(): Promise<void> {
   const storage = new S3BlobStore(config.storage);
   const boss = await createJobQueue(config.databaseUrl, { supervise: true, onError: (error) => logEvent("error", "jobs.error", {}, { code: error.name }) });
   // Same handlers as the serverless drain (src/job-drain.ts); pg-boss supervises itself here.
-  const deps = buildJobDeps(config, { tenancy: createTenancy(database.db), storage, boss });
+  const deps = buildJobDeps(config, { tenancy: createTenancy(database.db), storage, boss, db: database.db });
 
   let running = true;
   const stop = (signal: string) => {

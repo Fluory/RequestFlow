@@ -1,10 +1,10 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getJobClient, getRuntime } from "@/app/_server/runtime";
 import { createErpClient } from "@/features/export";
-import { createGuestAccount, GuestLimitReached } from "@/features/identity";
+import { createGuestAccount, GuestClientLimitReached, guestClientKey, GuestLimitReached } from "@/features/identity";
 import { logEvent } from "@/features/observability";
 import { currentFieldValues, currentLineItemValues } from "@/features/review";
 import { seedSamples } from "@/features/samples";
@@ -19,9 +19,11 @@ export async function startGuestAction(): Promise<void> {
   if (!config.guests.enabled) redirect("/");
   let account;
   try {
-    account = await createGuestAccount(database.db, auth, { maxPerDay: config.guests.maxPerDay });
+    // Per-client brake: a keyed hash of the address the proxy reports (same settings as the auth rate limit).
+    const clientKey = guestClientKey(await headers(), config.auth);
+    account = await createGuestAccount(database.db, auth, { maxPerDay: config.guests.maxPerDay, maxPerClient: config.guests.maxPerClient, clientKey });
   } catch (error) {
-    if (error instanceof GuestLimitReached) redirect("/?guest=busy");
+    if (error instanceof GuestLimitReached || error instanceof GuestClientLimitReached) redirect("/?guest=busy");
     throw error;
   }
   try {

@@ -19,6 +19,14 @@ export interface Company {
   slug: string;
 }
 
+type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+
+/** Runs inside the creating transaction – the guest access checks and records its admission there (atomic). */
+export interface BootstrapHooks {
+  before?: (tx: Transaction) => Promise<void>;
+  after?: (tx: Transaction, company: Company) => Promise<void>;
+}
+
 async function systemInviterId(db: Database): Promise<string> {
   await db
     .insert(schema.user)
@@ -36,9 +44,11 @@ async function systemInviterId(db: Database): Promise<string> {
 export async function bootstrapCompany(
   db: Database,
   input: { name: string; slug: string; adminEmail: string; role?: CompanyRole },
+  hooks: BootstrapHooks = {},
 ): Promise<{ company: Company; invitationId: string }> {
   const inviterId = await systemInviterId(db);
   return db.transaction(async (tx) => {
+    await hooks.before?.(tx);
     const [company] = await tx
       .insert(schema.organization)
       .values({ name: input.name, slug: input.slug, createdAt: new Date() })
@@ -49,6 +59,7 @@ export async function bootstrapCompany(
       .values({ organizationId: company.id, email: lower(input.adminEmail), role: input.role ?? "admin", status: "pending", expiresAt: expiry(), inviterId })
       .returning({ id: schema.invitation.id });
     if (!invitation) throw new Error("invitation insert returned no row");
+    await hooks.after?.(tx, company);
     return { company, invitationId: invitation.id };
   });
 }

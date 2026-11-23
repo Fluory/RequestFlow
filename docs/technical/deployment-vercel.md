@@ -125,7 +125,10 @@ separate Supabase project. Add every secret (`DATABASE_URL`, the S3 keys, `BETTE
 | `JOB_DRAIN_INLINE` | `true` |
 | `DEMO_MODE` | `true` |
 | `GUEST_ACCESS` | optional – unset follows `DEMO_MODE`: "Ohne Anmeldung ausprobieren" creates a guest company with the samples (no uploads, no live model calls, #126) |
-| `GUEST_MAX_PER_DAY` | optional, default `200` – guest companies per 24 h (abuse guard) |
+| `GUEST_MAX_PER_DAY` | optional, default `200` – guest companies per 24 h (abuse guard; checked atomically in the database) |
+| `GUEST_MAX_PER_CLIENT_PER_DAY` | optional, default `3` – guest companies per 24 h and client address (keyed by `AUTH_IP_HEADERS`; only an HMAC of the address is stored) |
+| `GUEST_RETENTION_HOURS` | optional, default `24` (max. 720) – every guest company is deleted completely after this time (queue `guest-purge`, run by every drain round) |
+| `FRAME_ANCESTORS` | optional – space-separated https origins that may embed the showcase in an iframe (e.g. the portfolio site, `https://<portfolio-domain>`). Unset → embedding is refused (`frame-ancestors 'none'`, `X-Frame-Options: DENY`). Read at **build** time: redeploy after a change |
 | `UPLOAD_MAX_PER_HOUR` | e.g. `20` – uploads per person and hour (every upload starts paid AI calls); **required** with `APP_ENV=showcase` |
 
 `.env.example` documents every variable. `MIGRATION_DATABASE_URL` and `SEED_PASSWORD` are **not** set on
@@ -200,6 +203,29 @@ run started meanwhile waits for the first and then finds the samples in place; a
   skipped (§3 step 6).
 - Remove the showcase completely: delete both Vercel projects (`requestflow`, `requestflow-ai`) and the
   Supabase project – all data is synthetic, nothing has to be kept.
+
+## 10. Fast Origin Transfer budget
+
+Vercel Hobby includes 10 GB of Fast Origin Transfer per month: "Data sent between the CDN and Vercel
+Functions", counted on request and response bytes, for Functions, Middleware, Blob and the Data Cache (ISR)
+(vercel.com/docs/manage-cdn-usage, read 2026-11-20). A CDN cache hit does not invoke the function.
+
+What causes it here: there is no middleware/proxy. Every page is a Function (`ƒ` in the build output – the
+root layout reads the session for the header), and so are `/api/*`, server actions (the guest start, uploads:
+the whole uploaded file counts as incoming bytes) and document downloads (`/api/documents/:id` streams the
+original through the Function; it stays that way – private bucket, no public or signed URLs, ADR-0001 D5).
+The uptime workflow calls `/api/health` (< 2 kB) every 15 minutes. There is no polling in the review UI.
+
+Measured 2026-11-20 on a local production build (`next start`, gzip/br, body + headers): `/` 3.7 kB,
+`/case-study` 9.2 kB, `/login` 3.6 kB, `/impressum` 5.7 kB, `/datenschutz` 8.2 kB – a public visit of these
+five pages is about 30 kB, i.e. roughly 300,000 such visits before 10 GB (estimate; signed-in pages, uploads
+and downloads come on top, depending on file size). Confirm real numbers in Vercel → Usage → Fast Origin
+Transfer, per project. Re-measure: `curl -s -o /dev/null -H 'Accept-Encoding: br, gzip' -w '%{size_download} %{size_header}\n' <url>`.
+
+Two rules for future changes:
+1. No middleware/proxy without a `matcher` limited to the paths that need it (never static files, icons, fonts).
+2. No client-side polling of Functions and no large bytes through a Function unless protection requires it –
+   cache public responses (`s-maxage`) instead of `no-store` where nothing session-specific is in them.
 
 ## Known limits
 

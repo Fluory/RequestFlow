@@ -15,6 +15,9 @@ test("a visitor reads the case study without signing in and reaches the sample t
 
   await expect(page.getByRole("link", { name: "Gemessene Nachweise" }).first()).toHaveAttribute("href", /\/docs\/product\/evidence\.md$/);
   await expect(page.getByRole("link", { name: "Quellcode auf GitHub" })).toHaveAttribute("href", "https://github.com/Fluory/RequestFlow");
+  // Portfolio notice in the footer of every page, also without a session, and in the page metadata.
+  await expect(page.getByRole("contentinfo").getByRole("link", { name: /^Portfolio-Projekt von / })).toHaveAttribute("href", /^https:\/\//);
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", /Portfolio-Projekt/);
   for (const shot of ["requests", "review", "exported"]) {
     const image = await page.request.get(`/case-study/${shot}.png`);
     expect(image.status(), `${shot}.png`).toBe(200);

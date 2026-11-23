@@ -3,6 +3,7 @@
 export { enqueueRequestExport, enqueueRequestProcessing, type JobSender } from "./boss";
 export { drain, markError as markProcessingFailed, type DrainDeps, type DrainOptions, type DrainResult, type JobRunner } from "./drain";
 export { describeFailure, PermanentProcessingError, processRequestJob, type ProcessingDeps } from "./process-request";
-export { QUEUE_DEFINITIONS, QUEUES, type QueueName, type RequestJob } from "./queues";
+export { QUEUE_DEFINITIONS, QUEUES, type GuestPurgeJob, type QueueName, type RequestJob } from "./queues";
 export { reprocessRequest, ReprocessRefused } from "./reprocess";
 export { assertProcessingBudget, PROCESS_EXPIRE_SECONDS } from "./budget";
+export { drainGuestPurges, enqueueExpiredGuestPurges, type GuestPurgeRunner, type GuestSweepDeps } from "./guest-purge";

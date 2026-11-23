@@ -12,8 +12,8 @@ let deps: Promise<JobDeps> | undefined;
 function jobDeps(): Promise<JobDeps> {
   deps ??= getJobClient()
     .then((boss) => {
-      const { config, tenancy, storage } = getRuntime();
-      return buildJobDeps(config, { tenancy, storage, boss });
+      const { config, tenancy, storage, database } = getRuntime();
+      return buildJobDeps(config, { tenancy, storage, boss, db: database.db });
     })
     .catch((error: unknown) => {
       deps = undefined;

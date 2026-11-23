@@ -5,6 +5,25 @@ This file records what changes **in the product** – process and session state 
 
 ## [Unreleased]
 
+### Added
+- Portfolio notice in the footer of every page and in the page description: a portfolio project by its author,
+  a reference project with a fictional customer, all data synthetic, not a product for sale.
+- Impressum (`/impressum`) and Datenschutz (`/datenschutz`), linked in a footer on every page; public, no
+  session, no data access. The privacy text describes what this app stores and which services receive it.
+- Guest retention: every guest company is deleted completely after `GUEST_RETENTION_HOURS` (default 24 h) –
+  stored documents, all company rows (incl. the audit trail, through the guarded database function
+  `app.purge_guest_company`) and the guest account. Runs as pg-boss jobs (queue `guest-purge`) from every drain
+  round (ADR-0001 D7 amendment 2026-11-20).
+
+### Security
+- Security headers on every route: Content-Security-Policy (own origin only; checked in a browser test against
+  the built app), HSTS over https, `X-Content-Type-Options`, `Referrer-Policy: same-origin`, frame protection
+  (embedding only for origins in `FRAME_ANCESTORS`) and a restrictive `Permissions-Policy`.
+- The daily guest cap is now atomic (check and insert under one database lock), and a per-client brake
+  (`GUEST_MAX_PER_CLIENT_PER_DAY`, default 3, keyed by an HMAC of the client address) keeps one visitor from
+  using up all guest slots.
+- Next.js and `eslint-config-next` 16.4.5 (ten moderate advisories of 16.4.0–16.4.4).
+
 ### Fixed
 - The guest start on Vercel now creates the samples: the sample files are read from the project root and traced
   into the server output instead of being rewritten to a public static URL by the bundler (#128).

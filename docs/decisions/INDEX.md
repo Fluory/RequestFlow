@@ -5,4 +5,4 @@ A dated amendment decided by the orchestrator is appended to the decision it cha
 
 | ADR | Date | Title | Status |
 |---|---|---|---|
-| [ADR-0001](ADR-0001-pilot-architecture.md) | 2026-09-22 | Pilot architecture baseline (D1–D11) | Accepted; amended 2026-09-24 (D11: Supabase instead of Neon + R2) |
+| [ADR-0001](ADR-0001-pilot-architecture.md) | 2026-09-22 | Pilot architecture baseline (D1–D11) | Accepted; amended 2026-09-24 (D11: Supabase instead of Neon + R2), 2026-11-20 (D7: guest retention) |

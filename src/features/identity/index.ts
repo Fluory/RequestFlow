@@ -5,4 +5,6 @@ export { bootstrapCompany, getCompany, inviteUser, type Company } from "./compan
 export { changeUserRole, listCompanyUsers, SelfDeactivation, setUserActive, UserNotInCompany, type CompanyUser, type PendingInvitation } from "./users";
 export { assertAdminRemains, LastAdminError, type MemberChange, type MemberState } from "./last-admin";
 export { authorize, AuthorizationError, isCompanyRole, COMPANY_ROLES, STAFF_ROLES, type Action, type Actor, type CompanyRole } from "./authorize";
-export { createGuestAccount, GuestLimitReached, GUEST_SLUG_PREFIX, type GuestAccount } from "./guests";
+export { createGuestAccount, GuestClientLimitReached, GuestLimitReached, GUEST_SLUG_PREFIX, type GuestAccount, type GuestAdmission } from "./guests";
+export { guestClientKey, type GuestClientSettings } from "./guest-client";
+export { expiredGuestCompanies, NotAGuestCompany, purgeGuestCompany, type GuestPurgeDeps } from "./guest-retention";
