@@ -6,6 +6,8 @@ This file records what changes **in the product** – process and session state 
 ## [Unreleased]
 
 ### Added
+- Portfolio notice in the footer of every page and in the page description: a portfolio project by its author,
+  a reference project with a fictional customer, all data synthetic, not a product for sale.
 - Impressum (`/impressum`) and Datenschutz (`/datenschutz`), linked in a footer on every page; public, no
   session, no data access. The privacy text describes what this app stores and which services receive it.
 - Guest retention: every guest company is deleted completely after `GUEST_RETENTION_HOURS` (default 24 h) –

@@ -8,7 +8,7 @@ import { Brand } from "@/app/_components/app-header";
 // synthetic data only.
 export const metadata: Metadata = {
   title: "Fallstudie – RequestFlow",
-  description: "Angebotsanfragen erfassen, jeden Wert neben seiner Quelle prüfen und genau einmal ans ERP übergeben – Referenzprojekt mit synthetischen Daten.",
+  description: "Angebotsanfragen erfassen, jeden Wert neben seiner Quelle prüfen und genau einmal ans ERP übergeben – Portfolio-Projekt von Florian Hein, Referenzprojekt mit synthetischen Daten.",
 };
 
 const REPO = "https://github.com/Fluory/RequestFlow";

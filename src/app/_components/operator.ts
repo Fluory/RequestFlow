@@ -14,4 +14,7 @@ export const OPERATOR = {
   updated: "November 2026",
 } as const;
 
+/** The operator's portfolio site (FinalPortfolioWebsite), linked from the footer's portfolio notice. */
+export const PORTFOLIO_URL = "https://final-portfolio-website-ten.vercel.app/";
+
 export const operatorAddress = (): string[] => [OPERATOR.name, OPERATOR.street, OPERATOR.city, OPERATOR.country].filter(Boolean);
